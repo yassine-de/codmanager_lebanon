@@ -85,6 +85,53 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
     setErrors({});
   }
 
+  const addVariant = () => {
+    setVariants(prev => [...prev, { id: `VAR-${Date.now()}-${prev.length}`, name: "", sku: "", price, quantity: 0 }]);
+  };
+  const updateVariant = (i: number, field: keyof ProductVariant, value: string | number) => {
+    setVariants(prev => prev.map((v, idx) => (idx === i ? { ...v, [field]: value } : v)));
+  };
+  const removeVariant = (i: number) => setVariants(prev => prev.filter((_, idx) => idx !== i));
+
+  const addOffer = () => {
+    setOffers(prev => [...prev, { id: `OFF-${Date.now()}-${prev.length}`, quantity: 1, price: 0 }]);
+  };
+  const updateOffer = (i: number, field: keyof ProductOffer, value: string | number) => {
+    setOffers(prev => prev.map((o, idx) => (idx === i ? { ...o, [field]: value } : o)));
+  };
+  const removeOffer = (i: number) => setOffers(prev => prev.filter((_, idx) => idx !== i));
+
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!seller.trim()) errs.seller = "Required";
+    if (!name.trim()) errs.name = "Required";
+    if (!sku.trim()) errs.sku = "Required";
+    if (price <= 0) errs.price = "Must be > 0";
+    if (totalQty <= 0) errs.totalQty = "Must be > 0";
+    if (isDbProduct) {
+      if (!storeLink.trim()) {
+        errs.storeLink = "Product link is required";
+      } else if (!isValidUrl(storeLink)) {
+        errs.storeLink = "Invalid URL format";
+      }
+      if (!videoLink.trim()) {
+        errs.videoLink = "Video link is required";
+      } else if (!isValidUrl(videoLink)) {
+        errs.videoLink = "Invalid URL format";
+      }
+    }
+    variants.forEach((v, i) => {
+      if (!v.name.trim()) errs[`v_name_${i}`] = "Required";
+      if (v.price <= 0) errs[`v_price_${i}`] = "Must be > 0";
+    });
+    offers.forEach((o, i) => {
+      if (o.quantity <= 0) errs[`o_qty_${i}`] = "Must be > 0";
+      if (o.price <= 0) errs[`o_price_${i}`] = "Must be > 0";
+    });
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   if (!product) return null;
 
   const handleSave = () => {
