@@ -34,6 +34,7 @@ export interface DashboardKPIs {
   withCourier: number;
   delivered: number;
   returned: number;
+  paid: number;
   deliveryCancelled: number;
   deliveryNoAnswer: number;
   deliveryPostponed: number;
@@ -91,7 +92,7 @@ function computeKPIs(orders: DashboardOrder[]): DashboardKPIs {
 
   return {
     total, newOrders, confirmed, noAnswer, postponed, cancelled, doubleOrders, wrongNumber,
-    pending, shipped, inTransit, withCourier, delivered, returned,
+    pending, shipped, inTransit, withCourier, delivered, paid, returned,
     deliveryCancelled, deliveryNoAnswer, deliveryPostponed,
     confirmationRate, deliveryRate,
     revenue, paidAmount, pendingAmount,
