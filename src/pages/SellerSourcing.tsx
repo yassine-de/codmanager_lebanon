@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Package2, Plus, Check, X, ExternalLink, Loader2 } from "lucide-react";
+import { Package2, Plus, Check, X, ExternalLink, Loader2, ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -39,6 +39,8 @@ interface SourcingRequest {
   unit_price: number;
   shipping_cost: number;
   total_price: number;
+  seller_price: number | null;
+  product_image_url: string | null;
   seller_validated: boolean | null;
   created_at: string;
 }
@@ -143,14 +145,14 @@ export default function SellerSourcing() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[40px]"></TableHead>
               <TableHead>Product</TableHead>
               <TableHead className="text-center">Qty</TableHead>
               <TableHead>Country</TableHead>
               <TableHead>Shipping</TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-center">Validation</TableHead>
-              <TableHead className="text-right">Unit Price</TableHead>
-              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Landing Price</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="text-center">Link</TableHead>
               <TableHead className="text-center">Actions</TableHead>
@@ -172,6 +174,15 @@ export default function SellerSourcing() {
 
                 return (
                   <TableRow key={req.id} className="text-xs">
+                    <TableCell className="pr-0">
+                      {req.product_image_url ? (
+                        <img src={req.product_image_url} alt="" className="w-8 h-8 rounded object-cover border" />
+                      ) : (
+                        <div className="w-8 h-8 rounded border bg-muted/30 flex items-center justify-center">
+                          <ImageIcon className="h-3.5 w-3.5 text-muted-foreground/40" />
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium max-w-[160px] truncate">{req.product_name}</TableCell>
                     <TableCell className="text-center tabular-nums">{req.quantity}</TableCell>
                     <TableCell className="text-muted-foreground">{req.destination_country}</TableCell>
@@ -186,11 +197,8 @@ export default function SellerSourcing() {
                         {vConfig.label}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {req.unit_price > 0 ? `${req.unit_price} MAD` : "—"}
-                    </TableCell>
                     <TableCell className="text-right tabular-nums font-medium">
-                      {req.total_price > 0 ? `${req.total_price} MAD` : "—"}
+                      {(req.seller_price ?? 0) > 0 ? `${req.seller_price} MAD` : "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       {format(new Date(req.created_at), "dd MMM yyyy")}
