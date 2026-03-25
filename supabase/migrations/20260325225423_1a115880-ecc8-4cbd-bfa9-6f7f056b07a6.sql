@@ -1,0 +1,1 @@
+ALTER TABLE public.sourcing_requests ADD COLUMN payment_date timestamp with time zone DEFAULT NULL;
