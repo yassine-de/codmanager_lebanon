@@ -53,6 +53,7 @@ export interface DbSourcingRequest {
   product_created: boolean | null;
   payment_status: string;
   payment_method: string | null;
+  payment_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -207,17 +208,18 @@ export default function Sourcing() {
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-[40px]"></TableHead>
+              <TableHead>Created</TableHead>
               <TableHead>Product</TableHead>
               <TableHead>Seller</TableHead>
               <TableHead className="text-center">Qty</TableHead>
+              <TableHead className="text-right">Unit Price</TableHead>
+              <TableHead className="text-right">Total Price</TableHead>
               <TableHead>Country</TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-center">Validation</TableHead>
               <TableHead className="text-right">Landed</TableHead>
               <TableHead className="text-right">Seller Price</TableHead>
-              <TableHead className="text-right">Profit</TableHead>
               <TableHead className="text-center">Payment</TableHead>
-              <TableHead>Date</TableHead>
               <TableHead className="text-center">Link</TableHead>
               <TableHead className="text-center w-[70px]">Edit</TableHead>
             </TableRow>
