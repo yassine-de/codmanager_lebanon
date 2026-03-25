@@ -159,6 +159,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
         storeLink: storeLink.trim(),
         videoLink: videoLink.trim(),
         lastSellingPrice,
+        lastPrice,
         offers,
       });
       onOpenChange(false);
