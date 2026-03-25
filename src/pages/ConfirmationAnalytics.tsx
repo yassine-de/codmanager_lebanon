@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { KPICard } from "@/components/KPICard";
-import { Phone, CheckCircle2, PhoneCall, Clock, XCircle, AlertTriangle, Truck, Users } from "lucide-react";
+import { Phone, CheckCircle2, PhoneCall, Clock, XCircle, AlertTriangle, Truck, Users, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DatePresetFilter, type DatePresetValue, getDateRangeFromPreset } from "@/components/DatePresetFilter";
@@ -194,8 +194,9 @@ export default function ConfirmationAnalytics() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard title="Treated Orders" value={stats.treated} icon={Phone} iconBg="bg-info/10" iconColor="text-info" delay={0} />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <KPICard title="Total Orders" value={stats.treated} icon={ShoppingCart} iconBg="bg-primary/10" iconColor="text-primary" delay={0} />
+        <KPICard title="Treated Orders" value={stats.treated} icon={Phone} iconBg="bg-info/10" iconColor="text-info" delay={50} />
         <KPICard title="Confirmed" value={stats.confirmed} subtitle={`${stats.confirmationRate}% rate`} icon={CheckCircle2} iconBg="bg-success/10" iconColor="text-success" delay={50} />
         <KPICard title="Answered Rate" value={`${stats.answeredRate}%`} icon={PhoneCall} iconBg="bg-primary/10" iconColor="text-primary" delay={100} />
         <KPICard title="First Call Avg" value={stats.firstCallAvg} icon={Clock} iconBg="bg-warning/10" iconColor="text-warning" delay={150} />
