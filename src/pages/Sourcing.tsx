@@ -227,7 +227,7 @@ export default function Sourcing() {
           <TableBody>
             {paginated.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={14} className="text-center py-10 text-muted-foreground text-sm">
+                <TableCell colSpan={15} className="text-center py-10 text-muted-foreground text-sm">
                   No sourcing requests found.
                 </TableCell>
               </TableRow>
@@ -236,9 +236,6 @@ export default function Sourcing() {
                 const sConfig = statusConfig[req.status] || statusConfig.waiting_quote;
                 const vKey = req.seller_validated === true ? "validated" : req.seller_validated === false ? "cancelled" : "pending";
                 const vConfig = validationConfig[vKey];
-                const profit = (req.seller_price ?? 0) > 0 && (req.landed_price ?? 0) > 0
-                  ? (req.seller_price! - req.landed_price!)
-                  : null;
                 const isReceivedNoProduct = req.status === "received" && req.product_created === false;
 
                 return (
@@ -252,9 +249,18 @@ export default function Sourcing() {
                         </div>
                       )}
                     </TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                      {format(new Date(req.created_at), "dd MMM yyyy")}
+                    </TableCell>
                     <TableCell className="font-medium max-w-[140px] truncate">{req.product_name}</TableCell>
                     <TableCell className="text-muted-foreground">{sellerNameMap[req.seller_id] || "—"}</TableCell>
                     <TableCell className="text-center tabular-nums">{req.quantity}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {(req.unit_price ?? 0) > 0 ? `${req.unit_price} MAD` : "—"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {(req.total_price ?? 0) > 0 ? `${req.total_price} MAD` : "—"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{req.destination_country}</TableCell>
                     <TableCell className="text-center">
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${sConfig.color}`}>
@@ -272,17 +278,10 @@ export default function Sourcing() {
                     <TableCell className="text-right tabular-nums">
                       {(req.seller_price ?? 0) > 0 ? `${req.seller_price} MAD` : "—"}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {profit !== null ? (
-                        <span className={`font-medium ${profit > 0 ? "text-success" : profit < 0 ? "text-destructive" : ""}`}>
-                          {profit > 0 ? "+" : ""}{profit} MAD
-                        </span>
-                      ) : "—"}
-                    </TableCell>
                     <TableCell className="text-center">
                       {(() => {
                         const pConfig = paymentConfig[req.payment_status] || paymentConfig.unpaid;
-                        const methodLabel = req.payment_method === 'from_invoice' ? 'Invoice' : req.payment_method === 'binance' ? 'Binance' : req.payment_method === 'wise' ? 'Wise' : req.payment_method === 'cash' ? 'Cash' : null;
+                        const methodLabel = req.payment_method === 'from_invoice' ? 'Invoice' : req.payment_method === 'binance' ? 'Binance' : req.payment_method === 'wise' ? 'Wise' : req.payment_method === 'cih' ? 'CIH' : null;
                         return (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -294,9 +293,6 @@ export default function Sourcing() {
                           </Tooltip>
                         );
                       })()}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">
-                      {format(new Date(req.created_at), "dd MMM yyyy")}
                     </TableCell>
                     <TableCell className="text-center">
                       <Tooltip>
