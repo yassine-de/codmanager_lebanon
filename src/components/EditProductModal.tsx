@@ -38,75 +38,10 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
   const [lastSellingPrice, setLastSellingPrice] = useState(0);
   const [offers, setOffers] = useState<ProductOffer[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
   const [prevId, setPrevId] = useState<string | null>(null);
-  if (product && product.id !== prevId) {
-    setPrevId(product.id);
-    setName(product.name);
-    setSeller(product.seller);
-    setSku(product.sku);
-    setImage(product.image);
-    setPrice(product.price);
-    setTotalQty(product.totalQty);
-    setVariants(product.variants.map(v => ({ ...v })));
-    setStoreLink(product.storeLink || "");
-    setVideoLink(product.videoLink || "");
-    setLastSellingPrice(product.lastSellingPrice || 0);
-    setOffers(product.offers?.map(o => ({ ...o })) || []);
-    setErrors({});
-  }
-
 
   // Check if this is a DB product (UUID format)
   const isDbProduct = product ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id) : false;
-
-  const addVariant = () => {
-    setVariants(prev => [...prev, { id: `VAR-${Date.now()}-${prev.length}`, name: "", sku: "", price, quantity: 0 }]);
-  };
-  const updateVariant = (i: number, field: keyof ProductVariant, value: string | number) => {
-    setVariants(prev => prev.map((v, idx) => (idx === i ? { ...v, [field]: value } : v)));
-  };
-  const removeVariant = (i: number) => setVariants(prev => prev.filter((_, idx) => idx !== i));
-
-  const addOffer = () => {
-    setOffers(prev => [...prev, { id: `OFF-${Date.now()}-${prev.length}`, quantity: 1, price: 0 }]);
-  };
-  const updateOffer = (i: number, field: keyof ProductOffer, value: string | number) => {
-    setOffers(prev => prev.map((o, idx) => (idx === i ? { ...o, [field]: value } : o)));
-  };
-  const removeOffer = (i: number) => setOffers(prev => prev.filter((_, idx) => idx !== i));
-
-  const validate = (): boolean => {
-    const errs: Record<string, string> = {};
-    if (!seller.trim()) errs.seller = "Required";
-    if (!name.trim()) errs.name = "Required";
-    if (!sku.trim()) errs.sku = "Required";
-    if (price <= 0) errs.price = "Must be > 0";
-    if (totalQty <= 0) errs.totalQty = "Must be > 0";
-    // Required links for DB products
-    if (isDbProduct) {
-      if (!storeLink.trim()) {
-        errs.storeLink = "Product link is required";
-      } else if (!isValidUrl(storeLink)) {
-        errs.storeLink = "Invalid URL format";
-      }
-      if (!videoLink.trim()) {
-        errs.videoLink = "Video link is required";
-      } else if (!isValidUrl(videoLink)) {
-        errs.videoLink = "Invalid URL format";
-      }
-    }
-    variants.forEach((v, i) => {
-      if (!v.name.trim()) errs[`v_name_${i}`] = "Required";
-      if (v.price <= 0) errs[`v_price_${i}`] = "Must be > 0";
-    });
-    offers.forEach((o, i) => {
-      if (o.quantity <= 0) errs[`o_qty_${i}`] = "Must be > 0";
-      if (o.price <= 0) errs[`o_price_${i}`] = "Must be > 0";
-    });
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
 
   const dbUpdateMutation = useMutation({
     mutationFn: async () => {
@@ -133,6 +68,22 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
       toast.error("Failed to update product");
     },
   });
+
+  if (product && product.id !== prevId) {
+    setPrevId(product.id);
+    setName(product.name);
+    setSeller(product.seller);
+    setSku(product.sku);
+    setImage(product.image);
+    setPrice(product.price);
+    setTotalQty(product.totalQty);
+    setVariants(product.variants.map(v => ({ ...v })));
+    setStoreLink(product.storeLink || "");
+    setVideoLink(product.videoLink || "");
+    setLastSellingPrice(product.lastSellingPrice || 0);
+    setOffers(product.offers?.map(o => ({ ...o })) || []);
+    setErrors({});
+  }
 
   if (!product) return null;
 
