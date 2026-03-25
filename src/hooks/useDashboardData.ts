@@ -34,6 +34,7 @@ export interface DashboardKPIs {
   withCourier: number;
   delivered: number;
   returned: number;
+  paid: number;
   deliveryCancelled: number;
   deliveryNoAnswer: number;
   deliveryPostponed: number;
@@ -63,7 +64,8 @@ function computeKPIs(orders: DashboardOrder[]): DashboardKPIs {
   const shipped = orders.filter(o => o.delivery_status === 'shipped').length;
   const inTransit = orders.filter(o => o.delivery_status === 'in_transit').length;
   const withCourier = orders.filter(o => o.delivery_status === 'with_courier').length;
-  const delivered = orders.filter(o => o.delivery_status === 'delivered').length;
+  const delivered = orders.filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid').length;
+  const paid = orders.filter(o => o.delivery_status === 'paid').length;
   const returned = orders.filter(o => o.delivery_status === 'returned').length;
   const deliveryCancelled = orders.filter(o => o.delivery_status === 'cancelled').length;
   const deliveryNoAnswer = orders.filter(o => o.delivery_status === 'no_answer').length;
@@ -75,13 +77,22 @@ function computeKPIs(orders: DashboardOrder[]): DashboardKPIs {
   const deliveryRate = totalShipped > 0 ? Math.round((delivered / totalShipped) * 100) : 0;
 
   // Financial
-  const revenue = orders.filter(o => o.delivery_status === 'delivered').reduce((s, o) => s + Number(o.total_amount), 0);
-  const paidAmount = revenue; // delivered = paid
-  const pendingAmount = 0;
+  // Delivered Amount = total of orders with delivery_status 'delivered' OR 'paid'
+  const revenue = orders
+    .filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid')
+    .reduce((s, o) => s + Number(o.total_amount), 0);
+  // Paid Amount = total of orders with delivery_status 'paid'
+  const paidAmount = orders
+    .filter(o => o.delivery_status === 'paid')
+    .reduce((s, o) => s + Number(o.total_amount), 0);
+  // Pending Amount = total of orders with delivery_status 'delivered' (delivered but not yet paid)
+  const pendingAmount = orders
+    .filter(o => o.delivery_status === 'delivered')
+    .reduce((s, o) => s + Number(o.total_amount), 0);
 
   return {
     total, newOrders, confirmed, noAnswer, postponed, cancelled, doubleOrders, wrongNumber,
-    pending, shipped, inTransit, withCourier, delivered, returned,
+    pending, shipped, inTransit, withCourier, delivered, paid, returned,
     deliveryCancelled, deliveryNoAnswer, deliveryPostponed,
     confirmationRate, deliveryRate,
     revenue, paidAmount, pendingAmount,
