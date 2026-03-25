@@ -88,6 +88,39 @@ export type Database = {
         }
         Relationships: []
       }
+      order_history: {
+        Row: {
+          changed_by: string
+          changed_by_role: string
+          created_at: string
+          field_changed: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          order_id: string
+        }
+        Insert: {
+          changed_by: string
+          changed_by_role: string
+          created_at?: string
+          field_changed: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          order_id: string
+        }
+        Update: {
+          changed_by?: string
+          changed_by_role?: string
+          created_at?: string
+          field_changed?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          order_id?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           agent_id: string | null
