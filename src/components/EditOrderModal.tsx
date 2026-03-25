@@ -246,7 +246,8 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
               </div>
             </div>
 
-            {/* Order Status */}
+            {/* Order Status - hidden for sellers */}
+            {!isSeller && (
             <div>
               <h3 className={sectionTitle}>Order Status</h3>
               <div className="grid grid-cols-2 gap-3">
@@ -290,10 +291,12 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
                 </div>
               </div>
             </div>
+            )}
 
             {/* Upsell + Notes */}
             <div>
               <h3 className={sectionTitle}>Additional</h3>
+              {!isSeller && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className={fieldLabel}>Upsell</Label>
@@ -306,6 +309,7 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
                   </Select>
                 </div>
               </div>
+              )}
               <div className="mt-3">
                 <Label className={fieldLabel}>Notes</Label>
                 <Textarea
