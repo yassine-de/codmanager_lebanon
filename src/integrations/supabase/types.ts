@@ -410,6 +410,8 @@ export type Database = {
           id: string
           landed_price: number | null
           notes: string | null
+          payment_method: string | null
+          payment_status: string
           product_created: boolean | null
           product_image_url: string | null
           product_name: string
@@ -433,6 +435,8 @@ export type Database = {
           id?: string
           landed_price?: number | null
           notes?: string | null
+          payment_method?: string | null
+          payment_status?: string
           product_created?: boolean | null
           product_image_url?: string | null
           product_name: string
@@ -456,6 +460,8 @@ export type Database = {
           id?: string
           landed_price?: number | null
           notes?: string | null
+          payment_method?: string | null
+          payment_status?: string
           product_created?: boolean | null
           product_image_url?: string | null
           product_name?: string
