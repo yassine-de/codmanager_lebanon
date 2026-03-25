@@ -253,6 +253,7 @@ function RadialGauge({ rate, title, delay = 0 }: { rate: number; title: string; 
 export default function Dashboard() {
   const { authUser } = useAuth();
   const isSeller = authUser?.role === "seller";
+  const navigate = useNavigate();
   const [datePreset, setDatePreset] = useState<DatePresetValue>("maximum");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const { kpis, last7, totals7, topProducts, topSellers, isLoading } = useDashboardData(dateRange);
