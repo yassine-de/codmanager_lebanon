@@ -10,11 +10,12 @@ import {
   Tooltip as RechartsTooltip, ResponsiveContainer,
 } from "recharts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FilterBar } from "@/components/FilterBar";
+import { DatePresetFilter, type DatePresetValue, getDateRangeFromPreset } from "@/components/DatePresetFilter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import type { LucideIcon } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 import { useDashboardData } from "@/hooks/useDashboardData";
 
 /* ── Animated Number ── */
