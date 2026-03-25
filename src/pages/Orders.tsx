@@ -53,7 +53,7 @@ function StatusBadge({ label, cls }: { label: string; cls: string }) {
 }
 
 /* ── Column definitions ── */
-type ColumnKey = 'id' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'confirmationStatus' | 'deliveryStatus';
+type ColumnKey = 'id' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'amount' | 'confirmationStatus' | 'deliveryStatus';
 
 const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
   { key: 'id', label: 'ID', defaultVisible: true },
@@ -64,6 +64,7 @@ const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean }[] =
   { key: 'city', label: 'City', defaultVisible: true },
   { key: 'phone', label: 'Phone', defaultVisible: true },
   { key: 'product', label: 'Product', defaultVisible: true },
+  { key: 'amount', label: 'Amount', defaultVisible: true },
   { key: 'confirmationStatus', label: 'Confirmation', defaultVisible: true },
   { key: 'deliveryStatus', label: 'Delivery', defaultVisible: true },
 ];
