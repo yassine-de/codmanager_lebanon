@@ -63,7 +63,8 @@ function computeKPIs(orders: DashboardOrder[]): DashboardKPIs {
   const shipped = orders.filter(o => o.delivery_status === 'shipped').length;
   const inTransit = orders.filter(o => o.delivery_status === 'in_transit').length;
   const withCourier = orders.filter(o => o.delivery_status === 'with_courier').length;
-  const delivered = orders.filter(o => o.delivery_status === 'delivered').length;
+  const delivered = orders.filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid').length;
+  const paid = orders.filter(o => o.delivery_status === 'paid').length;
   const returned = orders.filter(o => o.delivery_status === 'returned').length;
   const deliveryCancelled = orders.filter(o => o.delivery_status === 'cancelled').length;
   const deliveryNoAnswer = orders.filter(o => o.delivery_status === 'no_answer').length;
