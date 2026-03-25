@@ -36,6 +36,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
   const [storeLink, setStoreLink] = useState("");
   const [videoLink, setVideoLink] = useState("");
   const [lastSellingPrice, setLastSellingPrice] = useState(0);
+  const [lastPrice, setLastPrice] = useState(0);
   const [offers, setOffers] = useState<ProductOffer[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [prevId, setPrevId] = useState<string | null>(null);
@@ -81,6 +82,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
     setStoreLink(product.storeLink || "");
     setVideoLink(product.videoLink || "");
     setLastSellingPrice(product.lastSellingPrice || 0);
+    setLastPrice(product.lastPrice || 0);
     setOffers(product.offers?.map(o => ({ ...o })) || []);
     setErrors({});
   }
@@ -157,6 +159,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
         storeLink: storeLink.trim(),
         videoLink: videoLink.trim(),
         lastSellingPrice,
+        lastPrice,
         offers,
       });
       onOpenChange(false);
@@ -221,7 +224,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                   {errors.price && <p className="text-[11px] text-destructive">{errors.price}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Last Selling Price (MAD)</Label>
+                  <Label className="text-xs">Selling Price (MAD)</Label>
                   <Input type="number" min={0} step={0.01} value={lastSellingPrice} onChange={e => setLastSellingPrice(Number(e.target.value))} className="h-9 text-sm" />
                 </div>
                 <div className="space-y-1.5">
@@ -329,6 +332,23 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Last Selling Price (for agent) */}
+            <div>
+              <h3 className={sectionTitle}>Last Selling Price</h3>
+              <p className="text-[11px] text-muted-foreground mb-2">This price will be shown to the confirmation agent</p>
+              <div className="w-1/2">
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={lastPrice}
+                  onChange={e => setLastPrice(Number(e.target.value))}
+                  className="h-9 text-sm"
+                  placeholder="0"
+                />
+              </div>
             </div>
 
             {/* Variants */}

@@ -56,6 +56,7 @@ export function CreateProductModal({ open, onOpenChange, onCreate }: CreateProdu
       storeLink: '',
       videoLink: '',
       lastSellingPrice: Number(price),
+      lastPrice: 0,
       offers: [],
     };
     onCreate(product);
