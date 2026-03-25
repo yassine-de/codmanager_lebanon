@@ -85,6 +85,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
       notes: notes.trim() || "",
       payment_status: paymentStatus,
       payment_method: paymentStatus === "paid" ? paymentMethod : null,
+      payment_date: paymentStatus === "paid" && request.payment_status !== "paid" ? new Date().toISOString() : (paymentStatus === "unpaid" ? null : undefined),
       updated_at: new Date().toISOString(),
       seller_seen: false,
     };
@@ -333,7 +334,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
                     <Select value={paymentMethod || ""} onValueChange={setPaymentMethod}>
                       <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select method" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="cih">CIH</SelectItem>
                         <SelectItem value="binance">Binance</SelectItem>
                         <SelectItem value="wise">Wise</SelectItem>
                         <SelectItem value="from_invoice">From Invoice</SelectItem>
