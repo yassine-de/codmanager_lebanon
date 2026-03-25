@@ -21,6 +21,11 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   received: { label: "Received", color: "bg-success/15 text-success border-success/25" },
 };
 
+const paymentConfig: Record<string, { label: string; color: string }> = {
+  unpaid: { label: "Unpaid", color: "bg-destructive/15 text-destructive border-destructive/25" },
+  paid: { label: "Paid", color: "bg-success/15 text-success border-success/25" },
+};
+
 const validationConfig: Record<string, { label: string; color: string }> = {
   validated: { label: "Validated", color: "bg-success/15 text-success border-success/25" },
   cancelled: { label: "Cancelled", color: "bg-destructive/15 text-destructive border-destructive/25" },
@@ -46,6 +51,8 @@ export interface DbSourcingRequest {
   seller_validated: boolean | null;
   admin_seen: boolean | null;
   product_created: boolean | null;
+  payment_status: string;
+  payment_method: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -209,6 +216,7 @@ export default function Sourcing() {
               <TableHead className="text-right">Landed</TableHead>
               <TableHead className="text-right">Seller Price</TableHead>
               <TableHead className="text-right">Profit</TableHead>
+              <TableHead className="text-center">Payment</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="text-center">Link</TableHead>
               <TableHead className="text-center w-[70px]">Edit</TableHead>
@@ -217,7 +225,7 @@ export default function Sourcing() {
           <TableBody>
             {paginated.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={13} className="text-center py-10 text-muted-foreground text-sm">
+                <TableCell colSpan={14} className="text-center py-10 text-muted-foreground text-sm">
                   No sourcing requests found.
                 </TableCell>
               </TableRow>
@@ -268,6 +276,22 @@ export default function Sourcing() {
                           {profit > 0 ? "+" : ""}{profit} MAD
                         </span>
                       ) : "—"}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {(() => {
+                        const pConfig = paymentConfig[req.payment_status] || paymentConfig.unpaid;
+                        const methodLabel = req.payment_method === 'from_invoice' ? 'Invoice' : req.payment_method === 'binance' ? 'Binance' : req.payment_method === 'wise' ? 'Wise' : req.payment_method === 'cash' ? 'Cash' : null;
+                        return (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium cursor-default ${pConfig.color}`}>
+                                {pConfig.label}{methodLabel ? ` · ${methodLabel}` : ''}
+                              </span>
+                            </TooltipTrigger>
+                            {methodLabel && <TooltipContent>{`Paid via ${methodLabel}`}</TooltipContent>}
+                          </Tooltip>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       {format(new Date(req.created_at), "dd MMM yyyy")}
