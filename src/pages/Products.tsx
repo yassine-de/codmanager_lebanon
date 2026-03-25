@@ -75,6 +75,7 @@ export default function Products() {
       storeLink: p.product_url || "",
       videoLink: p.video_url || "",
       lastSellingPrice: Number(p.price) || 0,
+      lastPrice: Number(p.landed_price) || 0,
       offers: [],
     }));
     // Sellers only see DB products, admins see both
