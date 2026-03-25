@@ -21,6 +21,11 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   received: { label: "Received", color: "bg-success/15 text-success border-success/25" },
 };
 
+const paymentConfig: Record<string, { label: string; color: string }> = {
+  unpaid: { label: "Unpaid", color: "bg-destructive/15 text-destructive border-destructive/25" },
+  paid: { label: "Paid", color: "bg-success/15 text-success border-success/25" },
+};
+
 const validationConfig: Record<string, { label: string; color: string }> = {
   validated: { label: "Validated", color: "bg-success/15 text-success border-success/25" },
   cancelled: { label: "Cancelled", color: "bg-destructive/15 text-destructive border-destructive/25" },
@@ -211,6 +216,7 @@ export default function Sourcing() {
               <TableHead className="text-right">Landed</TableHead>
               <TableHead className="text-right">Seller Price</TableHead>
               <TableHead className="text-right">Profit</TableHead>
+              <TableHead className="text-center">Payment</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="text-center">Link</TableHead>
               <TableHead className="text-center w-[70px]">Edit</TableHead>
