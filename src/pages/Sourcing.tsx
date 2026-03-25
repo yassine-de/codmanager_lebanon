@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ExternalLink, Pencil, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Package2, Plus, Loader2 } from "lucide-react";
+import { ExternalLink, Pencil, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Package2, Plus, Loader2, ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EditSourcingModal } from "@/components/EditSourcingModal";
 import { CreateSourcingModal } from "@/components/CreateSourcingModal";
@@ -40,6 +40,9 @@ export interface DbSourcingRequest {
   unit_price: number | null;
   shipping_cost: number | null;
   total_price: number | null;
+  landed_price: number | null;
+  seller_price: number | null;
+  product_image_url: string | null;
   seller_validated: boolean | null;
   created_at: string;
   updated_at: string;
@@ -55,7 +58,6 @@ export default function Sourcing() {
   const [editRequest, setEditRequest] = useState<DbSourcingRequest | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
-  // Fetch sourcing requests
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["admin-sourcing"],
     queryFn: async () => {
@@ -68,7 +70,6 @@ export default function Sourcing() {
     },
   });
 
-  // Fetch seller profiles for name display
   const sellerIds = useMemo(() => [...new Set(requests.map(r => r.seller_id))], [requests]);
   const { data: sellerProfiles = [] } = useQuery({
     queryKey: ["seller-profiles", sellerIds],
@@ -177,19 +178,20 @@ export default function Sourcing() {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border bg-card">
+      <div className="rounded-lg border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[40px]"></TableHead>
               <TableHead>Product</TableHead>
               <TableHead>Seller</TableHead>
               <TableHead className="text-center">Qty</TableHead>
               <TableHead>Country</TableHead>
-              <TableHead>Shipping</TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-center">Validation</TableHead>
-              <TableHead className="text-right">Unit Price</TableHead>
-              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Landed</TableHead>
+              <TableHead className="text-right">Seller Price</TableHead>
+              <TableHead className="text-right">Profit</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="text-center">Link</TableHead>
               <TableHead className="text-center w-[70px]">Edit</TableHead>
@@ -198,7 +200,7 @@ export default function Sourcing() {
           <TableBody>
             {paginated.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-10 text-muted-foreground text-sm">
+                <TableCell colSpan={13} className="text-center py-10 text-muted-foreground text-sm">
                   No sourcing requests found.
                 </TableCell>
               </TableRow>
@@ -207,14 +209,25 @@ export default function Sourcing() {
                 const sConfig = statusConfig[req.status] || statusConfig.waiting_quote;
                 const vKey = req.seller_validated === true ? "validated" : req.seller_validated === false ? "cancelled" : "pending";
                 const vConfig = validationConfig[vKey];
+                const profit = (req.seller_price ?? 0) > 0 && (req.landed_price ?? 0) > 0
+                  ? (req.seller_price! - req.landed_price!)
+                  : null;
 
                 return (
                   <TableRow key={req.id} className="text-xs">
-                    <TableCell className="font-medium max-w-[160px] truncate">{req.product_name}</TableCell>
+                    <TableCell className="pr-0">
+                      {req.product_image_url ? (
+                        <img src={req.product_image_url} alt="" className="w-8 h-8 rounded object-cover border" />
+                      ) : (
+                        <div className="w-8 h-8 rounded border bg-muted/30 flex items-center justify-center">
+                          <ImageIcon className="h-3.5 w-3.5 text-muted-foreground/40" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium max-w-[140px] truncate">{req.product_name}</TableCell>
                     <TableCell className="text-muted-foreground">{sellerNameMap[req.seller_id] || "—"}</TableCell>
                     <TableCell className="text-center tabular-nums">{req.quantity}</TableCell>
                     <TableCell className="text-muted-foreground">{req.destination_country}</TableCell>
-                    <TableCell className="text-muted-foreground">{shippingLabel(req.shipping_method)}</TableCell>
                     <TableCell className="text-center">
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${sConfig.color}`}>
                         {sConfig.label}
@@ -226,10 +239,17 @@ export default function Sourcing() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {(req.unit_price ?? 0) > 0 ? `${req.unit_price} MAD` : "—"}
+                      {(req.landed_price ?? 0) > 0 ? `${req.landed_price} MAD` : "—"}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">
-                      {(req.total_price ?? 0) > 0 ? `${req.total_price} MAD` : "—"}
+                    <TableCell className="text-right tabular-nums">
+                      {(req.seller_price ?? 0) > 0 ? `${req.seller_price} MAD` : "—"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {profit !== null ? (
+                        <span className={`font-medium ${profit > 0 ? "text-success" : profit < 0 ? "text-destructive" : ""}`}>
+                          {profit > 0 ? "+" : ""}{profit} MAD
+                        </span>
+                      ) : "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       {format(new Date(req.created_at), "dd MMM yyyy")}
@@ -287,13 +307,7 @@ export default function Sourcing() {
         </div>
       )}
 
-      {/* Create Modal */}
-      <CreateSourcingModal
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-      />
-
-      {/* Edit Modal */}
+      <CreateSourcingModal open={createOpen} onOpenChange={setCreateOpen} />
       <EditSourcingModal
         request={editRequest}
         open={!!editRequest}
