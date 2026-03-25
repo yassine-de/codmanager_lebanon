@@ -130,11 +130,11 @@ export default function Products() {
   }, [search, appliedSeller, pageSize]);
 
   const handleCreate = (product: Product) => {
-    setProducts((prev) => [product, ...prev]);
+    setLocalProducts((prev) => [product, ...prev]);
   };
 
   const handleEdit = (updated: Product) => {
-    setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    setLocalProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   };
 
   return (
