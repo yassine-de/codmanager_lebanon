@@ -410,6 +410,7 @@ export type Database = {
           id: string
           landed_price: number | null
           notes: string | null
+          payment_date: string | null
           payment_method: string | null
           payment_status: string
           product_created: boolean | null
@@ -435,6 +436,7 @@ export type Database = {
           id?: string
           landed_price?: number | null
           notes?: string | null
+          payment_date?: string | null
           payment_method?: string | null
           payment_status?: string
           product_created?: boolean | null
@@ -460,6 +462,7 @@ export type Database = {
           id?: string
           landed_price?: number | null
           notes?: string | null
+          payment_date?: string | null
           payment_method?: string | null
           payment_status?: string
           product_created?: boolean | null

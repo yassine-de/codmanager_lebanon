@@ -85,6 +85,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
       notes: notes.trim() || "",
       payment_status: paymentStatus,
       payment_method: paymentStatus === "paid" ? paymentMethod : null,
+      payment_date: paymentStatus === "paid" && request.payment_status !== "paid" ? new Date().toISOString() : (paymentStatus === "unpaid" ? null : undefined),
       updated_at: new Date().toISOString(),
       seller_seen: false,
     };
@@ -333,7 +334,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
                     <Select value={paymentMethod || ""} onValueChange={setPaymentMethod}>
                       <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select method" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="cih">CIH</SelectItem>
                         <SelectItem value="binance">Binance</SelectItem>
                         <SelectItem value="wise">Wise</SelectItem>
                         <SelectItem value="from_invoice">From Invoice</SelectItem>
@@ -347,6 +348,12 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
                   <p className="text-xs text-warning font-medium">
                     💡 Total amount ({totalPrice.toLocaleString()} MAD) will be added to the seller's invoice for deduction.
                   </p>
+                </div>
+              )}
+              {request.payment_status === "paid" && request.payment_date && (
+                <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5">
+                  <span className="text-xs text-muted-foreground">Payment Date</span>
+                  <span className="text-xs font-medium tabular-nums">{new Date(request.payment_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
                 </div>
               )}
             </div>
