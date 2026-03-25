@@ -49,6 +49,18 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
   const { authUser } = useAuth();
   const isSeller = authUser?.role === 'seller';
 
+  // Fetch seller's own products for the dropdown
+  const { data: sellerProducts } = useQuery({
+    queryKey: ['seller-products', authUser?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from('products').select('name').eq('seller_id', authUser!.id);
+      return data?.map(p => p.name) || [];
+    },
+    enabled: isSeller && !!authUser?.id,
+  });
+
+  const availableProductNames = isSeller ? (sellerProducts || []) : productNames;
+
   const [customer, setCustomer] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
