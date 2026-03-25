@@ -73,13 +73,34 @@ export default function Products() {
       createdAt: p.created_at,
       variants: [],
       storeLink: p.product_url || "",
-      videoLink: "",
+      videoLink: p.video_url || "",
       lastSellingPrice: Number(p.price) || 0,
       offers: [],
     }));
     // Sellers only see DB products, admins see both
     return isAdmin ? [...dbMapped, ...localProducts] : dbMapped;
   }, [dbProducts, dbSellerNameMap, localProducts, isAdmin, authUser]);
+
+  // Mark unseen products as seen for sellers
+  useEffect(() => {
+    if (!isSeller || dbProducts.length === 0) return;
+    const unseenIds = dbProducts.filter(p => p.seller_seen === false).map(p => p.id);
+    if (unseenIds.length === 0) return;
+    const markSeen = async () => {
+      await supabase.from("products").update({ seller_seen: true }).in("id", unseenIds);
+      queryClient.invalidateQueries({ queryKey: ["seller-product-unseen"] });
+    };
+    markSeen();
+  }, [isSeller, dbProducts, queryClient]);
+
+  // Set of DB product IDs missing required links
+  const missingLinksIds = useMemo(() => {
+    const set = new Set<string>();
+    dbProducts.forEach(p => {
+      if (!p.product_url || !p.video_url) set.add(p.id);
+    });
+    return set;
+  }, [dbProducts]);
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
