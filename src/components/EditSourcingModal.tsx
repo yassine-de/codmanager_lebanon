@@ -310,6 +310,47 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
               </Select>
             </div>
 
+            {/* Payment */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-4 rounded-full bg-success" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payment</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Payment Status</Label>
+                  <Select value={paymentStatus} onValueChange={v => { setPaymentStatus(v); if (v === 'unpaid') setPaymentMethod(null); }}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unpaid">Unpaid</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {paymentStatus === "paid" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Payment Method</Label>
+                    <Select value={paymentMethod || ""} onValueChange={setPaymentMethod}>
+                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select method" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="binance">Binance</SelectItem>
+                        <SelectItem value="wise">Wise</SelectItem>
+                        <SelectItem value="from_invoice">From Invoice</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              {paymentStatus === "paid" && paymentMethod === "from_invoice" && (
+                <div className="rounded-lg border border-warning/25 bg-warning/10 px-4 py-2.5">
+                  <p className="text-xs text-warning font-medium">
+                    💡 Total amount ({totalPrice.toLocaleString()} MAD) will be added to the seller's invoice for deduction.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Notes */}
             <div className="space-y-1.5">
               <Label className="text-xs">Notes</Label>
