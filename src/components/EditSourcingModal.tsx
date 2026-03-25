@@ -89,6 +89,8 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     updateMutation.mutate();
   };
 
+  if (!request) return null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
