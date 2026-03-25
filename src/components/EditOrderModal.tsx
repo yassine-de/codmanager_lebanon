@@ -99,7 +99,7 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
   };
 
   const addProduct = () => {
-    setProducts(prev => [...prev, { name: productNames[0], qty: 1, price: 100 }]);
+    setProducts(prev => [...prev, { name: availableProductNames[0] || '', qty: 1, price: 100 }]);
   };
 
   const total = products.reduce((s, p) => s + p.qty * p.price, 0);
@@ -217,7 +217,7 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
                       <Select value={p.name} onValueChange={v => updateProduct(idx, 'name', v)}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {productNames.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+                          {availableProductNames.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
