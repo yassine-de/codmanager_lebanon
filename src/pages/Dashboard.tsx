@@ -3,7 +3,7 @@ import {
   ShoppingCart, CheckCircle2, Truck, DollarSign, XCircle, RotateCcw,
   Sparkles, PhoneOff, CalendarClock, TrendingUp, TrendingDown,
   Package, Copy, PhoneForwarded, Navigation, UserCheck, Banknote,
-  Clock, Store, Award,
+  Clock, Store, Award, Loader2,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis,
@@ -11,11 +11,11 @@ import {
 } from "recharts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { FilterBar } from "@/components/FilterBar";
-import { mockOrders, getKPIs, getTopProductsByDeliveryRate, getTopSellersByDelivered } from "@/lib/data";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { format, subDays, startOfDay, isAfter, eachDayOfInterval } from "date-fns";
+import { format } from "date-fns";
 import type { LucideIcon } from "lucide-react";
+import { useDashboardData } from "@/hooks/useDashboardData";
 
 /* ── Animated Number ── */
 function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
