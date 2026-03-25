@@ -252,18 +252,8 @@ function RadialGauge({ rate, title, delay = 0 }: { rate: number; title: string; 
 export default function Dashboard() {
   const { authUser } = useAuth();
   const isSeller = authUser?.role === "seller";
-  const kpis = getKPIs(mockOrders);
   const navigate = useNavigate();
-  const last7 = useMemo(() => getDailyData(7), []);
-
-  const totals7 = useMemo(() => ({
-    orders: last7.reduce((s, d) => s + d.orders, 0),
-    confirmed: last7.reduce((s, d) => s + d.confirmed, 0),
-    delivered: last7.reduce((s, d) => s + d.delivered, 0),
-  }), [last7]);
-
-  const topProducts = useMemo(() => getTopProductsByDeliveryRate(mockOrders).slice(0, 5), []);
-  const topSellers = useMemo(() => getTopSellersByDelivered(mockOrders).slice(0, 5), []);
+  const { kpis, last7, totals7, topProducts, topSellers, isLoading } = useDashboardData();
 
   const pct = (val: number, base: number) => base > 0 ? Math.round((val / base) * 100) : 0;
 
