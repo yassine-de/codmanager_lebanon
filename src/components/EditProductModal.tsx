@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,8 @@ interface EditProductModalProps {
 }
 
 export function EditProductModal({ product, open, onOpenChange, onSave }: EditProductModalProps) {
+  const { authUser } = useAuth();
+  const isSeller = authUser?.role === "seller";
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [seller, setSeller] = useState("");
@@ -192,11 +195,13 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
             <div>
               <h3 className={sectionTitle}>Basic Information</h3>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Seller *</Label>
-                  <Input value={seller} onChange={e => setSeller(e.target.value)} className={`h-9 text-sm ${errors.seller ? "border-destructive" : ""}`} disabled={isDbProduct} />
-                  {errors.seller && <p className="text-[11px] text-destructive">{errors.seller}</p>}
-                </div>
+                {!isSeller && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Seller *</Label>
+                    <Input value={seller} onChange={e => setSeller(e.target.value)} className={`h-9 text-sm ${errors.seller ? "border-destructive" : ""}`} disabled={isDbProduct} />
+                    {errors.seller && <p className="text-[11px] text-destructive">{errors.seller}</p>}
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Product Name *</Label>
                   <Input value={name} onChange={e => setName(e.target.value)} className={`h-9 text-sm ${errors.name ? "border-destructive" : ""}`} />
@@ -219,8 +224,8 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
               <h3 className={sectionTitle}>Pricing & Stock</h3>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Price (MAD) *</Label>
-                  <Input type="number" min={0.01} step={0.01} value={price} onChange={e => setPrice(Number(e.target.value))} className={`h-9 text-sm ${errors.price ? "border-destructive" : ""}`} />
+                  <Label className="text-xs">Buying Price (MAD) *</Label>
+                  <Input type="number" min={0.01} step={0.01} value={price} onChange={e => setPrice(Number(e.target.value))} className={`h-9 text-sm ${errors.price ? "border-destructive" : ""}`} disabled={isSeller} />
                   {errors.price && <p className="text-[11px] text-destructive">{errors.price}</p>}
                 </div>
                 <div className="space-y-1.5">
@@ -230,7 +235,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Total Quantity *</Label>
-                  <Input type="number" min={1} step={1} value={totalQty} onChange={e => setTotalQty(Number(e.target.value))} className={`h-9 text-sm ${errors.totalQty ? "border-destructive" : ""}`} />
+                  <Input type="number" min={1} step={1} value={totalQty} onChange={e => setTotalQty(Number(e.target.value))} className={`h-9 text-sm ${errors.totalQty ? "border-destructive" : ""}`} disabled={isSeller} />
                   {errors.totalQty && <p className="text-[11px] text-destructive">{errors.totalQty}</p>}
                 </div>
               </div>
