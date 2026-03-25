@@ -711,6 +711,13 @@ export default function Orders() {
           history={historyOrder.history}
         />
       )}
+
+      {/* Create Order Modal - Seller only */}
+      <CreateOrderModal
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+        onCreated={() => window.location.reload()}
+      />
     </div>
     </TooltipProvider>
   );
