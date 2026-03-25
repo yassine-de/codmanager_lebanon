@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
 import { format, subDays, startOfDay, eachDayOfInterval, isAfter } from "date-fns";
+import type { DateRange } from "react-day-picker";
 
 export interface DashboardOrder {
   id: string;
@@ -129,8 +130,8 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
   });
 }
 
-export function useDashboardData() {
-  const { data: orders = [], isLoading, error } = useQuery({
+export function useDashboardData(dateRange?: DateRange) {
+  const { data: allOrders = [], isLoading, error } = useQuery({
     queryKey: ["dashboard-orders"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -140,6 +141,17 @@ export function useDashboardData() {
       return (data || []) as DashboardOrder[];
     },
   });
+
+  // Filter by date range on created_at
+  const orders = useMemo(() => {
+    if (!dateRange?.from) return allOrders;
+    return allOrders.filter(o => {
+      const created = new Date(o.created_at);
+      if (dateRange.from && created < dateRange.from) return false;
+      if (dateRange.to && created > dateRange.to) return false;
+      return true;
+    });
+  }, [allOrders, dateRange]);
 
   const kpis = useMemo(() => computeKPIs(orders), [orders]);
   const last7 = useMemo(() => computeDailyData(orders, 7), [orders]);
