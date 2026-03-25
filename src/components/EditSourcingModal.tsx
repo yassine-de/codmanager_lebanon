@@ -47,8 +47,6 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     setErrors({});
   }
 
-  if (!request) return null;
-
   const totalPrice = quantity * unitPrice + shippingCost;
 
   const validate = (): boolean => {
@@ -90,6 +88,8 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     if (!validate()) return;
     updateMutation.mutate();
   };
+
+  if (!request) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
