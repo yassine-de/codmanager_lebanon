@@ -1,9 +1,10 @@
 import { LayoutDashboard, ShoppingCart, Package, BarChart3, Package2, BoxIcon, Settings, Users, ChevronDown, Link2, CheckSquare, Store, DollarSign, PhoneForwarded, FileText, FileSpreadsheet, Calculator, Headphones, Play, ListChecks } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
-import { mockOrders } from "@/lib/data";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
   SidebarContent,
@@ -19,9 +20,9 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-const navItems = [
+const getNavItems = (orderCount: number) => [
   { title: "dashboard", url: "/", icon: LayoutDashboard },
-  { title: "orders", url: "/orders", icon: ShoppingCart, badge: mockOrders.length, permission: "access_to_orders", sellerVisible: true },
+  { title: "orders", url: "/orders", icon: ShoppingCart, badge: orderCount, permission: "access_to_orders", sellerVisible: true },
   { title: "products", url: "/products", icon: BoxIcon, permission: "access_to_products", sellerVisible: true },
   { title: "confirmations", url: "/confirmations", icon: Package, permission: "access_to_confirmations" },
   { title: "sourcing", url: "/sourcing", icon: Package2, permission: "access_to_sourcing" },
@@ -55,6 +56,20 @@ export function AppSidebar() {
   const { t } = useLanguage();
   const isSeller = authUser?.role === "seller";
   const isAgent = authUser?.role === "agent";
+
+  const { data: orderCount = 0 } = useQuery({
+    queryKey: ["sidebar-order-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("orders")
+        .select("*", { count: "exact", head: true });
+      if (error) throw error;
+      return count || 0;
+    },
+    refetchInterval: 30000, // refresh every 30s
+  });
+
+  const navItems = getNavItems(orderCount);
 
   const visibleItems = navItems.filter((item: any) => {
     if (item.agentOnly) return isAgent;
