@@ -143,7 +143,7 @@ const Users = () => {
     }
   };
 
-
+  const handleSave = async () => {
     if (!form.name || !form.email || (!editingUser && !form.password)) {
       toast.error("Remplis tous les champs obligatoires");
       return;
