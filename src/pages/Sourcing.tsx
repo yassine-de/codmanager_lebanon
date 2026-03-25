@@ -277,6 +277,22 @@ export default function Sourcing() {
                         </span>
                       ) : "—"}
                     </TableCell>
+                    <TableCell className="text-center">
+                      {(() => {
+                        const pConfig = paymentConfig[req.payment_status] || paymentConfig.unpaid;
+                        const methodLabel = req.payment_method === 'from_invoice' ? 'Invoice' : req.payment_method === 'binance' ? 'Binance' : req.payment_method === 'wise' ? 'Wise' : req.payment_method === 'cash' ? 'Cash' : null;
+                        return (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium cursor-default ${pConfig.color}`}>
+                                {pConfig.label}{methodLabel ? ` · ${methodLabel}` : ''}
+                              </span>
+                            </TooltipTrigger>
+                            {methodLabel && <TooltipContent>{`Paid via ${methodLabel}`}</TooltipContent>}
+                          </Tooltip>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       {format(new Date(req.created_at), "dd MMM yyyy")}
                     </TableCell>
