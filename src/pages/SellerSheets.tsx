@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, ExternalLink, Eye, Loader2, FileSpreadsheet, RefreshCw, AlertTriangle } from "lucide-react";
+import { Plus, ExternalLink, Eye, Loader2, FileSpreadsheet, RefreshCw, AlertTriangle, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
@@ -46,6 +46,16 @@ export default function SellerSheets() {
   const [errorsSheet, setErrorsSheet] = useState<Sheet | null>(null);
   const [errors, setErrors] = useState<SheetError[]>([]);
   const [errorsLoading, setErrorsLoading] = useState(false);
+  const [serviceEmail, setServiceEmail] = useState("");
+
+  const fetchServiceEmail = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "google_service_account_email")
+      .maybeSingle();
+    if (data) setServiceEmail(data.value);
+  };
 
   const fetchSheets = async () => {
     if (!user) return;
@@ -66,6 +76,7 @@ export default function SellerSheets() {
 
   useEffect(() => {
     fetchSheets();
+    fetchServiceEmail();
   }, [user]);
 
   const handleLink = async () => {
@@ -113,7 +124,18 @@ export default function SellerSheets() {
           <p className="text-muted-foreground text-xs mt-0.5">
             Link your Google Sheets to import orders automatically
           </p>
+      </div>
+
+      {/* Service account email info */}
+      {serviceEmail && (
+        <div className="bg-muted/50 border rounded-lg p-3 flex items-start gap-2">
+          <Mail className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+          <div>
+            <p className="text-xs font-medium">Share your Google Sheet with this email for automatic import:</p>
+            <p className="text-xs text-primary font-mono mt-0.5 select-all">{serviceEmail}</p>
+          </div>
         </div>
+      )}
         <Button size="sm" onClick={() => setLinkOpen(true)} className="gap-1.5">
           <Plus className="w-3.5 h-3.5" />
           Link Sheet
