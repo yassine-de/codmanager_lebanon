@@ -214,12 +214,23 @@ const AgentDashboard = () => {
           <CardContent className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" outerRadius={90} innerRadius={45} paddingAngle={3} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                <Pie data={pieData} cx="50%" cy="50%" outerRadius={90} innerRadius={50} paddingAngle={3} dataKey="value" label={false}>
                   {pieData.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value: number, name: string) => [`${value}`, name]} />
+                <Legend
+                  verticalAlign="bottom"
+                  iconType="circle"
+                  iconSize={10}
+                  formatter={(value: string, entry: any) => {
+                    const total = pieData.reduce((s, d) => s + d.value, 0);
+                    const item = pieData.find(d => d.name === value);
+                    const pct = total > 0 && item ? Math.round((item.value / total) * 100) : 0;
+                    return `${value} ${pct}%`;
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
