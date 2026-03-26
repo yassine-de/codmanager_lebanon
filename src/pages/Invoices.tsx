@@ -77,6 +77,7 @@ export default function Invoices() {
   const [detailSellerName, setDetailSellerName] = useState("");
   const [detailSellerRates, setDetailSellerRates] = useState<any>(null);
   const [detailIsDraft, setDetailIsDraft] = useState(false);
+  const [detailSellerId, setDetailSellerId] = useState<string>("");
   const [detailDraftOrders, setDetailDraftOrders] = useState<any[]>([]);
 
   // Addon dialog
@@ -434,6 +435,7 @@ export default function Invoices() {
     const sellerId = row.type === "draft" ? row.data.sellerId : row.data.seller_id;
     setDetailSellerName(sellerNameMap[sellerId] || "—");
     setDetailSellerRates(sellerRatesMap[sellerId] || null);
+    setDetailSellerId(sellerId);
     if (row.type === "draft") {
       setDetailInvoiceId(null);
       setDetailInvoiceNumber("Draft Invoice");
@@ -842,6 +844,7 @@ export default function Invoices() {
         invoiceId={detailInvoiceId}
         invoiceNumber={detailInvoiceNumber}
         sellerName={detailSellerName}
+        sellerId={detailSellerId}
         sellerRates={detailSellerRates}
         isDraft={detailIsDraft}
         draftOrders={detailDraftOrders}
