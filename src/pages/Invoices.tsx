@@ -187,8 +187,8 @@ export default function Invoices() {
   });
 
   const sellerRatesMap = useMemo(() => {
-    const map: Record<string, { rate_1kg: number; rate_2kg: number; rate_3kg: number }> = {};
-    sellerRatesData.forEach(r => { map[r.user_id] = { rate_1kg: r.rate_1kg, rate_2kg: r.rate_2kg, rate_3kg: r.rate_3kg }; });
+    const map: Record<string, { rate_1kg: number; rate_2kg: number; rate_3kg: number; rate_3kg_plus: number }> = {};
+    sellerRatesData.forEach(r => { map[r.user_id] = { rate_1kg: r.rate_1kg, rate_2kg: r.rate_2kg, rate_3kg: r.rate_3kg, rate_3kg_plus: (r as any).rate_3kg_plus ?? 6 }; });
     return map;
   }, [sellerRatesData]);
 
