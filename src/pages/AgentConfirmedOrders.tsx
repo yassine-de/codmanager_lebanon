@@ -234,6 +234,7 @@ const AgentConfirmedOrders = () => {
             />
           </div>
         </div>
+      </div>
 
       <Card>
         <CardContent className="p-0">
