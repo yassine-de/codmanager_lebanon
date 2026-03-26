@@ -25,6 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { InvoiceDetailModal } from "@/components/InvoiceDetailModal";
+import InvoiceHistoryModal from "@/components/InvoiceHistoryModal";
 import { toast } from "sonner";
 
 interface DbInvoice {
@@ -85,6 +86,11 @@ export default function Invoices() {
   const [addonType, setAddonType] = useState<"in" | "out">("in");
   const [addonAmount, setAddonAmount] = useState("");
   const [addonReason, setAddonReason] = useState("");
+
+  // History modal
+  const [historyInvoiceId, setHistoryInvoiceId] = useState<string | null>(null);
+  const [historyInvoiceNumber, setHistoryInvoiceNumber] = useState("");
+  const [historyOrderIds, setHistoryOrderIds] = useState<string[] | undefined>(undefined);
 
   // Fetch invoices
   const { data: invoices = [], isLoading: loadingInvoices } = useQuery({
@@ -667,7 +673,11 @@ export default function Invoices() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted"
-                                  onClick={() => toast.info("No history for draft invoices")}>
+                                  onClick={() => {
+                                    setHistoryInvoiceId(null);
+                                    setHistoryInvoiceNumber("Draft");
+                                    setHistoryOrderIds(d.orders.map((o: any) => o.order_id));
+                                  }}>
                                   <History className="h-3.5 w-3.5" />
                                 </Button>
                               </TooltipTrigger>
@@ -795,7 +805,12 @@ export default function Invoices() {
                               )}
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted"
+                                    onClick={() => {
+                                      setHistoryInvoiceId(inv.id);
+                                      setHistoryInvoiceNumber(inv.invoice_number);
+                                      setHistoryOrderIds(undefined);
+                                    }}>
                                     <History className="h-3.5 w-3.5" />
                                   </Button>
                                 </TooltipTrigger>
@@ -912,6 +927,15 @@ export default function Invoices() {
         sellerRates={detailSellerRates}
         isDraft={detailIsDraft}
         draftOrders={detailDraftOrders}
+      />
+
+      {/* History Modal */}
+      <InvoiceHistoryModal
+        open={historyInvoiceId !== null || (historyOrderIds !== undefined && historyOrderIds.length > 0)}
+        onOpenChange={open => { if (!open) { setHistoryInvoiceId(null); setHistoryOrderIds(undefined); } }}
+        invoiceId={historyInvoiceId}
+        invoiceNumber={historyInvoiceNumber}
+        orderIds={historyOrderIds}
       />
     </div>
   );
