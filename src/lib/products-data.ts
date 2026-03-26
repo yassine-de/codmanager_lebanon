@@ -30,6 +30,7 @@ export interface Product {
   lastSellingPrice: number;
   lastPrice: number;
   offers: ProductOffer[];
+  weight?: string;
 }
 
 const productImages = [

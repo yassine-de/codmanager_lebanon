@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, ExternalLink, Video, Tag, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Trash2, ExternalLink, Video, Tag, Loader2, Weight } from "lucide-react";
 import { toast } from "sonner";
 import { type Product, type ProductVariant, type ProductOffer } from "@/lib/products-data";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +42,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
   const [lastSellingPrice, setLastSellingPrice] = useState(0);
   const [lastPrice, setLastPrice] = useState(0);
   const [offers, setOffers] = useState<ProductOffer[]>([]);
+  const [weight, setWeight] = useState<string>("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [prevId, setPrevId] = useState<string | null>(null);
 
@@ -56,6 +58,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
           price: lastSellingPrice,
           landed_price: price,
           quantity: totalQty,
+          weight: weight || null,
           product_url: storeLink.trim(),
           video_url: videoLink.trim(),
           image_url: image.trim(),
@@ -88,6 +91,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
     setLastSellingPrice(product.lastSellingPrice || 0);
     setLastPrice(product.lastPrice || 0);
     setOffers(product.offers?.map(o => ({ ...o })) || []);
+    setWeight(product.weight || "");
     setErrors({});
   }
 
@@ -165,6 +169,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
         lastSellingPrice,
         lastPrice,
         offers,
+        weight,
       });
       onOpenChange(false);
       toast.success("Product updated");
@@ -253,6 +258,29 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Available</p>
                   <p className="text-sm font-semibold tabular-nums mt-0.5">{Math.max(0, product.available + (totalQty - product.totalQty))}</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Weight */}
+            <div>
+              <h3 className={sectionTitle}>
+                <span className="flex items-center gap-1.5">
+                  <Weight className="w-3.5 h-3.5 text-muted-foreground" />
+                  Weight
+                </span>
+              </h3>
+              <div className="w-1/2">
+                <Select value={weight} onValueChange={setWeight}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Select weight bracket" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="up_to_1kg">Up to 1 kg</SelectItem>
+                    <SelectItem value="up_to_2kg">Up to 2 kg</SelectItem>
+                    <SelectItem value="up_to_3kg">Up to 3 kg</SelectItem>
+                    <SelectItem value="more_than_3kg">More than 3 kg</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

@@ -77,6 +77,7 @@ export default function Products() {
       lastSellingPrice: Number(p.price) || 0,
       lastPrice: Number(p.landed_price) || 0,
       offers: [],
+      weight: (p as any).weight || undefined,
     }));
     // Sellers only see DB products, admins see both
     return isAdmin ? [...dbMapped, ...localProducts] : dbMapped;
@@ -297,6 +298,7 @@ export default function Products() {
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Delivered</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Shipped</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Available</th>
+                      <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Weight</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Variants</th>
                       <th className="text-left py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Created</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider w-[60px]">Actions</th>
@@ -350,6 +352,15 @@ export default function Products() {
                           }`}>
                             {product.available}
                           </span>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          {product.weight ? (
+                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">
+                              {product.weight === 'up_to_1kg' ? '≤1kg' : product.weight === 'up_to_2kg' ? '≤2kg' : product.weight === 'up_to_3kg' ? '≤3kg' : '>3kg'}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="py-2 px-3 text-center">
                           {product.variants.length > 0 ? (
