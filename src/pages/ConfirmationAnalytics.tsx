@@ -115,12 +115,13 @@ export default function ConfirmationAnalytics() {
 
   // Agent scores
   const agentScores = useMemo(() => {
-    const map: Record<string, { total: number; confirmed: number; delivered: number; shipped: number }> = {};
+    const map: Record<string, { total: number; answered: number; confirmed: number; delivered: number; shipped: number }> = {};
     orders.forEach(o => {
       const agentId = o.agent_id;
       if (!agentId) return;
-      if (!map[agentId]) map[agentId] = { total: 0, confirmed: 0, delivered: 0, shipped: 0 };
+      if (!map[agentId]) map[agentId] = { total: 0, answered: 0, confirmed: 0, delivered: 0, shipped: 0 };
       map[agentId].total++;
+      if (["confirmed", "cancelled", "reported"].includes(o.confirmation_status) || o.postpone_date !== null) map[agentId].answered++;
       if (o.confirmation_status === "confirmed") map[agentId].confirmed++;
       if (o.delivery_status === "delivered") map[agentId].delivered++;
       if (o.delivery_status && ["shipped", "pending", "delivered"].includes(o.delivery_status)) map[agentId].shipped++;
@@ -131,7 +132,7 @@ export default function ConfirmationAnalytics() {
         name: profileNameMap[id] || id.slice(0, 8),
         total: d.total,
         confirmed: d.confirmed,
-        confirmationRate: d.total > 0 ? Math.round((d.confirmed / d.total) * 100) : 0,
+        confirmationRate: d.answered > 0 ? Math.round((d.confirmed / d.answered) * 100) : 0,
         delivered: d.delivered,
         deliveryRate: d.shipped > 0 ? Math.round((d.delivered / d.shipped) * 100) : 0,
       }))
