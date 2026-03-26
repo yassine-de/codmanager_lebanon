@@ -203,6 +203,27 @@ export function InvoiceDetailModal({ open, onOpenChange, invoiceId, invoiceNumbe
                     <span className="text-muted-foreground">Total Fees (shipping rates)</span>
                     <span className="font-semibold tabular-nums text-destructive">-{totalFees.toFixed(2)} MAD</span>
                   </div>
+                  {/* Addons breakdown */}
+                  {addons.length > 0 && (
+                    <div className="border-t pt-2 space-y-1.5">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Addons</span>
+                      {addons.map(addon => (
+                        <div key={addon.id} className="flex justify-between text-xs items-center">
+                          <span className="flex items-center gap-1.5 text-muted-foreground">
+                            {addon.type === "in" ? (
+                              <ArrowDownCircle className="h-3 w-3 text-success" />
+                            ) : (
+                              <ArrowUpCircle className="h-3 w-3 text-destructive" />
+                            )}
+                            {addon.reason || (addon.type === "in" ? "Bonus" : "Deduction")}
+                          </span>
+                          <span className={`font-semibold tabular-nums ${addon.type === "in" ? "text-success" : "text-destructive"}`}>
+                            {addon.type === "in" ? "+" : "-"}{addon.amount.toFixed(2)} MAD
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="border-t pt-2 flex justify-between text-sm">
                     <span className="font-bold">Net Payable</span>
                     <span className="font-bold text-success tabular-nums">{netPayable.toLocaleString()} MAD</span>
