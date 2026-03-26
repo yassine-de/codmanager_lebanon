@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
-  FileText, Search, RotateCcw, Eye, CalendarDays, Store, CreditCard, CheckCircle2,
+  FileText, Search, RotateCcw, Eye, CalendarDays, Store, CreditCard, CheckCircle2, PlusCircle,
   Wallet, Clock, ArrowDownCircle, ArrowUpCircle,
   Loader2, ChevronLeft, ChevronRight, Package
 } from "lucide-react";
