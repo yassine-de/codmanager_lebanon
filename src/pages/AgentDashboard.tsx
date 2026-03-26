@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockOrders } from "@/lib/data";
-import { mockProducts } from "@/lib/products-data";
-import { format, subDays, startOfDay, endOfDay, isWithinInterval } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { format, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { CheckCircle2, Clock, PhoneOff, XCircle, TrendingUp, Trophy, Sparkles, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { DatePresetFilter, getDateRangeFromPreset, type DatePresetValue } from "@/components/DatePresetFilter";
 import type { DateRange } from "react-day-picker";
 
@@ -28,27 +28,46 @@ const COLORS = {
 const AgentDashboard = () => {
   const { authUser } = useAuth();
   const agentName = authUser?.name || "Agent";
+  const userId = authUser?.id;
   const quote = motivationalQuotes[Math.floor(Date.now() / 86400000) % motivationalQuotes.length];
 
   const [datePreset, setDatePreset] = useState<DatePresetValue>("7d");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getDateRangeFromPreset("7d"));
 
+  // Fetch orders assigned to this agent that have been treated (status != 'new')
+  const { data: agentOrders = [] } = useQuery({
+    queryKey: ["agent-dashboard-orders", userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, order_id, confirmation_status, delivery_status, product_name, price, quantity, total_amount, confirmed_at, created_at")
+        .eq("agent_id", userId)
+        .neq("confirmation_status", "new");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!userId,
+  });
+
+  // Filter by confirmed_at date (when the agent actually treated the order)
   const filteredOrders = useMemo(() => {
-    return mockOrders.filter((o) => {
+    return agentOrders.filter((o) => {
+      // Use confirmed_at as the treatment date; fallback to created_at if null
+      const treatDate = o.confirmed_at ? new Date(o.confirmed_at) : new Date(o.created_at);
       if (!dateRange?.from) return true;
-      const d = new Date(o.createdAt);
       const from = startOfDay(dateRange.from);
       const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
-      return isWithinInterval(d, { start: from, end: to });
+      return isWithinInterval(treatDate, { start: from, end: to });
     });
-  }, [dateRange]);
+  }, [agentOrders, dateRange]);
 
   const stats = useMemo(() => {
     const total = filteredOrders.length;
-    const confirmed = filteredOrders.filter((o) => ["confirmed", "shipped", "delivered", "in_transit", "with_courier"].includes(o.status)).length;
-    const postponed = filteredOrders.filter((o) => o.status === "postponed").length;
-    const noAnswer = filteredOrders.filter((o) => o.status === "no_answer").length;
-    const cancelled = filteredOrders.filter((o) => o.status === "cancelled").length;
+    const confirmed = filteredOrders.filter((o) => o.confirmation_status === "confirmed").length;
+    const postponed = filteredOrders.filter((o) => o.confirmation_status === "postponed").length;
+    const noAnswer = filteredOrders.filter((o) => o.confirmation_status === "no_answer").length;
+    const cancelled = filteredOrders.filter((o) => o.confirmation_status === "cancelled").length;
     return {
       total,
       confirmed,
@@ -88,12 +107,10 @@ const AgentDashboard = () => {
   const topByConfirmation = useMemo(() => {
     const productMap = new Map<string, { total: number; confirmed: number }>();
     filteredOrders.forEach((o) => {
-      o.products.forEach((p) => {
-        const entry = productMap.get(p.name) || { total: 0, confirmed: 0 };
-        entry.total++;
-        if (["confirmed", "shipped", "delivered", "in_transit", "with_courier"].includes(o.status)) entry.confirmed++;
-        productMap.set(p.name, entry);
-      });
+      const entry = productMap.get(o.product_name) || { total: 0, confirmed: 0 };
+      entry.total++;
+      if (o.confirmation_status === "confirmed") entry.confirmed++;
+      productMap.set(o.product_name, entry);
     });
     return Array.from(productMap.entries())
       .map(([name, d]) => ({ name, rate: d.total ? Math.round((d.confirmed / d.total) * 100) : 0, total: d.total }))
@@ -106,12 +123,10 @@ const AgentDashboard = () => {
   const topByDelivery = useMemo(() => {
     const productMap = new Map<string, { shipped: number; delivered: number }>();
     filteredOrders.forEach((o) => {
-      o.products.forEach((p) => {
-        const entry = productMap.get(p.name) || { shipped: 0, delivered: 0 };
-        if (["shipped", "delivered", "in_transit", "with_courier", "returned"].includes(o.status)) entry.shipped++;
-        if (o.status === "delivered") entry.delivered++;
-        productMap.set(p.name, entry);
-      });
+      const entry = productMap.get(o.product_name) || { shipped: 0, delivered: 0 };
+      if (["shipped", "delivered", "in_transit", "with_courier", "returned", "paid"].includes(o.delivery_status || "")) entry.shipped++;
+      if (o.delivery_status === "delivered" || o.delivery_status === "paid") entry.delivered++;
+      productMap.set(o.product_name, entry);
     });
     return Array.from(productMap.entries())
       .map(([name, d]) => ({ name, rate: d.shipped ? Math.round((d.delivered / d.shipped) * 100) : 0, shipped: d.shipped }))
