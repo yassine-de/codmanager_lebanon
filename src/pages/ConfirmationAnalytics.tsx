@@ -325,13 +325,15 @@ export default function ConfirmationAnalytics() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
         <KPICard title="Total Orders" value={stats.total} icon={ShoppingCart} iconBg="bg-primary/10" iconColor="text-primary" delay={0} />
         <KPICard title="Confirmed" value={stats.confirmed} subtitle={`${stats.confirmationRate}% rate`} icon={CheckCircle2} iconBg="bg-success/10" iconColor="text-success" delay={50} />
         <KPICard title="Answered Rate" value={`${stats.answeredRate}%`} icon={PhoneCall} iconBg="bg-primary/10" iconColor="text-primary" delay={100} />
         <KPICard title="Cancelled" value={stats.cancelled} subtitle={`${stats.cancelledRate}% rate`} icon={XCircle} iconBg="bg-destructive/10" iconColor="text-destructive" delay={150} />
         <KPICard title="Reported (Postponed)" value={stats.postponed} subtitle={`${stats.postponedRate}% rate`} icon={AlertTriangle} iconBg="bg-warning/10" iconColor="text-warning" delay={200} />
         <KPICard title="Delivered" value={stats.delivered} subtitle={`${stats.deliveredRate}% delivery rate`} icon={Truck} iconBg="bg-success/10" iconColor="text-success" delay={250} />
+        <KPICard title="First Call Avg" value={timeStats.firstCallAvg} icon={Timer} iconBg="bg-accent/10" iconColor="text-accent-foreground" delay={300} />
+        <KPICard title="Handling Time" value={timeStats.handlingTime} icon={Hourglass} iconBg="bg-accent/10" iconColor="text-accent-foreground" delay={350} />
       </div>
 
       {/* Agent Scores Table */}
