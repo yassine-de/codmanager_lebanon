@@ -168,7 +168,6 @@ const AgentOrders = () => {
       // Merge: agent's pending orders first, then unassigned
       const data = [...(myResult.data || []), ...(unassignedResult.data || [])];
 
-      if (error) throw error;
       if (!data || data.length === 0) {
         toast.info("No new orders to process! 🎉");
         setLoading(false);
