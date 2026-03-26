@@ -239,6 +239,7 @@ export default function Invoices() {
       const rates = sellerRatesMap[sellerId] || null;
       const totalAmount = orders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
       const totalFees = orders.reduce((sum, o) => sum + calculateFeeFromWeight(getProductWeight(sellerId, o.product_name), rates), 0);
+      const codFees = totalAmount * 0.05;
       return {
         id: `draft-${sellerId}`,
         sellerId,
@@ -246,7 +247,8 @@ export default function Invoices() {
         ordersCount: orders.length,
         totalAmount,
         totalFees,
-        netPayable: totalAmount - totalFees,
+        codFees,
+        netPayable: totalAmount - totalFees - codFees,
       };
     });
   }, [unassignedOrders, sellerRatesMap, productWeightMap]);
@@ -265,6 +267,7 @@ export default function Invoices() {
       const rates = sellerRatesMap[inv.seller_id] || null;
       const totalAmount = orders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
       const totalFees = orders.reduce((sum, o) => sum + calculateFeeFromWeight(getProductWeight(inv.seller_id, o.product_name), rates), 0);
+      const codFees = totalAmount * 0.05;
       const addons = addonsByInvoice[inv.id] || [];
       const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
       return {
@@ -272,8 +275,9 @@ export default function Invoices() {
         ordersCount: orders.length,
         totalAmount,
         totalFees,
+        codFees,
         addonNet,
-        netPayable: totalAmount - totalFees + addonNet,
+        netPayable: totalAmount - totalFees - codFees + addonNet,
         sellerName: sellerNameMap[inv.seller_id] || inv.seller_id.slice(0, 8),
       };
     });
