@@ -928,6 +928,15 @@ export default function Invoices() {
         isDraft={detailIsDraft}
         draftOrders={detailDraftOrders}
       />
+
+      {/* History Modal */}
+      <InvoiceHistoryModal
+        open={historyInvoiceId !== null || (historyOrderIds !== undefined && historyOrderIds.length > 0)}
+        onOpenChange={open => { if (!open) { setHistoryInvoiceId(null); setHistoryOrderIds(undefined); } }}
+        invoiceId={historyInvoiceId}
+        invoiceNumber={historyInvoiceNumber}
+        orderIds={historyOrderIds}
+      />
     </div>
   );
 }
