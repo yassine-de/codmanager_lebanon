@@ -397,6 +397,37 @@ export default function Invoices() {
     },
   });
 
+  // Finalize draft then open addon dialog
+  const finalizeAndAddonMutation = useMutation({
+    mutationFn: async (draft: typeof draftInvoices[0]) => {
+      const { data: invoice, error: invError } = await supabase
+        .from("invoices")
+        .insert({ seller_id: draft.sellerId, status: "ready", finalized_at: new Date().toISOString() } as any)
+        .select()
+        .single();
+      if (invError) throw invError;
+      const orderIds = draft.orders.map(o => o.id);
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update({ invoice_id: invoice.id } as any)
+        .in("id", orderIds);
+      if (updateError) throw updateError;
+      return invoice;
+    },
+    onSuccess: (invoice) => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-delivered-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-orders-summary"] });
+      toast.success("Invoice finalized");
+      // Open addon dialog with the new invoice ID
+      setAddonInvoiceId(invoice.id);
+      setAddonType("in");
+      setAddonAmount("");
+      setAddonReason("");
+    },
+    onError: () => toast.error("Failed to finalize invoice"),
+  });
+
   // Add addon
   const addAddonMutation = useMutation({
     mutationFn: async ({ invoiceId, type, amount, reason }: { invoiceId: string; type: string; amount: number; reason: string }) => {
@@ -626,7 +657,8 @@ export default function Invoices() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10"
-                                  onClick={() => toast.info("Finalize the invoice first to add addons")}>
+                                  onClick={() => finalizeAndAddonMutation.mutate(d)}
+                                  disabled={finalizeAndAddonMutation.isPending}>
                                   <PlusCircle className="h-3.5 w-3.5" />
                                 </Button>
                               </TooltipTrigger>
