@@ -19,6 +19,7 @@ import type { DateRange } from "react-day-picker";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import OnlineStatusPanel from "@/components/OnlineStatusPanel";
 
 /* ── Animated Number ── */
 function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
@@ -404,6 +405,9 @@ export default function Dashboard() {
               onClick={() => navigate("/orders?delivery=returned")} />
           </div>
         </div>
+
+        {/* ═══════════ TEAM STATUS (admin only) ═══════════ */}
+        {!isSeller && <OnlineStatusPanel />}
 
         {/* ═══════════ TOP PERFORMERS ═══════════ */}
         <div className={`grid grid-cols-1 ${!isSeller ? 'lg:grid-cols-2' : ''} gap-4`}>
