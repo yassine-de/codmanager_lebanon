@@ -178,8 +178,11 @@ const AgentOrders = () => {
       setCurrentIndex(0);
       setStarted(true);
 
-      // Claim the first order
-      await claimOrder(data[0] as DbOrder);
+      // Claim the first order (only if not already assigned to this agent)
+      const firstOrder = data[0] as DbOrder;
+      if (!firstOrder.agent_id) {
+        await claimOrder(firstOrder);
+      }
 
       toast.success(`${data.length} orders available — Let's go! 🚀`);
     } catch (err: any) {
