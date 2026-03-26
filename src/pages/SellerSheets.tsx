@@ -422,7 +422,52 @@ export default function SellerSheets() {
         </DialogContent>
       </Dialog>
 
-      {/* Errors Modal */}
+      {/* Edit Sheet Modal */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Edit Sheet</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Integration Name *</Label>
+              <Input
+                placeholder="e.g. My Orders Sheet"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Sheet Name</Label>
+              <Input
+                placeholder="e.g. Sheet1"
+                value={editForm.sheet_name}
+                onChange={(e) => setEditForm({ ...editForm, sheet_name: e.target.value })}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Google Sheet URL *</Label>
+              <Input
+                placeholder="https://docs.google.com/spreadsheets/d/..."
+                value={editForm.sheet_url}
+                onChange={(e) => setEditForm({ ...editForm, sheet_url: e.target.value })}
+                className="text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleEdit} disabled={editSaving}>
+              {editSaving && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       <Dialog open={errorsOpen} onOpenChange={setErrorsOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
           <DialogHeader>
