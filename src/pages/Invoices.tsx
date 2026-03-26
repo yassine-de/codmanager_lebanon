@@ -126,7 +126,7 @@ export default function Invoices() {
       if (invoiceIds.length === 0) return [];
       const { data, error } = await supabase
         .from("orders")
-        .select("id, invoice_id, price, quantity, weight")
+        .select("id, invoice_id, price, quantity, product_name, seller_id")
         .in("invoice_id", invoiceIds);
       if (error) throw error;
       return data;
