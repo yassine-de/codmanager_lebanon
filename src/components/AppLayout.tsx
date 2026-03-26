@@ -9,6 +9,7 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import { useLanguage, type Language } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { usePresenceHeartbeat } from "@/hooks/usePresence";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -35,6 +36,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { authUser, signOut } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const { language, setLanguage, t } = useLanguage();
+  usePresenceHeartbeat();
 
   const handleLogout = async () => {
     await signOut();
