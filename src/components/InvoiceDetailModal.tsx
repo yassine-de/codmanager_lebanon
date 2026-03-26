@@ -110,8 +110,9 @@ export function InvoiceDetailModal({ open, onOpenChange, invoiceId, invoiceNumbe
 
   const totalAmount = displayOrders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
   const totalFees = displayOrders.reduce((sum, o) => sum + calculateFeeFromWeight(getWeight(o.product_name), sellerRates), 0);
+  const codFees = totalAmount * 0.05;
   const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
-  const netPayable = totalAmount - totalFees + addonNet;
+  const netPayable = totalAmount - totalFees - codFees + addonNet;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -202,6 +203,10 @@ export function InvoiceDetailModal({ open, onOpenChange, invoiceId, invoiceNumbe
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Total Fees (shipping rates)</span>
                     <span className="font-semibold tabular-nums text-destructive">-{totalFees.toFixed(2)} MAD</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">COD Fees (5%)</span>
+                    <span className="font-semibold tabular-nums text-destructive">-{codFees.toFixed(2)} MAD</span>
                   </div>
                   {/* Addons breakdown */}
                   {addons.length > 0 && (
