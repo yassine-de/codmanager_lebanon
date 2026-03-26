@@ -678,6 +678,7 @@ export default function Invoices() {
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{d.totalAmount.toLocaleString()} <span className="text-muted-foreground text-[10px]">MAD</span></TableCell>
                         <TableCell className="text-right tabular-nums text-destructive">-{d.totalFees.toFixed(2)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-destructive">-{d.codFees.toFixed(2)}</TableCell>
                         <TableCell className="text-right tabular-nums font-bold text-success">{d.netPayable.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">MAD</span></TableCell>
                         <TableCell className="text-center">
                           <Switch
@@ -752,6 +753,7 @@ export default function Invoices() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{inv.totalAmount.toLocaleString()} <span className="text-muted-foreground text-[10px]">MAD</span></TableCell>
                       <TableCell className="text-right tabular-nums text-destructive">-{inv.totalFees.toFixed(2)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">-{inv.codFees.toFixed(2)}</TableCell>
                       <TableCell className="text-right tabular-nums font-bold text-success">{inv.netPayable.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">MAD</span></TableCell>
                       {!isSeller && (
                         <TableCell className="text-center">
