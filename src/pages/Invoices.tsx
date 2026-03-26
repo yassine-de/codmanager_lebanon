@@ -193,6 +193,34 @@ export default function Invoices() {
     return map;
   }, [sellerRatesData]);
 
+  // Fetch products to get weight info
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ["products-for-invoices", allSellerIds],
+    queryFn: async () => {
+      if (allSellerIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("products")
+        .select("name, seller_id, weight")
+        .in("seller_id", allSellerIds);
+      if (error) throw error;
+      return data as { name: string; seller_id: string; weight: string | null }[];
+    },
+    enabled: allSellerIds.length > 0,
+  });
+
+  // Map: "sellerId|productName" -> weight text
+  const productWeightMap = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    allProducts.forEach(p => {
+      map[`${p.seller_id}|${p.name}`] = p.weight;
+    });
+    return map;
+  }, [allProducts]);
+
+  const getProductWeight = (sellerId: string, productName: string): string | null => {
+    return productWeightMap[`${sellerId}|${productName}`] || null;
+  };
+
   // Compute draft invoices (grouped unassigned orders by seller)
   const draftInvoices = useMemo(() => {
     const grouped: Record<string, typeof unassignedOrders> = {};
@@ -203,7 +231,7 @@ export default function Invoices() {
     return Object.entries(grouped).map(([sellerId, orders]) => {
       const rates = sellerRatesMap[sellerId] || null;
       const totalAmount = orders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
-      const totalFees = orders.reduce((sum, o) => sum + calculateFee(o.weight || 0, rates), 0);
+      const totalFees = orders.reduce((sum, o) => sum + calculateFeeFromWeight(getProductWeight(sellerId, o.product_name), rates), 0);
       return {
         id: `draft-${sellerId}`,
         sellerId,
@@ -214,7 +242,7 @@ export default function Invoices() {
         netPayable: totalAmount - totalFees,
       };
     });
-  }, [unassignedOrders, sellerRatesMap]);
+  }, [unassignedOrders, sellerRatesMap, productWeightMap]);
 
   // Compute invoice summaries
   const invoiceSummaries = useMemo(() => {
@@ -229,7 +257,7 @@ export default function Invoices() {
       const orders = ordersBySeller[inv.id] || [];
       const rates = sellerRatesMap[inv.seller_id] || null;
       const totalAmount = orders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
-      const totalFees = orders.reduce((sum, o) => sum + calculateFee(o.weight || 0, rates), 0);
+      const totalFees = orders.reduce((sum, o) => sum + calculateFeeFromWeight(getProductWeight(inv.seller_id, o.product_name), rates), 0);
       const addons = addonsByInvoice[inv.id] || [];
       const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
       return {
@@ -242,7 +270,7 @@ export default function Invoices() {
         sellerName: sellerNameMap[inv.seller_id] || inv.seller_id.slice(0, 8),
       };
     });
-  }, [invoices, invoiceOrders, sellerRatesMap, addonsByInvoice, sellerNameMap]);
+  }, [invoices, invoiceOrders, sellerRatesMap, addonsByInvoice, sellerNameMap, productWeightMap]);
 
   // Combined list: drafts first, then invoices
   type CombinedRow = { type: "draft"; data: typeof draftInvoices[0] } | { type: "invoice"; data: typeof invoiceSummaries[0] };
