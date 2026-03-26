@@ -136,8 +136,19 @@ const AgentOrders = () => {
   const handleStart = async () => {
     setLoading(true);
     try {
-      // Fetch unassigned new orders, filtered by assigned products
-      let query = supabase
+      // Fetch: orders already claimed by this agent (still new) + unassigned new orders
+      const userId = authUser!.id;
+
+      // 1) Orders already assigned to this agent that are still "new"
+      let myQuery = supabase
+        .from("orders")
+        .select("*")
+        .eq("confirmation_status", "new")
+        .eq("agent_id", userId)
+        .order("created_at", { ascending: true });
+
+      // 2) Unassigned new orders
+      let unassignedQuery = supabase
         .from("orders")
         .select("*")
         .eq("confirmation_status", "new")
@@ -145,10 +156,17 @@ const AgentOrders = () => {
         .order("created_at", { ascending: true });
 
       if (assignedProducts) {
-        query = query.in("product_name", assignedProducts);
+        myQuery = myQuery.in("product_name", assignedProducts);
+        unassignedQuery = unassignedQuery.in("product_name", assignedProducts);
       }
 
-      const { data, error } = await query;
+      const [myResult, unassignedResult] = await Promise.all([myQuery, unassignedQuery]);
+
+      if (myResult.error) throw myResult.error;
+      if (unassignedResult.error) throw unassignedResult.error;
+
+      // Merge: agent's pending orders first, then unassigned
+      const data = [...(myResult.data || []), ...(unassignedResult.data || [])];
 
       if (error) throw error;
       if (!data || data.length === 0) {
