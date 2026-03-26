@@ -614,7 +614,7 @@ export default function Invoices() {
                         </TableCell>
                         <TableCell className="text-center text-muted-foreground/40">—</TableCell>
                         <TableCell>
-                          <div className="flex items-center justify-center">
+                          <div className="flex items-center justify-center gap-0.5">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-info hover:bg-info/10" onClick={() => openDetail(row)}>
