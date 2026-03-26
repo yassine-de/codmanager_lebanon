@@ -11,8 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { mockProducts } from "@/lib/products-data";
-import { mockOrders } from "@/lib/data";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -39,30 +37,14 @@ function AnimatedNumber({ value, prefix = "", suffix = "", decimals = 2, classNa
   return <span className={className}>{prefix}{display.toFixed(decimals)}{suffix}</span>;
 }
 
-/* ── Compute product metrics from orders ── */
-function getProductMetrics(productName: string, dateRange?: DateRange) {
-  let productOrders = mockOrders.filter(o => o.products.some(p => p.name === productName));
-  
-  if (dateRange?.from) {
-    productOrders = productOrders.filter(o => {
-      const d = new Date(o.createdAt);
-      if (dateRange.from && d < dateRange.from) return false;
-      if (dateRange.to && d > new Date(dateRange.to.getTime() + 86400000 - 1)) return false;
-      return true;
-    });
-  }
-
-  const totalOrders = productOrders.length;
-  if (totalOrders === 0) return { confirmationRate: 0.45, deliveryRate: 0.65, totalLeads: 0 };
-
-  const confirmed = productOrders.filter(o => ['confirmed', 'shipped', 'delivered'].includes(o.status)).length;
-  const delivered = productOrders.filter(o => o.status === 'delivered').length;
-
-  return {
-    confirmationRate: totalOrders > 0 ? confirmed / totalOrders : 0.45,
-    deliveryRate: confirmed > 0 ? delivered / confirmed : 0.65,
-    totalLeads: totalOrders,
-  };
+interface RealProduct {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  landed_price: number | null;
+  image_url: string | null;
+  weight: string | null;
 }
 
 /* ── Default weight options (fallback) ── */
@@ -87,8 +69,23 @@ export default function Simulation() {
   const [manualConfirmationRate, setManualConfirmationRate] = useState<string>("");
   const [manualDeliveryRate, setManualDeliveryRate] = useState<string>("");
 
-  // Seller rates from DB
+  // Real data from DB
   const [sellerRates, setSellerRates] = useState<{ rate_1kg: number; rate_2kg: number; rate_3kg: number } | null>(null);
+  const [realProducts, setRealProducts] = useState<RealProduct[]>([]);
+  const [orderMetrics, setOrderMetrics] = useState<{ confirmationRate: number; deliveryRate: number; totalLeads: number }>({ confirmationRate: 0, deliveryRate: 0, totalLeads: 0 });
+
+  // Fetch seller products
+  useEffect(() => {
+    if (!authUser?.id) return;
+    supabase
+      .from("products")
+      .select("id, name, sku, price, landed_price, image_url, weight")
+      .eq("seller_id", authUser.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (data) setRealProducts(data);
+      });
+  }, [authUser?.id]);
 
   // Fetch seller shipping rates from DB
   useEffect(() => {
@@ -103,6 +100,48 @@ export default function Simulation() {
       });
   }, [authUser?.id]);
 
+  // Fetch real order metrics when product is selected
+  useEffect(() => {
+    if (mode !== "system" || !selectedProductId || !authUser?.id) return;
+    const selectedProd = realProducts.find(p => p.id === selectedProductId);
+    if (!selectedProd) return;
+
+    const fetchMetrics = async () => {
+      let query = supabase
+        .from("orders")
+        .select("confirmation_status, delivery_status, created_at")
+        .eq("seller_id", authUser.id)
+        .eq("product_name", selectedProd.name);
+
+      if (dateRange?.from) {
+        query = query.gte("created_at", dateRange.from.toISOString());
+      }
+      if (dateRange?.to) {
+        query = query.lte("created_at", new Date(dateRange.to.getTime() + 86400000 - 1).toISOString());
+      }
+
+      const { data: orders } = await query;
+      if (!orders || orders.length === 0) {
+        setOrderMetrics({ confirmationRate: 0, deliveryRate: 0, totalLeads: 0 });
+        setNumberOfLeads("100");
+        return;
+      }
+
+      const total = orders.length;
+      const confirmed = orders.filter(o => ['confirmed', 'shipped', 'delivered'].includes(o.confirmation_status)).length;
+      const delivered = orders.filter(o => o.delivery_status === 'delivered').length;
+
+      setOrderMetrics({
+        confirmationRate: total > 0 ? confirmed / total : 0,
+        deliveryRate: confirmed > 0 ? delivered / confirmed : 0,
+        totalLeads: total,
+      });
+      setNumberOfLeads(total > 0 ? total.toString() : "100");
+    };
+
+    fetchMetrics();
+  }, [mode, selectedProductId, authUser?.id, dateRange, realProducts]);
+
   const weightOptions = useMemo(() => {
     if (sellerRates) {
       return [
@@ -114,25 +153,32 @@ export default function Simulation() {
     return DEFAULT_WEIGHT_OPTIONS;
   }, [sellerRates]);
 
-  const selectedProduct = useMemo(() => mockProducts.find(p => p.id === selectedProductId), [selectedProductId]);
+  const selectedProduct = useMemo(() => realProducts.find(p => p.id === selectedProductId), [selectedProductId, realProducts]);
 
-  const shippingRate = useMemo(() => weightOptions.find(w => w.value === selectedWeight)?.rate ?? weightOptions[0]?.rate ?? 3, [selectedWeight, weightOptions]);
-
-  // Auto-fill leads when product is selected in system mode
-  useEffect(() => {
-    if (mode === "system" && selectedProduct) {
-      const m = getProductMetrics(selectedProduct.name, dateRange);
-      setNumberOfLeads(m.totalLeads > 0 ? m.totalLeads.toString() : "100");
+  // Auto-select weight from product in system mode
+  const autoShippingRate = useMemo(() => {
+    if (mode === "system" && selectedProduct?.weight) {
+      const w = parseFloat(selectedProduct.weight);
+      if (!isNaN(w)) {
+        if (w <= 1) return weightOptions[0]?.rate ?? 3;
+        if (w <= 2) return weightOptions[1]?.rate ?? 5;
+        return weightOptions[2]?.rate ?? 7;
+      }
     }
-  }, [mode, selectedProduct, dateRange]);
+    return null;
+  }, [mode, selectedProduct, weightOptions]);
+
+  const shippingRate = useMemo(() => {
+    if (mode === "system" && autoShippingRate !== null) return autoShippingRate;
+    return weightOptions.find(w => w.value === selectedWeight)?.rate ?? weightOptions[0]?.rate ?? 3;
+  }, [mode, autoShippingRate, selectedWeight, weightOptions]);
 
   const metrics = useMemo(() => {
     if (mode === "system") {
       if (!selectedProduct) return null;
-      const orderMetrics = getProductMetrics(selectedProduct.name, dateRange);
-      const buyingPrice = Math.round(selectedProduct.price * 0.4);
+      const buyingPrice = selectedProduct.landed_price ? Number(selectedProduct.landed_price) : Math.round(Number(selectedProduct.price) * 0.4);
       return {
-        sellingPrice: selectedProduct.price,
+        sellingPrice: Number(selectedProduct.price),
         buyingPrice,
         confirmationRate: orderMetrics.confirmationRate,
         deliveryRate: orderMetrics.deliveryRate,
@@ -150,7 +196,7 @@ export default function Simulation() {
         deliveryRate: dr / 100,
       };
     }
-  }, [mode, selectedProduct, manualBuyingPrice, manualSellingPrice, manualConfirmationRate, manualDeliveryRate, dateRange]);
+  }, [mode, selectedProduct, orderMetrics, manualBuyingPrice, manualSellingPrice, manualConfirmationRate, manualDeliveryRate]);
 
   const results = useMemo(() => {
     if (!metrics) return null;
@@ -225,14 +271,17 @@ export default function Simulation() {
                     <SelectValue placeholder="Choose a product..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockProducts.map(p => (
+                    {realProducts.map(p => (
                       <SelectItem key={p.id} value={p.id} className="text-sm">
                         <div className="flex items-center gap-2">
-                          <img src={p.image} alt="" className="w-5 h-5 rounded object-cover" />
+                          {p.image_url && <img src={p.image_url} alt="" className="w-5 h-5 rounded object-cover" />}
                           {p.name} — {p.price} MAD
                         </div>
                       </SelectItem>
                     ))}
+                    {realProducts.length === 0 && (
+                      <div className="px-3 py-4 text-sm text-muted-foreground text-center">No products found</div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -351,29 +400,40 @@ export default function Simulation() {
                 className="h-10 text-sm"
               />
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
-                <Weight className="h-3 w-3" /> Product Weight
-                {sellerRates && (
-                  <Badge variant="outline" className="ml-1 text-[9px] font-normal text-success">Your Rates</Badge>
-                )}
-              </Label>
-              <Select value={selectedWeight} onValueChange={setSelectedWeight}>
-                <SelectTrigger className="h-10 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {weightOptions.map(w => (
-                    <SelectItem key={w.value} value={w.value} className="text-sm">
-                      {w.label} — {w.rate} MAD shipping
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[10px] text-muted-foreground mt-1.5">
-                Shipping: <span className="font-semibold text-foreground">{shippingRate} MAD</span> per confirmed order
-              </p>
-            </div>
+            {mode === "system" && selectedProduct?.weight && (
+              <div className="rounded-lg bg-muted/30 border border-border p-3 flex items-center gap-2">
+                <Weight className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Product Weight:</span>
+                <span className="text-sm font-medium text-foreground">{selectedProduct.weight} kg</span>
+                <Badge variant="outline" className="ml-1 text-[9px] font-normal text-info">Auto</Badge>
+                <span className="text-xs text-muted-foreground ml-auto">Shipping: <span className="font-semibold text-foreground">{shippingRate} MAD</span></span>
+              </div>
+            )}
+            {mode === "manual" && (
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+                  <Weight className="h-3 w-3" /> Product Weight
+                  {sellerRates && (
+                    <Badge variant="outline" className="ml-1 text-[9px] font-normal text-success">Your Rates</Badge>
+                  )}
+                </Label>
+                <Select value={selectedWeight} onValueChange={setSelectedWeight}>
+                  <SelectTrigger className="h-10 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {weightOptions.map(w => (
+                      <SelectItem key={w.value} value={w.value} className="text-sm">
+                        {w.label} — {w.rate} MAD shipping
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  Shipping: <span className="font-semibold text-foreground">{shippingRate} MAD</span> per confirmed order
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
