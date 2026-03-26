@@ -149,19 +149,28 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
   // Validate product for requests where product_created is false
   const validateProductMutation = useMutation({
     mutationFn: async () => {
+      if (!productWeight) {
+        toast.error("Product weight is required before creating a product");
+        throw new Error("Weight required");
+      }
+      // Save weight first
+      await supabase
+        .from("sourcing_requests")
+        .update({ product_weight: productWeight } as any)
+        .eq("id", request!.id);
       await createProduct();
       if (!request) return;
       await supabase
         .from("sourcing_requests")
-        .update({ product_created: true, updated_at: new Date().toISOString() })
+        .update({ product_created: true, product_weight: productWeight, updated_at: new Date().toISOString() } as any)
         .eq("id", request.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-sourcing"] });
       toast.success("Product created successfully");
     },
-    onError: () => {
-      toast.error("Failed to create product");
+    onError: (err: any) => {
+      if (err?.message !== "Weight required") toast.error("Failed to create product");
     },
   });
 
@@ -173,6 +182,11 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     const alreadyCreated = request?.product_created === true;
 
     if (isNowReceived && !wasReceived && !alreadyCreated) {
+      if (!productWeight) {
+        toast.error("Product weight is required before creating a product");
+        setErrors(prev => ({ ...prev, productWeight: "Weight is required" }));
+        return;
+      }
       setShowProductConfirm(true);
       return;
     }
