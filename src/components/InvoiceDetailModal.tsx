@@ -144,12 +144,13 @@ export function InvoiceDetailModal({ open, onOpenChange, invoiceId, invoiceNumbe
                     <TableHead className="text-[11px] font-semibold text-center">Status</TableHead>
                     <TableHead className="text-[11px] font-semibold text-right">Fees</TableHead>
                     <TableHead className="text-[11px] font-semibold text-right">Amount</TableHead>
+                    <TableHead className="text-[11px] font-semibold text-right">Paid Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {displayOrders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-10 text-muted-foreground text-xs">
+                      <TableCell colSpan={10} className="text-center py-10 text-muted-foreground text-xs">
                         No orders in this invoice.
                       </TableCell>
                     </TableRow>
@@ -182,6 +183,7 @@ export function InvoiceDetailModal({ open, onOpenChange, invoiceId, invoiceNumbe
                           </TableCell>
                           <TableCell className="text-right tabular-nums">{fee.toFixed(2)}</TableCell>
                           <TableCell className="text-right tabular-nums font-medium">{amount.toLocaleString()}</TableCell>
+                          <TableCell className="text-right tabular-nums font-bold text-success">{(amount - fee).toLocaleString()}</TableCell>
                         </TableRow>
                       );
                     })
