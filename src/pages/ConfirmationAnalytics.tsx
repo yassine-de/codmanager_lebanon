@@ -50,6 +50,20 @@ export default function ConfirmationAnalytics() {
     },
   });
 
+  // Fetch order history for time calculations
+  const { data: orderHistory = [] } = useQuery({
+    queryKey: ["order-history-for-analytics"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("order_history")
+        .select("order_id, field_changed, old_value, new_value, created_at")
+        .in("field_changed", ["confirmation_status", "agent_id"])
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const profileNameMap = useMemo(() => {
     const map: Record<string, string> = {};
     profiles.forEach(p => { map[p.user_id] = p.name; });
