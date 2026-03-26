@@ -400,29 +400,40 @@ export default function Simulation() {
                 className="h-10 text-sm"
               />
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
-                <Weight className="h-3 w-3" /> Product Weight
-                {sellerRates && (
-                  <Badge variant="outline" className="ml-1 text-[9px] font-normal text-success">Your Rates</Badge>
-                )}
-              </Label>
-              <Select value={selectedWeight} onValueChange={setSelectedWeight}>
-                <SelectTrigger className="h-10 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {weightOptions.map(w => (
-                    <SelectItem key={w.value} value={w.value} className="text-sm">
-                      {w.label} — {w.rate} MAD shipping
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[10px] text-muted-foreground mt-1.5">
-                Shipping: <span className="font-semibold text-foreground">{shippingRate} MAD</span> per confirmed order
-              </p>
-            </div>
+            {mode === "system" && selectedProduct?.weight && (
+              <div className="rounded-lg bg-muted/30 border border-border p-3 flex items-center gap-2">
+                <Weight className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Product Weight:</span>
+                <span className="text-sm font-medium text-foreground">{selectedProduct.weight} kg</span>
+                <Badge variant="outline" className="ml-1 text-[9px] font-normal text-info">Auto</Badge>
+                <span className="text-xs text-muted-foreground ml-auto">Shipping: <span className="font-semibold text-foreground">{shippingRate} MAD</span></span>
+              </div>
+            )}
+            {mode === "manual" && (
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+                  <Weight className="h-3 w-3" /> Product Weight
+                  {sellerRates && (
+                    <Badge variant="outline" className="ml-1 text-[9px] font-normal text-success">Your Rates</Badge>
+                  )}
+                </Label>
+                <Select value={selectedWeight} onValueChange={setSelectedWeight}>
+                  <SelectTrigger className="h-10 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {weightOptions.map(w => (
+                      <SelectItem key={w.value} value={w.value} className="text-sm">
+                        {w.label} — {w.rate} MAD shipping
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  Shipping: <span className="font-semibold text-foreground">{shippingRate} MAD</span> per confirmed order
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
