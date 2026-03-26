@@ -230,7 +230,7 @@ export function InvoiceDetailModal({ open, onOpenChange, invoiceId, invoiceNumbe
                     </div>
                   )}
                   <div className="border-t pt-2 flex justify-between text-sm">
-                    <span className="font-bold">Net Payable</span>
+                    <span className="font-bold">Paid Amount</span>
                     <span className="font-bold text-success tabular-nums">{netPayable.toLocaleString()} MAD</span>
                   </div>
                 </div>
