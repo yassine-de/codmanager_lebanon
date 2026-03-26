@@ -315,17 +315,34 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
               </div>
             </div>
 
-            {/* Status */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">Status</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map(s => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Status & Weight */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Status</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map(s => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Product Weight {canValidateProduct && <span className="text-destructive">*</span>}</Label>
+                <Select value={productWeight || ""} onValueChange={v => { setProductWeight(v); setErrors(prev => { const { productWeight: _, ...rest } = prev; return rest; }); }}>
+                  <SelectTrigger className={`h-9 text-sm ${errors.productWeight ? "border-destructive" : ""}`}>
+                    <SelectValue placeholder="Select weight" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="up_to_1kg">Up to 1kg</SelectItem>
+                    <SelectItem value="up_to_2kg">Up to 2kg</SelectItem>
+                    <SelectItem value="up_to_3kg">Up to 3kg</SelectItem>
+                    <SelectItem value="more_than_3kg">More than 3kg</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.productWeight && <p className="text-[11px] text-destructive">{errors.productWeight}</p>}
+              </div>
             </div>
 
             {/* Payment */}
