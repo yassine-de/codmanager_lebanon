@@ -294,8 +294,8 @@ export default function Invoices() {
       const sellerName = sellerNameMap[sellerId] || "";
       if (sellerFilter !== "all" && sellerId !== sellerFilter) return false;
       if (statusFilter !== "all") {
-        if (statusFilter === "draft" && row.type !== "draft") return false;
-        if (statusFilter !== "draft" && (row.type === "draft" || row.data.status !== statusFilter)) return false;
+      if (statusFilter === "draft" && row.type !== "draft" && !(row.type === "invoice" && row.data.status === "draft")) return false;
+      if (statusFilter !== "draft" && (row.type === "draft" || row.data.status !== statusFilter)) return false;
       }
       if (dateRange?.from) {
         const date = new Date(row.type === "draft" ? Date.now() : row.data.created_at);
@@ -397,12 +397,12 @@ export default function Invoices() {
     },
   });
 
-  // Finalize draft then open addon dialog
+  // Finalize draft then open addon dialog (creates as draft, not ready)
   const finalizeAndAddonMutation = useMutation({
     mutationFn: async (draft: typeof draftInvoices[0]) => {
       const { data: invoice, error: invError } = await supabase
         .from("invoices")
-        .insert({ seller_id: draft.sellerId, status: "ready", finalized_at: new Date().toISOString() } as any)
+        .insert({ seller_id: draft.sellerId, status: "draft" } as any)
         .select()
         .single();
       if (invError) throw invError;
@@ -418,14 +418,14 @@ export default function Invoices() {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["unassigned-delivered-orders"] });
       queryClient.invalidateQueries({ queryKey: ["invoice-orders-summary"] });
-      toast.success("Invoice finalized");
+      toast.success("Invoice created as draft");
       // Open addon dialog with the new invoice ID
       setAddonInvoiceId(invoice.id);
       setAddonType("in");
       setAddonAmount("");
       setAddonReason("");
     },
-    onError: () => toast.error("Failed to finalize invoice"),
+    onError: () => toast.error("Failed to create invoice"),
   });
 
   // Add addon
@@ -709,6 +709,12 @@ export default function Invoices() {
                             onCheckedChange={() => {
                               if (inv.status === "ready") {
                                 toggleReadyMutation.mutate({ invoiceId: inv.id, currentStatus: inv.status });
+                              } else if (inv.status === "draft") {
+                                // Manually finalize draft DB invoice to ready
+                                supabase.from("invoices").update({ status: "ready", finalized_at: new Date().toISOString() } as any).eq("id", inv.id).then(() => {
+                                  queryClient.invalidateQueries({ queryKey: ["invoices"] });
+                                  toast.success("Invoice marked as Ready");
+                                });
                               }
                             }}
                             disabled={inv.status === "paid"}
@@ -717,6 +723,7 @@ export default function Invoices() {
                         </TableCell>
                       )}
                       <TableCell className="text-center">
+                        {inv.status === "draft" && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning bg-warning/10">Draft</Badge>}
                         {inv.status === "ready" && <Badge variant="outline" className="text-[10px] border-info/30 text-info bg-info/10">Ready</Badge>}
                         {inv.status === "paid" && <Badge variant="outline" className="text-[10px] border-success/30 text-success bg-success/10">Paid</Badge>}
                       </TableCell>
