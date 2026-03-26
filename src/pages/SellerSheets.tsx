@@ -76,6 +76,7 @@ export default function SellerSheets() {
 
   useEffect(() => {
     fetchSheets();
+    fetchServiceEmail();
   }, [user]);
 
   const handleLink = async () => {
