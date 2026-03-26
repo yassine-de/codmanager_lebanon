@@ -446,6 +446,10 @@ export default function Invoices() {
         .update({ invoice_id: invoice.id } as any)
         .in("id", orderIds);
       if (updateError) throw updateError;
+      // Log order additions
+      for (const o of draft.orders) {
+        await logInvoiceHistory(invoice.id, "order_added", null, null, null, o.order_id);
+      }
       return invoice;
     },
     onSuccess: (invoice) => {
