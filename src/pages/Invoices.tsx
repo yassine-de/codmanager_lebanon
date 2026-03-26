@@ -25,6 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { InvoiceDetailModal } from "@/components/InvoiceDetailModal";
+import InvoiceHistoryModal from "@/components/InvoiceHistoryModal";
 import { toast } from "sonner";
 
 interface DbInvoice {
@@ -85,6 +86,11 @@ export default function Invoices() {
   const [addonType, setAddonType] = useState<"in" | "out">("in");
   const [addonAmount, setAddonAmount] = useState("");
   const [addonReason, setAddonReason] = useState("");
+
+  // History modal
+  const [historyInvoiceId, setHistoryInvoiceId] = useState<string | null>(null);
+  const [historyInvoiceNumber, setHistoryInvoiceNumber] = useState("");
+  const [historyOrderIds, setHistoryOrderIds] = useState<string[] | undefined>(undefined);
 
   // Fetch invoices
   const { data: invoices = [], isLoading: loadingInvoices } = useQuery({
