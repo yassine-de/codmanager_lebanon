@@ -239,6 +239,7 @@ export default function Invoices() {
       const rates = sellerRatesMap[sellerId] || null;
       const totalAmount = orders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
       const totalFees = orders.reduce((sum, o) => sum + calculateFeeFromWeight(getProductWeight(sellerId, o.product_name), rates), 0);
+      const codFees = totalAmount * 0.05;
       return {
         id: `draft-${sellerId}`,
         sellerId,
@@ -246,7 +247,8 @@ export default function Invoices() {
         ordersCount: orders.length,
         totalAmount,
         totalFees,
-        netPayable: totalAmount - totalFees,
+        codFees,
+        netPayable: totalAmount - totalFees - codFees,
       };
     });
   }, [unassignedOrders, sellerRatesMap, productWeightMap]);
@@ -265,6 +267,7 @@ export default function Invoices() {
       const rates = sellerRatesMap[inv.seller_id] || null;
       const totalAmount = orders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
       const totalFees = orders.reduce((sum, o) => sum + calculateFeeFromWeight(getProductWeight(inv.seller_id, o.product_name), rates), 0);
+      const codFees = totalAmount * 0.05;
       const addons = addonsByInvoice[inv.id] || [];
       const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
       return {
@@ -272,8 +275,9 @@ export default function Invoices() {
         ordersCount: orders.length,
         totalAmount,
         totalFees,
+        codFees,
         addonNet,
-        netPayable: totalAmount - totalFees + addonNet,
+        netPayable: totalAmount - totalFees - codFees + addonNet,
         sellerName: sellerNameMap[inv.seller_id] || inv.seller_id.slice(0, 8),
       };
     });
@@ -636,6 +640,7 @@ export default function Invoices() {
                 <TableHead className="text-[11px] font-semibold text-center">Orders</TableHead>
                 <TableHead className="text-[11px] font-semibold text-right">Amount</TableHead>
                 <TableHead className="text-[11px] font-semibold text-right">Fees</TableHead>
+                <TableHead className="text-[11px] font-semibold text-right">COD 5%</TableHead>
                 <TableHead className="text-[11px] font-semibold text-right">Net Payable</TableHead>
                 {!isSeller && <TableHead className="text-[11px] font-semibold text-center">Ready</TableHead>}
                 <TableHead className="text-[11px] font-semibold text-center">Status</TableHead>
@@ -673,6 +678,7 @@ export default function Invoices() {
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{d.totalAmount.toLocaleString()} <span className="text-muted-foreground text-[10px]">MAD</span></TableCell>
                         <TableCell className="text-right tabular-nums text-destructive">-{d.totalFees.toFixed(2)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-destructive">-{d.codFees.toFixed(2)}</TableCell>
                         <TableCell className="text-right tabular-nums font-bold text-success">{d.netPayable.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">MAD</span></TableCell>
                         <TableCell className="text-center">
                           <Switch
@@ -747,6 +753,7 @@ export default function Invoices() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{inv.totalAmount.toLocaleString()} <span className="text-muted-foreground text-[10px]">MAD</span></TableCell>
                       <TableCell className="text-right tabular-nums text-destructive">-{inv.totalFees.toFixed(2)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">-{inv.codFees.toFixed(2)}</TableCell>
                       <TableCell className="text-right tabular-nums font-bold text-success">{inv.netPayable.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">MAD</span></TableCell>
                       {!isSeller && (
                         <TableCell className="text-center">
