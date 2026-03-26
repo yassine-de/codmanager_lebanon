@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Package } from "lucide-react";
+import { Loader2, Package, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -92,9 +92,26 @@ export function InvoiceDetailModal({ open, onOpenChange, invoiceId, invoiceNumbe
 
   const getWeight = (productName: string) => productWeightMap[productName] || null;
 
+  // Fetch addons for this invoice
+  const { data: addons = [] } = useQuery({
+    queryKey: ["invoice-addons-detail", invoiceId],
+    queryFn: async () => {
+      if (!invoiceId) return [];
+      const { data, error } = await supabase
+        .from("invoice_addons")
+        .select("*")
+        .eq("invoice_id", invoiceId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; type: string; amount: number; reason: string; created_at: string | null }[];
+    },
+    enabled: !!invoiceId && open,
+  });
+
   const totalAmount = displayOrders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
   const totalFees = displayOrders.reduce((sum, o) => sum + calculateFeeFromWeight(getWeight(o.product_name), sellerRates), 0);
-  const netPayable = totalAmount - totalFees;
+  const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
+  const netPayable = totalAmount - totalFees + addonNet;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -186,6 +203,27 @@ export function InvoiceDetailModal({ open, onOpenChange, invoiceId, invoiceNumbe
                     <span className="text-muted-foreground">Total Fees (shipping rates)</span>
                     <span className="font-semibold tabular-nums text-destructive">-{totalFees.toFixed(2)} MAD</span>
                   </div>
+                  {/* Addons breakdown */}
+                  {addons.length > 0 && (
+                    <div className="border-t pt-2 space-y-1.5">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Addons</span>
+                      {addons.map(addon => (
+                        <div key={addon.id} className="flex justify-between text-xs items-center">
+                          <span className="flex items-center gap-1.5 text-muted-foreground">
+                            {addon.type === "in" ? (
+                              <ArrowDownCircle className="h-3 w-3 text-success" />
+                            ) : (
+                              <ArrowUpCircle className="h-3 w-3 text-destructive" />
+                            )}
+                            {addon.reason || (addon.type === "in" ? "Bonus" : "Deduction")}
+                          </span>
+                          <span className={`font-semibold tabular-nums ${addon.type === "in" ? "text-success" : "text-destructive"}`}>
+                            {addon.type === "in" ? "+" : "-"}{addon.amount.toFixed(2)} MAD
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="border-t pt-2 flex justify-between text-sm">
                     <span className="font-bold">Net Payable</span>
                     <span className="font-bold text-success tabular-nums">{netPayable.toLocaleString()} MAD</span>
