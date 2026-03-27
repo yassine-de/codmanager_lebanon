@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link2, Loader2, Upload, X, ImageIcon } from "lucide-react";
+import { Link2, Loader2, Upload, X, ImageIcon, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -26,6 +27,8 @@ interface SourcingRequest {
   notes: string | null;
   product_image_url: string | null;
   variants: any[] | null;
+  seller_validated: boolean | null;
+  status: string;
 }
 
 interface Props {
@@ -194,10 +197,36 @@ export function EditSellerSourcingModal({ request, open, onOpenChange }: Props) 
     },
     onError: () => { toast.error("Failed to update request"); },
   });
+  const [showValidateConfirm, setShowValidateConfirm] = useState(false);
+
+  const validateMutation = useMutation({
+    mutationFn: async () => {
+      if (!request) return;
+      const { error } = await supabase
+        .from("sourcing_requests")
+        .update({
+          seller_validated: true,
+          status: "validated",
+          updated_at: new Date().toISOString(),
+          admin_seen: false,
+        })
+        .eq("id", request.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["seller-sourcing"] });
+      onOpenChange(false);
+      toast.success("Sourcing request validated");
+    },
+    onError: () => { toast.error("Failed to validate request"); },
+  });
 
   if (!request) return null;
 
+  const canValidate = request.seller_validated === null;
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -346,7 +375,19 @@ export function EditSellerSourcingModal({ request, open, onOpenChange }: Props) 
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          {canValidate && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 border-success/30 text-success hover:bg-success/10 sm:mr-auto"
+              onClick={() => setShowValidateConfirm(true)}
+              disabled={validateMutation.isPending}
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Validate Request
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button size="sm" onClick={() => { if (validate()) updateMutation.mutate(); }} disabled={updateMutation.isPending}>
             {updateMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
@@ -355,5 +396,33 @@ export function EditSellerSourcingModal({ request, open, onOpenChange }: Props) 
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Validate Confirmation */}
+    <AlertDialog open={showValidateConfirm} onOpenChange={setShowValidateConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-success" />
+            Validate Sourcing Request?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to validate the sourcing request for <strong>{request.product_name}</strong>?
+            Once validated, you won't be able to edit it anymore.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => validateMutation.mutate()}
+            disabled={validateMutation.isPending}
+            className="bg-success hover:bg-success/90 text-success-foreground"
+          >
+            {validateMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+            Yes, Validate
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   );
 }
