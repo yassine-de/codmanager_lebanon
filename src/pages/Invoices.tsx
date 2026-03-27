@@ -141,21 +141,8 @@ export default function Invoices() {
     enabled: invoiceIds.length > 0,
   });
 
-  // Fetch unassigned delivered orders (drafts) - admin only
-  const { data: unassignedOrders = [], isLoading: loadingDrafts } = useQuery({
-    queryKey: ["unassigned-delivered-orders"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("delivery_status", "delivered")
-        .is("invoice_id", null)
-        .order("delivered_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !isSeller,
-  });
+  // No more virtual drafts - DB trigger auto-creates draft invoices
+  const loadingDrafts = false;
 
   // Fetch all seller profiles
   const allSellerIds = useMemo(() => {
