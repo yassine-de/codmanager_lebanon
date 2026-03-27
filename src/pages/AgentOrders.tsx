@@ -272,6 +272,9 @@ const AgentOrders = () => {
         resetForm();
         return true;
       }
+
+      // Try to claim by setting agent_id — only works if still unassigned (RLS enforces this)
+      const { data, error } = await supabase
         .from("orders")
         .update({ agent_id: authUser.id })
         .eq("id", order.id)
