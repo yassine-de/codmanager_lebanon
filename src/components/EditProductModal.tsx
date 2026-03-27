@@ -86,9 +86,9 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
     setPrice(product.price);
     setTotalQty(product.totalQty);
     setVariants(product.variants.map(v => ({ ...v })));
-    setStoreLink(product.storeLink || "");
+    setStoreLink(isSeller ? "" : (product.storeLink || ""));
     setVideoLink(product.videoLink || "");
-    setLastSellingPrice(product.lastSellingPrice || 0);
+    setLastSellingPrice(isSeller ? 0 : (product.lastSellingPrice || 0));
     setLastPrice(product.lastPrice || 0);
     setOffers(product.offers?.map(o => ({ ...o })) || []);
     setWeight(product.weight || "");
@@ -128,6 +128,9 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
         errs.videoLink = "Video link is required";
       } else if (!isValidUrl(videoLink)) {
         errs.videoLink = "Invalid URL format";
+      }
+      if (isSeller && lastSellingPrice <= 0) {
+        errs.sellingPrice = "Selling price is required";
       }
     }
     variants.forEach((v, i) => {
@@ -235,8 +238,9 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                   {errors.price && <p className="text-[11px] text-destructive">{errors.price}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Selling Price (MAD)</Label>
-                  <Input type="number" min={0} step={0.01} value={lastSellingPrice} onChange={e => setLastSellingPrice(Number(e.target.value))} className="h-9 text-sm" />
+                  <Label className="text-xs">Selling Price (MAD) {isSeller && isDbProduct && <span className="text-destructive">*</span>}</Label>
+                  <Input type="number" min={0} step={0.01} value={lastSellingPrice || ""} onChange={e => setLastSellingPrice(Number(e.target.value))} placeholder={isSeller ? "Enter selling price" : ""} className={`h-9 text-sm ${errors.sellingPrice ? "border-destructive" : ""}`} />
+                  {errors.sellingPrice && <p className="text-[11px] text-destructive">{errors.sellingPrice}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Total Quantity *</Label>
@@ -270,17 +274,23 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                 </span>
               </h3>
               <div className="w-1/2">
-                <Select value={weight} onValueChange={setWeight}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Select weight bracket" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="up_to_1kg">Up to 1 kg</SelectItem>
-                    <SelectItem value="up_to_2kg">Up to 2 kg</SelectItem>
-                    <SelectItem value="up_to_3kg">Up to 3 kg</SelectItem>
-                    <SelectItem value="more_than_3kg">More than 3 kg</SelectItem>
-                  </SelectContent>
-                </Select>
+                {isSeller ? (
+                  <div className="h-9 flex items-center px-3 rounded-md border bg-muted/50 text-sm text-muted-foreground">
+                    {weight === "up_to_1kg" ? "Up to 1 kg" : weight === "up_to_2kg" ? "Up to 2 kg" : weight === "up_to_3kg" ? "Up to 3 kg" : weight === "more_than_3kg" ? "More than 3 kg" : "Not set"}
+                  </div>
+                ) : (
+                  <Select value={weight} onValueChange={setWeight}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Select weight bracket" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="up_to_1kg">Up to 1 kg</SelectItem>
+                      <SelectItem value="up_to_2kg">Up to 2 kg</SelectItem>
+                      <SelectItem value="up_to_3kg">Up to 3 kg</SelectItem>
+                      <SelectItem value="more_than_3kg">More than 3 kg</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
 
