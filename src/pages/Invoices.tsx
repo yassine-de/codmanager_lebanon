@@ -254,25 +254,20 @@ export default function Invoices() {
   // Filters
   const filtered = useMemo(() => {
     return combined.filter(row => {
-      const sellerId = row.type === "draft" ? row.data.sellerId : row.data.seller_id;
+      const sellerId = row.data.seller_id;
       const sellerName = sellerNameMap[sellerId] || "";
       if (sellerFilter !== "all" && sellerId !== sellerFilter) return false;
       if (statusFilter !== "all") {
-      if (statusFilter === "draft" && row.type !== "draft" && !(row.type === "invoice" && row.data.status === "draft")) return false;
-      if (statusFilter !== "draft" && (row.type === "draft" || row.data.status !== statusFilter)) return false;
+        if (row.data.status !== statusFilter) return false;
       }
       if (dateRange?.from) {
-        const date = new Date(row.type === "draft" ? Date.now() : row.data.created_at);
+        const date = new Date(row.data.created_at);
         if (date < dateRange.from) return false;
         if (dateRange.to && date > dateRange.to) return false;
       }
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        if (row.type === "draft") {
-          if (!sellerName.toLowerCase().includes(q) && !"draft".includes(q)) return false;
-        } else {
-          if (!row.data.invoice_number.toLowerCase().includes(q) && !sellerName.toLowerCase().includes(q)) return false;
-        }
+        if (!row.data.invoice_number.toLowerCase().includes(q) && !sellerName.toLowerCase().includes(q) && !row.data.status.toLowerCase().includes(q)) return false;
       }
       return true;
     });
@@ -282,9 +277,9 @@ export default function Invoices() {
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // Stats
-  const totalAmount = filtered.reduce((s, r) => s + (r.type === "draft" ? r.data.netPayable : r.data.netPayable), 0);
-  const paidAmount = filtered.filter(r => r.type === "invoice" && r.data.status === "paid").reduce((s, r) => s + (r as any).data.netPayable, 0);
-  const needToPay = filtered.filter(r => r.type === "invoice" && r.data.status === "ready").reduce((s, r) => s + (r as any).data.netPayable, 0);
+  const totalAmount = filtered.reduce((s, r) => s + r.data.netPayable, 0);
+  const paidAmount = filtered.filter(r => r.data.status === "paid").reduce((s, r) => s + r.data.netPayable, 0);
+  const needToPay = filtered.filter(r => r.data.status === "ready").reduce((s, r) => s + r.data.netPayable, 0);
 
   const sellerOptions = useMemo(() => {
     return allSellerIds.map(id => ({
