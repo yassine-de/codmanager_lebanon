@@ -638,7 +638,7 @@ export default function Invoices() {
                           <div className="flex items-center justify-center gap-1.5">
                             <Switch
                               checked={inv.status === "paid"}
-                              onCheckedChange={() => togglePaidMutation.mutate({ invoiceId: inv.id, currentStatus: inv.status })}
+                              onCheckedChange={() => togglePaidMutation.mutate({ invoiceId: inv.id, currentStatus: inv.status, netPayable: inv.netPayable, sellerId: inv.seller_id })}
                               disabled={inv.status !== "ready" && inv.status !== "paid"}
                               className="data-[state=checked]:bg-success scale-90"
                             />
