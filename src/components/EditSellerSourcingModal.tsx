@@ -197,8 +197,33 @@ export function EditSellerSourcingModal({ request, open, onOpenChange }: Props) 
     },
     onError: () => { toast.error("Failed to update request"); },
   });
+  const [showValidateConfirm, setShowValidateConfirm] = useState(false);
+
+  const validateMutation = useMutation({
+    mutationFn: async () => {
+      if (!request) return;
+      const { error } = await supabase
+        .from("sourcing_requests")
+        .update({
+          seller_validated: true,
+          status: "validated",
+          updated_at: new Date().toISOString(),
+          admin_seen: false,
+        })
+        .eq("id", request.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["seller-sourcing"] });
+      onOpenChange(false);
+      toast.success("Sourcing request validated");
+    },
+    onError: () => { toast.error("Failed to validate request"); },
+  });
 
   if (!request) return null;
+
+  const canValidate = request.seller_validated === null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
