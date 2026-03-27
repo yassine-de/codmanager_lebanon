@@ -444,7 +444,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                         </div>
                         <div className="space-y-1">
                           <Label className="text-[10px] text-muted-foreground">Quantity</Label>
-                          <Input type="number" min={0} step={1} value={variant.quantity} onChange={e => updateVariant(i, "quantity", Number(e.target.value))} className={`h-8 text-xs`} />
+                          <Input type="number" min={0} step={1} value={variant.quantity} onChange={e => updateVariant(i, "quantity", Number(e.target.value))} className={`h-8 text-xs`} disabled={isSeller} />
                         </div>
                       </div>
                       <div className="space-y-1">
