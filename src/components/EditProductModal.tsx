@@ -309,7 +309,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className={`text-xs flex items-center gap-1.5 ${errors.storeLink ? "text-destructive" : ""}`}>
-                    <ExternalLink className="w-3 h-3 text-muted-foreground" /> Product Link {isDbProduct && <span className="text-destructive">*</span>}
+                    <ExternalLink className="w-3 h-3 text-muted-foreground" /> Product Link {isDbProduct && isSeller && <span className="text-destructive">*</span>}
                   </Label>
                   <Input
                     value={storeLink}
@@ -321,7 +321,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                 </div>
                 <div className="space-y-1.5">
                   <Label className={`text-xs flex items-center gap-1.5 ${errors.videoLink ? "text-destructive" : ""}`}>
-                    <Video className="w-3 h-3 text-muted-foreground" /> Video Link {isDbProduct && <span className="text-destructive">*</span>}
+                    <Video className="w-3 h-3 text-muted-foreground" /> Video Link {isDbProduct && isSeller && <span className="text-destructive">*</span>}
                   </Label>
                   <Input
                     value={videoLink}
