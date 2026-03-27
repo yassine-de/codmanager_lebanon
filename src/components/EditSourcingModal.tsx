@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ExternalLink, Loader2, MapPin, Ship, ImageIcon, PackageCheck } from "lucide-react";
+import { ExternalLink, Loader2, MapPin, Ship, ImageIcon, PackageCheck, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { DbSourcingRequest } from "@/pages/Sourcing";
