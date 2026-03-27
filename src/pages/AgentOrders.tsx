@@ -66,6 +66,8 @@ interface DbOrder {
   offers: string | null;
   last_price: number | null;
   created_at: string;
+  updated_at: string;
+  _isFollowUp?: boolean; // local flag, not from DB
 }
 
 const AgentOrders = () => {
