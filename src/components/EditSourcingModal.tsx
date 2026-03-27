@@ -291,14 +291,14 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
 
   const handleSave = () => {
     if (!validate()) return;
-    // If status changed to received and product not yet created, show confirmation
     const wasReceived = request?.status === "received";
     const isNowReceived = status === "received";
     const alreadyCreated = request?.product_created === true;
+    const isExistingProduct = !!sourceProductId;
 
     if (isNowReceived && !wasReceived && !alreadyCreated) {
       if (!productWeight) {
-        toast.error("Product weight is required before creating a product");
+        toast.error("Product weight is required");
         setErrors(prev => ({ ...prev, productWeight: "Weight is required" }));
         return;
       }
@@ -308,9 +308,15 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     updateMutation.mutate({});
   };
 
-  const handleProductConfirm = (yes: boolean) => {
+  const handleProductConfirm = (action: "create" | "addStock" | "no") => {
     setShowProductConfirm(false);
-    updateMutation.mutate({ withProduct: yes ? true : false });
+    if (action === "addStock") {
+      updateMutation.mutate({ addStock: true });
+    } else if (action === "create") {
+      updateMutation.mutate({ withProduct: true });
+    } else {
+      updateMutation.mutate({ withProduct: false });
+    }
   };
 
   if (!request) return null;
