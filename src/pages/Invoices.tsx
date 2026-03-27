@@ -148,9 +148,8 @@ export default function Invoices() {
   const allSellerIds = useMemo(() => {
     const ids = new Set<string>();
     invoices.forEach(i => ids.add(i.seller_id));
-    unassignedOrders.forEach(o => ids.add(o.seller_id));
     return [...ids];
-  }, [invoices, unassignedOrders]);
+  }, [invoices]);
 
   const { data: sellerProfiles = [] } = useQuery({
     queryKey: ["seller-profiles-invoices", allSellerIds],
@@ -215,42 +214,17 @@ export default function Invoices() {
     return productWeightMap[`${sellerId}|${productName}`] || null;
   };
 
-  // Compute draft invoices (grouped unassigned orders by seller)
-  const draftInvoices = useMemo(() => {
-    const grouped: Record<string, typeof unassignedOrders> = {};
-    unassignedOrders.forEach(order => {
-      if (!grouped[order.seller_id]) grouped[order.seller_id] = [];
-      grouped[order.seller_id].push(order);
-    });
-    return Object.entries(grouped).map(([sellerId, orders]) => {
-      const rates = sellerRatesMap[sellerId] || null;
-      const totalAmount = orders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
-      const totalFees = orders.reduce((sum, o) => sum + calculateFeeFromWeight(getProductWeight(sellerId, o.product_name), rates), 0);
-      const codFees = totalAmount * 0.05;
-      return {
-        id: `draft-${sellerId}`,
-        sellerId,
-        orders,
-        ordersCount: orders.length,
-        totalAmount,
-        totalFees,
-        codFees,
-        netPayable: totalAmount - totalFees - codFees,
-      };
-    });
-  }, [unassignedOrders, sellerRatesMap, productWeightMap]);
-
-  // Compute invoice summaries
+  // Compute invoice summaries (all invoices including drafts from DB)
   const invoiceSummaries = useMemo(() => {
-    const ordersBySeller: Record<string, typeof invoiceOrders> = {};
+    const ordersByInvoice: Record<string, typeof invoiceOrders> = {};
     invoiceOrders.forEach(o => {
       const key = o.invoice_id!;
-      if (!ordersBySeller[key]) ordersBySeller[key] = [];
-      ordersBySeller[key].push(o);
+      if (!ordersByInvoice[key]) ordersByInvoice[key] = [];
+      ordersByInvoice[key].push(o);
     });
 
     return invoices.map(inv => {
-      const orders = ordersBySeller[inv.id] || [];
+      const orders = ordersByInvoice[inv.id] || [];
       const rates = sellerRatesMap[inv.seller_id] || null;
       const totalAmount = orders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
       const totalFees = orders.reduce((sum, o) => sum + calculateFeeFromWeight(getProductWeight(inv.seller_id, o.product_name), rates), 0);
@@ -270,19 +244,12 @@ export default function Invoices() {
     });
   }, [invoices, invoiceOrders, sellerRatesMap, addonsByInvoice, sellerNameMap, productWeightMap]);
 
-  // Combined list: drafts first, then invoices
-  type CombinedRow = { type: "draft"; data: typeof draftInvoices[0] } | { type: "invoice"; data: typeof invoiceSummaries[0] };
-
+  // All invoices as rows (no more virtual drafts)
   const combined = useMemo(() => {
-    const rows: CombinedRow[] = [];
-    if (!isSeller) {
-      draftInvoices.forEach(d => rows.push({ type: "draft", data: d }));
-    }
-    invoiceSummaries
+    return invoiceSummaries
       .filter(inv => isSeller ? inv.status !== "draft" : true)
-      .forEach(inv => rows.push({ type: "invoice", data: inv }));
-    return rows;
-  }, [draftInvoices, invoiceSummaries, isSeller]);
+      .map(inv => ({ type: "invoice" as const, data: inv }));
+  }, [invoiceSummaries, isSeller]);
 
   // Filters
   const filtered = useMemo(() => {
