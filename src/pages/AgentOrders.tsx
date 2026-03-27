@@ -258,8 +258,20 @@ const AgentOrders = () => {
     if (!authUser) return false;
     setClaiming(true);
     try {
-      // Try to claim by setting agent_id — only works if still unassigned (RLS enforces this)
-      const { data, error } = await supabase
+      // If this is a follow-up order already assigned to us, no need to claim
+      if (order.agent_id === authUser.id) {
+        setEditItems([{ name: order.product_name, qty: order.quantity, price: Number(order.price) }]);
+        setEditCustomer({
+          name: order.customer_name,
+          phone: order.customer_phone,
+          city: order.customer_city,
+          address: order.customer_address || "",
+        });
+        setEditingCustomer(false);
+        setEditMode(false);
+        resetForm();
+        return true;
+      }
         .from("orders")
         .update({ agent_id: authUser.id })
         .eq("id", order.id)
