@@ -374,7 +374,19 @@ export function EditSellerSourcingModal({ request, open, onOpenChange }: Props) 
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          {canValidate && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 border-success/30 text-success hover:bg-success/10 sm:mr-auto"
+              onClick={() => setShowValidateConfirm(true)}
+              disabled={validateMutation.isPending}
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Validate Request
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button size="sm" onClick={() => { if (validate()) updateMutation.mutate(); }} disabled={updateMutation.isPending}>
             {updateMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
@@ -383,5 +395,33 @@ export function EditSellerSourcingModal({ request, open, onOpenChange }: Props) 
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Validate Confirmation */}
+    <AlertDialog open={showValidateConfirm} onOpenChange={setShowValidateConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-success" />
+            Validate Sourcing Request?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to validate the sourcing request for <strong>{request.product_name}</strong>?
+            Once validated, you won't be able to edit it anymore.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => validateMutation.mutate()}
+            disabled={validateMutation.isPending}
+            className="bg-success hover:bg-success/90 text-success-foreground"
+          >
+            {validateMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+            Yes, Validate
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   );
 }
