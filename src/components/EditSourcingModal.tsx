@@ -407,7 +407,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
                   </div>
                   <div className="rounded-lg border bg-background px-3 py-2">
                     <p className="text-[10px] text-muted-foreground">Buying Price</p>
-                    <p className="text-sm font-bold tabular-nums">{(sourceProduct.price ?? 0).toLocaleString()} MAD</p>
+                    <p className="text-sm font-bold tabular-nums">{(sellerPrice ?? 0).toLocaleString()} MAD</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-1.5 mt-1">
