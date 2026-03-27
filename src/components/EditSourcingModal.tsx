@@ -237,6 +237,41 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
               </div>
             </div>
 
+            {/* Variants Display (read-only) */}
+            {request.variants && Array.isArray(request.variants) && (request.variants as any[]).length > 0 && (
+              <div className="rounded-xl border bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Variants</span>
+                </div>
+                <div className="space-y-2">
+                  {(request.variants as any[]).map((variant: any, vi: number) => (
+                    <div key={vi} className="rounded-lg border bg-background p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold">{variant.name || variant.group || `Variant ${vi + 1}`}</span>
+                        <span className="text-[10px] text-muted-foreground font-medium tabular-nums">
+                          Qty: {variant.quantity ?? (variant.options?.reduce?.((s: number, o: any) => s + (o.quantity || 0), 0) || 0)}
+                        </span>
+                      </div>
+                      {variant.subVariants && variant.subVariants.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {variant.subVariants.map((sv: any, si: number) => (
+                            <span key={si} className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                              {sv.name} <span className="text-primary/60">×{sv.quantity}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {variant.options && !variant.subVariants && variant.options.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {variant.options.map((opt: any, oi: number) => (
+                            <span key={oi} className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                              {opt.name} <span className="text-primary/60">×{opt.quantity}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
             {/* Validate Product Button - shows when received but product not created */}
             {canValidateProduct && (
               <Button
