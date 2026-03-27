@@ -627,6 +627,7 @@ export type Database = {
           total_price: number | null
           unit_price: number | null
           updated_at: string
+          variants: Json | null
         }
         Insert: {
           admin_seen?: boolean | null
@@ -654,6 +655,7 @@ export type Database = {
           total_price?: number | null
           unit_price?: number | null
           updated_at?: string
+          variants?: Json | null
         }
         Update: {
           admin_seen?: boolean | null
@@ -681,6 +683,7 @@ export type Database = {
           total_price?: number | null
           unit_price?: number | null
           updated_at?: string
+          variants?: Json | null
         }
         Relationships: []
       }
