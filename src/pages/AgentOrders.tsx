@@ -66,6 +66,8 @@ interface DbOrder {
   offers: string | null;
   last_price: number | null;
   created_at: string;
+  updated_at: string;
+  _isFollowUp?: boolean; // local flag, not from DB
 }
 
 const AgentOrders = () => {
@@ -77,6 +79,7 @@ const AgentOrders = () => {
   const [orderQueue, setOrderQueue] = useState<DbOrder[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [newOrderCount, setNewOrderCount] = useState(0);
+  const [noAnswerCount, setNoAnswerCount] = useState(0);
   const [assignedProducts, setAssignedProducts] = useState<string[] | null>(null); // null = all
 
   // Editable customer info
@@ -118,73 +121,132 @@ const AgentOrders = () => {
         : null; // null = all products
       setAssignedProducts(prodNames);
 
-      // Count available orders (filtered by assigned products)
-      let query = supabase
+      // Count available new orders
+      let newQuery = supabase
         .from("orders")
         .select("id", { count: "exact", head: true })
         .eq("confirmation_status", "new")
         .is("agent_id", null);
       if (prodNames) {
-        query = query.in("product_name", prodNames);
+        newQuery = newQuery.in("product_name", prodNames);
       }
-      const { count } = await query;
-      setNewOrderCount(count || 0);
+      const { count: newCount } = await newQuery;
+      setNewOrderCount(newCount || 0);
+
+      // Count no_answer orders assigned to this agent (for follow-up)
+      let naQuery = supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("confirmation_status", "no_answer")
+        .eq("agent_id", authUser.id)
+        .lt("attempt_count", NO_ANSWER_MAX_ATTEMPTS);
+      if (prodNames) {
+        naQuery = naQuery.in("product_name", prodNames);
+      }
+      const { count: naCount } = await naQuery;
+      setNoAnswerCount(naCount || 0);
     };
     init();
   }, [authUser]);
 
+  // Helper to fetch prioritized orders
+  const fetchPrioritizedOrders = async (): Promise<DbOrder[]> => {
+    const userId = authUser!.id;
+
+    // 1) Orders already assigned to this agent that are still "new"
+    let myNewQuery = supabase
+      .from("orders")
+      .select("*")
+      .eq("confirmation_status", "new")
+      .eq("agent_id", userId)
+      .order("created_at", { ascending: true });
+
+    // 2) Unassigned new orders
+    let unassignedQuery = supabase
+      .from("orders")
+      .select("*")
+      .eq("confirmation_status", "new")
+      .is("agent_id", null)
+      .order("created_at", { ascending: true });
+
+    if (assignedProducts) {
+      myNewQuery = myNewQuery.in("product_name", assignedProducts);
+      unassignedQuery = unassignedQuery.in("product_name", assignedProducts);
+    }
+
+    const [myNewResult, unassignedResult] = await Promise.all([myNewQuery, unassignedQuery]);
+    if (myNewResult.error) throw myNewResult.error;
+    if (unassignedResult.error) throw unassignedResult.error;
+
+    const newOrders = [...(myNewResult.data || []), ...(unassignedResult.data || [])] as DbOrder[];
+
+    // 3) No-answer follow-ups assigned to this agent, sorted by attempt_count ASC then updated_at ASC (oldest first)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    let noAnswerQuery = supabase
+      .from("orders")
+      .select("*")
+      .eq("confirmation_status", "no_answer")
+      .eq("agent_id", userId)
+      .lt("attempt_count", NO_ANSWER_MAX_ATTEMPTS)
+      .order("attempt_count", { ascending: true })
+      .order("updated_at", { ascending: true });
+
+    if (assignedProducts) {
+      noAnswerQuery = noAnswerQuery.in("product_name", assignedProducts);
+    }
+
+    // If there are new orders, only get no_answer orders older than 1h (cooldown)
+    // If no new orders, get ALL no_answer orders immediately
+    if (newOrders.length > 0) {
+      noAnswerQuery = noAnswerQuery.lt("updated_at", oneHourAgo);
+    }
+
+    const noAnswerResult = await noAnswerQuery;
+    if (noAnswerResult.error) throw noAnswerResult.error;
+
+    const noAnswerOrders = ((noAnswerResult.data || []) as DbOrder[]).map(o => ({
+      ...o,
+      _isFollowUp: true,
+    }));
+
+    // Combined queue: new orders first, then no-answer follow-ups
+    return [...newOrders, ...noAnswerOrders];
+  };
+
   const handleStart = async () => {
     setLoading(true);
     try {
-      // Fetch: orders already claimed by this agent (still new) + unassigned new orders
-      const userId = authUser!.id;
-
-      // 1) Orders already assigned to this agent that are still "new"
-      let myQuery = supabase
-        .from("orders")
-        .select("*")
-        .eq("confirmation_status", "new")
-        .eq("agent_id", userId)
-        .order("created_at", { ascending: true });
-
-      // 2) Unassigned new orders
-      let unassignedQuery = supabase
-        .from("orders")
-        .select("*")
-        .eq("confirmation_status", "new")
-        .is("agent_id", null)
-        .order("created_at", { ascending: true });
-
-      if (assignedProducts) {
-        myQuery = myQuery.in("product_name", assignedProducts);
-        unassignedQuery = unassignedQuery.in("product_name", assignedProducts);
-      }
-
-      const [myResult, unassignedResult] = await Promise.all([myQuery, unassignedQuery]);
-
-      if (myResult.error) throw myResult.error;
-      if (unassignedResult.error) throw unassignedResult.error;
-
-      // Merge: agent's pending orders first, then unassigned
-      const data = [...(myResult.data || []), ...(unassignedResult.data || [])];
+      const data = await fetchPrioritizedOrders();
 
       if (!data || data.length === 0) {
-        toast.info("No new orders to process! 🎉");
+        toast.info("No orders to process right now! 🎉");
         setLoading(false);
         return;
       }
 
-      setOrderQueue(data as DbOrder[]);
+      setOrderQueue(data);
       setCurrentIndex(0);
       setStarted(true);
 
       // Claim the first order (only if not already assigned to this agent)
-      const firstOrder = data[0] as DbOrder;
-      if (!firstOrder.agent_id) {
+      const firstOrder = data[0];
+      if (!firstOrder.agent_id || firstOrder.agent_id !== authUser!.id) {
         await claimOrder(firstOrder);
+      } else {
+        // Already ours — init edit state
+        setEditItems([{ name: firstOrder.product_name, qty: firstOrder.quantity, price: Number(firstOrder.price) }]);
+        setEditCustomer({
+          name: firstOrder.customer_name,
+          phone: firstOrder.customer_phone,
+          city: firstOrder.customer_city,
+          address: firstOrder.customer_address || "",
+        });
+        resetForm();
       }
 
-      toast.success(`${data.length} orders available — Let's go! 🚀`);
+      const newCount = data.filter(o => o.confirmation_status === "new").length;
+      const followUpCount = data.filter(o => o._isFollowUp).length;
+      toast.success(`${newCount} new + ${followUpCount} follow-up orders — Let's go! 🚀`);
     } catch (err: any) {
       toast.error(err.message || "Failed to load orders");
     } finally {
@@ -196,6 +258,21 @@ const AgentOrders = () => {
     if (!authUser) return false;
     setClaiming(true);
     try {
+      // If this is a follow-up order already assigned to us, no need to claim
+      if (order.agent_id === authUser.id) {
+        setEditItems([{ name: order.product_name, qty: order.quantity, price: Number(order.price) }]);
+        setEditCustomer({
+          name: order.customer_name,
+          phone: order.customer_phone,
+          city: order.customer_city,
+          address: order.customer_address || "",
+        });
+        setEditingCustomer(false);
+        setEditMode(false);
+        resetForm();
+        return true;
+      }
+
       // Try to claim by setting agent_id — only works if still unassigned (RLS enforces this)
       const { data, error } = await supabase
         .from("orders")
@@ -358,24 +435,45 @@ const AgentOrders = () => {
   const moveToNext = async () => {
     let nextIdx = currentIndex + 1;
 
-    // Try to find and claim next unclaimed order
+    // Try to find and claim next unclaimed order in current queue
     while (nextIdx < orderQueue.length) {
       const nextOrder = orderQueue[nextIdx];
-      // If already assigned to this agent, just move to it
+      // If already assigned to this agent (follow-up or previously claimed), just move to it
       if (nextOrder.agent_id === authUser?.id) {
-        setCurrentIndex(nextIdx);
-        return;
+        const claimed = await claimOrder(nextOrder);
+        if (claimed) {
+          setCurrentIndex(nextIdx);
+          return;
+        }
+      } else {
+        const claimed = await claimOrder(nextOrder);
+        if (claimed) {
+          setCurrentIndex(nextIdx);
+          return;
+        }
       }
-      const claimed = await claimOrder(nextOrder);
-      if (claimed) {
-        setCurrentIndex(nextIdx);
-        return;
-      }
-      // Skip if already claimed by another agent
+      // Skip if claim failed
       nextIdx++;
     }
 
-    // No more orders
+    // Queue exhausted — try to refetch for more orders (new arrivals + cooled-down no_answer)
+    try {
+      const freshOrders = await fetchPrioritizedOrders();
+      if (freshOrders.length > 0) {
+        setOrderQueue(freshOrders);
+        setCurrentIndex(0);
+        const firstOrder = freshOrders[0];
+        await claimOrder(firstOrder);
+        const newCount = freshOrders.filter(o => o.confirmation_status === "new").length;
+        const followUpCount = freshOrders.filter(o => o._isFollowUp).length;
+        toast.success(`${newCount} new + ${followUpCount} follow-up orders loaded! 🔄`);
+        return;
+      }
+    } catch (err) {
+      console.error("Error refetching orders:", err);
+    }
+
+    // Truly no more orders
     toast.success("All orders processed! 🎉");
     setStarted(false);
     setOrderQueue([]);
@@ -405,7 +503,10 @@ const AgentOrders = () => {
           </div>
           <h1 className="text-2xl font-bold text-foreground">Ready to start confirming?</h1>
           <p className="text-muted-foreground text-sm max-w-md">
-            You have <span className="font-bold text-primary">{newOrderCount}</span> new orders waiting.
+            You have <span className="font-bold text-primary">{newOrderCount}</span> new orders
+            {noAnswerCount > 0 && (
+              <> and <span className="font-bold text-blue-500">{noAnswerCount}</span> follow-up orders</>
+            )} waiting.
             Hit the button below and they'll come to you one by one.
           </p>
         </div>
@@ -413,7 +514,7 @@ const AgentOrders = () => {
           size="lg"
           className="gap-2 text-base px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all"
           onClick={handleStart}
-          disabled={newOrderCount === 0 || loading}
+          disabled={(newOrderCount === 0 && noAnswerCount === 0) || loading}
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
           Start Fast Confirmation

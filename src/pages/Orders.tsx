@@ -55,7 +55,7 @@ function StatusBadge({ label, cls }: { label: string; cls: string }) {
 }
 
 /* ── Column definitions ── */
-type ColumnKey = 'id' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'amount' | 'confirmationStatus' | 'deliveryStatus';
+type ColumnKey = 'id' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'amount' | 'confirmationStatus' | 'deliveryStatus' | 'attempts';
 
 const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
   { key: 'id', label: 'ID', defaultVisible: true },
@@ -68,6 +68,7 @@ const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean }[] =
   { key: 'product', label: 'Product', defaultVisible: true },
   { key: 'amount', label: 'Amount', defaultVisible: true },
   { key: 'confirmationStatus', label: 'Confirmation', defaultVisible: true },
+  { key: 'attempts', label: 'Attempts', defaultVisible: true },
   { key: 'deliveryStatus', label: 'Delivery', defaultVisible: true },
 ];
 
@@ -201,6 +202,7 @@ export default function Orders() {
         upsell: false,
         warehouseState: "in_stock" as const,
         history: [],
+        attemptCount: o.attempt_count || 0,
       }));
 
       setOrders(mapped);
@@ -543,6 +545,7 @@ export default function Orders() {
                 {isCol('product') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Product</th>}
                 {isCol('amount') && <th className="text-right py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Amount</th>}
                 {isCol('confirmationStatus') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Confirmation</th>}
+                {isCol('attempts') && isAdmin && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Attempts</th>}
                 {isCol('deliveryStatus') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Delivery</th>}
                 <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Actions</th>
               </tr>
@@ -564,6 +567,17 @@ export default function Orders() {
                   {isCol('product') && <td className="py-2.5 px-4 text-xs text-muted-foreground">{order.products.map(p => p.name).join(', ')}</td>}
                   {isCol('amount') && <td className="py-2.5 px-4 text-xs font-medium tabular-nums text-right">{order.total.toLocaleString()} MAD</td>}
                   {isCol('confirmationStatus') && <td className="py-2.5 px-4"><StatusBadge {...confirmationConfig[order.confirmationStatus]} /></td>}
+                  {isCol('attempts') && isAdmin && (
+                    <td className="py-2.5 px-4 text-xs">
+                      {(order.attemptCount || 0) > 0 ? (
+                        <span className="inline-flex items-center rounded-full bg-[hsl(38,90%,55%)]/12 text-[hsl(38,90%,55%)] border border-[hsl(38,90%,55%)]/20 px-2 py-0.5 text-[11px] font-medium">
+                          {order.attemptCount}× attempt{(order.attemptCount || 0) > 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  )}
                   {isCol('deliveryStatus') && <td className="py-2.5 px-4"><StatusBadge {...deliveryConfig[order.deliveryStatus]} /></td>}
                   <td className="py-2.5 px-4">
                     <div className="flex items-center gap-1.5">
