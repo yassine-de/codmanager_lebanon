@@ -407,7 +407,7 @@ export function EditSellerSourcingModal({ request, open, onOpenChange }: Props) 
           </AlertDialogTitle>
           <AlertDialogDescription>
             Are you sure you want to validate the sourcing request for <strong>{request.product_name}</strong>?
-            Once validated, you won't be able to edit it anymore.
+            Once validated, we will start working on sourcing your product.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
