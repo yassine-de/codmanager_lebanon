@@ -25,11 +25,21 @@ export default function ProductDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("*")
+        .select("*, variants, weight")
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
+      const rawVariants = (data as any).variants as any[] | null;
+      const mappedVariants = rawVariants
+        ? rawVariants.map((v: any, i: number) => ({
+            id: v.id || `v-${i}`,
+            name: v.name || v.group || "",
+            sku: "",
+            price: 0,
+            quantity: v.quantity || (v.subVariants ? v.subVariants.reduce((s: number, sv: any) => s + (sv.quantity || 0), 0) : 0),
+          }))
+        : [];
       return {
         id: data.id,
         seller: authUser?.name || "Unknown",
@@ -42,12 +52,13 @@ export default function ProductDetail() {
         shipped: 0,
         available: data.quantity || 0,
         createdAt: data.created_at,
-        variants: [],
+        variants: mappedVariants,
         storeLink: data.product_url || "",
         videoLink: data.video_url || "",
         lastSellingPrice: Number(data.price) || 0,
         lastPrice: Number(data.landed_price) || 0,
         offers: [],
+        weight: (data as any).weight || undefined,
       } as Product;
     },
     enabled: !mockProduct && !!id,
