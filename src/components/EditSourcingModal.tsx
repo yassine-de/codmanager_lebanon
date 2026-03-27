@@ -46,6 +46,25 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     },
     enabled: !!sourceProductId,
   });
+
+  // Fetch previous landed_price from older sourcing requests for same product
+  const { data: prevLandedPrice } = useQuery({
+    queryKey: ["prev-landed-price", sourceProductId, request?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sourcing_requests")
+        .select("landed_price")
+        .eq("source_product_id", sourceProductId)
+        .neq("id", request!.id)
+        .gt("landed_price", 0)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.landed_price ?? null;
+    },
+    enabled: !!sourceProductId && !!request,
+  });
   const [unitPrice, setUnitPrice] = useState(0);
   const [shippingCost, setShippingCost] = useState(0);
   const [landedPrice, setLandedPrice] = useState(0);
