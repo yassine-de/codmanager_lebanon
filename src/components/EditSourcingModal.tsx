@@ -607,26 +607,38 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
         </DialogContent>
       </Dialog>
 
-      {/* Product Creation Confirmation */}
+      {/* Product Confirmation - different for existing vs new */}
       <AlertDialog open={showProductConfirm} onOpenChange={setShowProductConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <PackageCheck className="h-5 w-5 text-primary" />
-              Create Product?
+              {sourceProductId ? "Add Stock to Product?" : "Create Product?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              The sourcing request for <strong>{request.product_name}</strong> has been received. 
-              Do you want to automatically create a product for this seller?
+              {sourceProductId ? (
+                <>
+                  This sourcing request is linked to an existing product: <strong>{sourceProduct?.name || request.product_name}</strong>.
+                  Do you want to add <strong>{quantity} units</strong> to the existing product stock?
+                </>
+              ) : (
+                <>
+                  The sourcing request for <strong>{request.product_name}</strong> has been received.
+                  Do you want to automatically create a product for this seller?
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => handleProductConfirm(false)} disabled={updateMutation.isPending}>
+            <AlertDialogCancel onClick={() => handleProductConfirm("no")} disabled={updateMutation.isPending}>
               No
             </AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleProductConfirm(true)} disabled={updateMutation.isPending}>
+            <AlertDialogAction
+              onClick={() => handleProductConfirm(sourceProductId ? "addStock" : "create")}
+              disabled={updateMutation.isPending}
+            >
               {updateMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-              Yes, Create Product
+              {sourceProductId ? "Yes, Add Stock" : "Yes, Create Product"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
