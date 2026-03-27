@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Package2, Plus, Check, X, ExternalLink, Loader2, ImageIcon } from "lucide-react";
+import { Package2, Plus, Check, X, ExternalLink, Loader2, ImageIcon, Pencil } from "lucide-react";
 import { SourcingVariantsBadge } from "@/components/SourcingVariantsBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { toast } from "sonner";
 import { CreateSellerSourcingModal } from "@/components/CreateSellerSourcingModal";
+import { EditSellerSourcingModal } from "@/components/EditSellerSourcingModal";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   waiting_quote: { label: "Waiting Quote", color: "bg-warning/15 text-warning border-warning/25" },
@@ -52,6 +53,7 @@ export default function SellerSourcing() {
   const { authUser } = useAuth();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editRequest, setEditRequest] = useState<SourcingRequest | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [validationFilter, setValidationFilter] = useState("all");
 
@@ -251,38 +253,57 @@ export default function SellerSourcing() {
                       </Tooltip>
                     </TableCell>
                     <TableCell className="text-center">
-                      {canValidate ? (
-                        <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1">
+                        {/* Edit button - only before validation */}
+                        {req.seller_validated === null && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-7 w-7 text-success hover:bg-success/10"
-                                onClick={() => validateMutation.mutate({ id: req.id, validated: true })}
+                                className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                onClick={() => setEditRequest(req)}
                               >
-                                <Check className="h-3.5 w-3.5" />
+                                <Pencil className="h-3.5 w-3.5" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Validate</TooltipContent>
+                            <TooltipContent>Edit</TooltipContent>
                           </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                                onClick={() => validateMutation.mutate({ id: req.id, validated: false })}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Cancel</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground">—</span>
-                      )}
+                        )}
+                        {canValidate && (
+                          <>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-success hover:bg-success/10"
+                                  onClick={() => validateMutation.mutate({ id: req.id, validated: true })}
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Validate</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                                  onClick={() => validateMutation.mutate({ id: req.id, validated: false })}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Cancel</TooltipContent>
+                            </Tooltip>
+                          </>
+                        )}
+                        {!canValidate && req.seller_validated !== null && (
+                          <span className="text-[10px] text-muted-foreground">—</span>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -293,6 +314,7 @@ export default function SellerSourcing() {
       </div>
 
       <CreateSellerSourcingModal open={createOpen} onOpenChange={setCreateOpen} />
+      <EditSellerSourcingModal request={editRequest} open={!!editRequest} onOpenChange={(v) => { if (!v) setEditRequest(null); }} />
     </div>
   );
 }
