@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link2, Loader2, Upload, X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Link2, Loader2, Upload, X, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -15,6 +16,12 @@ const countries = [
   "Morocco", "Turkey", "China", "UAE", "Saudi Arabia", "Egypt",
   "France", "Spain", "Germany", "USA", "UK", "India",
 ];
+
+interface VariantRow {
+  id: string;
+  name: string;
+  quantity: number | "";
+}
 
 interface Props {
   open: boolean;
@@ -34,6 +41,16 @@ export function CreateSellerSourcingModal({ open, onOpenChange }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [hasVariants, setHasVariants] = useState(false);
+  const [variants, setVariants] = useState<VariantRow[]>([]);
+
+  // Auto-calculate total quantity from variants
+  useEffect(() => {
+    if (hasVariants && variants.length > 0) {
+      const total = variants.reduce((sum, v) => sum + (typeof v.quantity === "number" ? v.quantity : 0), 0);
+      setQuantity(total > 0 ? total : "");
+    }
+  }, [hasVariants, variants]);
 
   const resetForm = () => {
     setProductName("");
@@ -45,6 +62,8 @@ export function CreateSellerSourcingModal({ open, onOpenChange }: Props) {
     setImageFile(null);
     setImagePreview(null);
     setErrors({});
+    setHasVariants(false);
+    setVariants([]);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,13 +83,48 @@ export function CreateSellerSourcingModal({ open, onOpenChange }: Props) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const addVariant = () => {
+    setVariants(prev => [...prev, { id: `v-${Date.now()}-${prev.length}`, name: "", quantity: "" }]);
+  };
+
+  const updateVariant = (index: number, field: keyof VariantRow, value: string | number) => {
+    setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+  };
+
+  const removeVariant = (index: number) => {
+    setVariants(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleVariantToggle = (checked: boolean) => {
+    setHasVariants(checked);
+    if (checked) {
+      setVariants([{ id: `v-${Date.now()}-0`, name: "", quantity: "" }]);
+      setQuantity("");
+    } else {
+      setVariants([]);
+      setQuantity("");
+    }
+  };
+
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!productName.trim()) errs.productName = "Product name is required";
-    if (!quantity || quantity <= 0) errs.quantity = "Quantity must be greater than 0";
     if (!country) errs.country = "Country is required";
     if (!shippingMethod) errs.shippingMethod = "Shipping method is required";
     if (!productUrl.trim()) errs.productUrl = "Product URL is required";
+
+    if (hasVariants) {
+      if (variants.length === 0) errs.variants = "Add at least one variant";
+      variants.forEach((v, i) => {
+        if (!v.name.trim()) errs[`v_name_${i}`] = "Required";
+        if (!v.quantity || v.quantity <= 0) errs[`v_qty_${i}`] = "Must be > 0";
+      });
+      const total = variants.reduce((sum, v) => sum + (typeof v.quantity === "number" ? v.quantity : 0), 0);
+      if (total <= 0) errs.quantity = "Total quantity must be > 0";
+    } else {
+      if (!quantity || quantity <= 0) errs.quantity = "Quantity must be greater than 0";
+    }
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -92,6 +146,10 @@ export function CreateSellerSourcingModal({ open, onOpenChange }: Props) {
         productImageUrl = urlData.publicUrl;
       }
 
+      const variantsData = hasVariants
+        ? variants.map(v => ({ name: v.name.trim(), quantity: Number(v.quantity) }))
+        : null;
+
       const { error } = await supabase.from("sourcing_requests").insert({
         seller_id: authUser!.id,
         product_name: productName.trim(),
@@ -102,6 +160,7 @@ export function CreateSellerSourcingModal({ open, onOpenChange }: Props) {
         notes: notes.trim() || "",
         status: "waiting_quote",
         product_image_url: productImageUrl,
+        variants: variantsData as any,
       });
       if (error) throw error;
     },
@@ -134,18 +193,90 @@ export function CreateSellerSourcingModal({ open, onOpenChange }: Props) {
             <span className="text-sm font-medium">Sourcing Informations</span>
           </div>
 
-          {/* Product Name + Quantity */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Product Name *</Label>
-              <Input
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                placeholder="e.g. Wireless Earbuds Pro"
-                className={`h-9 text-sm ${errors.productName ? "border-destructive" : ""}`}
-              />
-              {errors.productName && <p className="text-[11px] text-destructive">{errors.productName}</p>}
+          {/* Product Name */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Product Name *</Label>
+            <Input
+              value={productName}
+              onChange={(e) => setProductName(e.target.value)}
+              placeholder="e.g. Wireless Earbuds Pro"
+              className={`h-9 text-sm ${errors.productName ? "border-destructive" : ""}`}
+            />
+            {errors.productName && <p className="text-[11px] text-destructive">{errors.productName}</p>}
+          </div>
+
+          {/* Variant Toggle */}
+          <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2.5">
+            <div>
+              <p className="text-xs font-medium">Has Variants?</p>
+              <p className="text-[11px] text-muted-foreground">Sizes, colors, or other variations</p>
             </div>
+            <Switch checked={hasVariants} onCheckedChange={handleVariantToggle} />
+          </div>
+
+          {/* Variants List */}
+          {hasVariants && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium">Variants *</Label>
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addVariant}>
+                  <Plus className="h-3 w-3" /> Add
+                </Button>
+              </div>
+              {variants.length === 0 ? (
+                <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-center">
+                  <p className="text-xs text-muted-foreground">Add at least one variant</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {variants.map((v, i) => (
+                    <div key={v.id} className="flex items-center gap-2 bg-muted/30 rounded-lg p-2.5">
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Variant Name *</Label>
+                          <Input
+                            value={v.name}
+                            onChange={e => updateVariant(i, "name", e.target.value)}
+                            placeholder="e.g. S, M, Red..."
+                            className={`h-8 text-xs ${errors[`v_name_${i}`] ? "border-destructive" : ""}`}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Quantity *</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={v.quantity}
+                            onChange={e => updateVariant(i, "quantity", e.target.value ? Number(e.target.value) : "")}
+                            placeholder="0"
+                            className={`h-8 text-xs ${errors[`v_qty_${i}`] ? "border-destructive" : ""}`}
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={() => removeVariant(i)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Auto-calculated total */}
+              <div className="flex items-center justify-between rounded-md bg-primary/5 border border-primary/20 px-3 py-2">
+                <span className="text-xs font-medium text-muted-foreground">Total Quantity</span>
+                <span className="text-sm font-semibold tabular-nums">{quantity || 0}</span>
+              </div>
+              {errors.variants && <p className="text-[11px] text-destructive">{errors.variants}</p>}
+            </div>
+          )}
+
+          {/* Quantity (only when no variants) */}
+          {!hasVariants && (
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Quantity *</Label>
               <Input
@@ -159,7 +290,7 @@ export function CreateSellerSourcingModal({ open, onOpenChange }: Props) {
               />
               {errors.quantity && <p className="text-[11px] text-destructive">{errors.quantity}</p>}
             </div>
-          </div>
+          )}
 
           {/* Country + Shipping Method */}
           <div className="grid grid-cols-2 gap-4">

@@ -1,0 +1,1 @@
+ALTER TABLE public.sourcing_requests ADD COLUMN variants jsonb DEFAULT NULL;
