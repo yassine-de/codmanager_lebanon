@@ -26,6 +26,8 @@ interface SourcingRequest {
   notes: string | null;
   product_image_url: string | null;
   variants: any[] | null;
+  seller_validated: boolean | null;
+  status: string;
 }
 
 interface Props {
