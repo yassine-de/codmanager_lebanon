@@ -121,17 +121,30 @@ const AgentOrders = () => {
         : null; // null = all products
       setAssignedProducts(prodNames);
 
-      // Count available orders (filtered by assigned products)
-      let query = supabase
+      // Count available new orders
+      let newQuery = supabase
         .from("orders")
         .select("id", { count: "exact", head: true })
         .eq("confirmation_status", "new")
         .is("agent_id", null);
       if (prodNames) {
-        query = query.in("product_name", prodNames);
+        newQuery = newQuery.in("product_name", prodNames);
       }
-      const { count } = await query;
-      setNewOrderCount(count || 0);
+      const { count: newCount } = await newQuery;
+      setNewOrderCount(newCount || 0);
+
+      // Count no_answer orders assigned to this agent (for follow-up)
+      let naQuery = supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("confirmation_status", "no_answer")
+        .eq("agent_id", authUser.id)
+        .lt("attempt_count", NO_ANSWER_MAX_ATTEMPTS);
+      if (prodNames) {
+        naQuery = naQuery.in("product_name", prodNames);
+      }
+      const { count: naCount } = await naQuery;
+      setNoAnswerCount(naCount || 0);
     };
     init();
   }, [authUser]);
