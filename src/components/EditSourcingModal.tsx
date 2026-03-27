@@ -85,7 +85,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     setUnitPrice(request.unit_price ?? 0);
     setShippingCost(request.shipping_cost ?? 0);
     setLandedPrice(request.landed_price || prevLandedPrice || 0);
-    setSellerPrice(request.seller_price ?? 0);
+    setSellerPrice(request.seller_price || prevSellerPrice || 0);
     setQuantity(request.quantity);
     setStatus(request.status);
     setNotes(request.notes ?? "");
