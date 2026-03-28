@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";
 import { DateRange } from "react-day-picker";
 import { supabase } from "@/integrations/supabase/client";
+import { SmartRecommendations } from "@/components/SmartRecommendations";
 
 export default function ConfirmationAnalytics() {
   const [agentFilter, setAgentFilter] = useState<string>("all");
@@ -23,7 +24,7 @@ export default function ConfirmationAnalytics() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_id, confirmation_status, delivery_status, cancel_reason, product_name, seller_id, agent_id, created_at, confirmed_at, delivered_at, price, quantity, postpone_date")
+        .select("id, order_id, confirmation_status, delivery_status, cancel_reason, product_name, seller_id, agent_id, created_at, confirmed_at, delivered_at, price, quantity, postpone_date, attempt_count")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -59,6 +60,18 @@ export default function ConfirmationAnalytics() {
         .select("order_id, field_changed, old_value, new_value, created_at")
         .in("field_changed", ["confirmation_status", "agent_id"])
         .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch calls for duration tracking
+  const { data: callsData = [] } = useQuery({
+    queryKey: ["calls-for-analytics"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("calls")
+        .select("agent_id, duration");
       if (error) throw error;
       return data;
     },
@@ -411,6 +424,22 @@ export default function ConfirmationAnalytics() {
           </div>
         </div>
       )}
+
+      {/* Smart Recommendations */}
+      <SmartRecommendations
+        orders={filteredOrders.map(o => ({
+          agent_id: o.agent_id || '',
+          confirmation_status: o.confirmation_status,
+          delivery_status: o.delivery_status,
+          created_at: o.created_at,
+          attempt_count: o.attempt_count ?? 0,
+          postpone_date: o.postpone_date,
+        })).filter(o => o.agent_id !== '')}
+        orderHistory={orderHistory}
+        calls={callsData}
+        profileNameMap={profileNameMap}
+        agentIds={agentIds}
+      />
 
       {/* Cancel Reasons */}
       <div className="bg-card rounded-lg border p-5 animate-slide-up" style={{ animationDelay: '150ms' }}>
