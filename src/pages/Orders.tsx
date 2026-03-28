@@ -600,7 +600,7 @@ export default function Orders() {
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     {Object.entries(confirmationConfig).map(([key, cfg]) => (
-                      <DropdownMenuItem key={key} onClick={() => handleBulkStatusChange("confirmation_status", key)} className="text-xs">
+                      <DropdownMenuItem key={key} onClick={() => requestBulkStatusChange("confirmation_status", key)} className="text-xs">
                         {cfg.label}
                       </DropdownMenuItem>
                     ))}
@@ -612,7 +612,7 @@ export default function Orders() {
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     {Object.entries(deliveryConfig).map(([key, cfg]) => (
-                      <DropdownMenuItem key={key} onClick={() => handleBulkStatusChange("delivery_status", key)} className="text-xs">
+                      <DropdownMenuItem key={key} onClick={() => requestBulkStatusChange("delivery_status", key)} className="text-xs">
                         {cfg.label}
                       </DropdownMenuItem>
                     ))}
