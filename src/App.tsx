@@ -122,7 +122,6 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
       <Sonner />
       <BrowserRouter>
         <LanguageProvider>
