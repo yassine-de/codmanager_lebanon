@@ -383,10 +383,11 @@ export default function SellerSheets() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 rounded-full bg-muted text-muted-foreground hover:bg-muted/80"
-                          onClick={fetchSheets}
-                          title="Refresh"
+                          onClick={handleSync}
+                          disabled={syncing}
+                          title="Sync & check for new orders"
                         >
-                          <RefreshCw className="w-3.5 h-3.5" />
+                          <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
                         </Button>
                         {sheet.errors_count > 0 && (
                           <Button
