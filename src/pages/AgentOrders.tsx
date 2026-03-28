@@ -984,7 +984,6 @@ const AgentOrders = () => {
                   </div>
                 );
               })()}
-              )}
 
               {/* Add Item Button */}
               {editMode && sellerProducts.length > 0 && (
