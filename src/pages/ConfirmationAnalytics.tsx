@@ -369,6 +369,17 @@ export default function ConfirmationAnalytics() {
         <KPICard title="Handling Time" value={timeStats.handlingTime} icon={Hourglass} iconBg="bg-accent/10" iconColor="text-accent-foreground" delay={350} />
       </div>
 
+      {/* Daily Confirmation Report */}
+      <DailyConfirmationReport
+        orders={filteredOrders.map(o => ({
+          agent_id: o.agent_id,
+          confirmation_status: o.confirmation_status,
+          postpone_date: o.postpone_date,
+        }))}
+        profileNameMap={profileNameMap}
+        agentIds={agentIds}
+      />
+
       {/* Agent Scores Table */}
       {agentScores.length > 0 && (
         <div className="bg-card rounded-lg border p-5 animate-slide-up" style={{ animationDelay: '100ms' }}>
