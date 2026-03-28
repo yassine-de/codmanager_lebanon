@@ -205,7 +205,18 @@ export default function Orders() {
     toast.success(`${selected.length} orders exported`);
   };
 
-  const handleBulkStatusChange = async (field: "confirmation_status" | "delivery_status", newValue: string) => {
+  const [bulkConfirm, setBulkConfirm] = useState<{ field: "confirmation_status" | "delivery_status"; value: string; label: string } | null>(null);
+
+  const requestBulkStatusChange = (field: "confirmation_status" | "delivery_status", newValue: string) => {
+    const label = field === "confirmation_status"
+      ? confirmationConfig[newValue as ConfirmationStatus]?.label || newValue
+      : deliveryConfig[newValue as DeliveryStatus]?.label || newValue;
+    setBulkConfirm({ field, value: newValue, label });
+  };
+
+  const handleBulkStatusChange = async () => {
+    if (!bulkConfirm) return;
+    const { field, value: newValue } = bulkConfirm;
     const selected = getSelectedOrderObjects();
     if (selected.length === 0) return;
     const orderIds = selected.map(o => o.id);
@@ -218,10 +229,10 @@ export default function Orders() {
     if (error) {
       toast.error("Failed to update orders");
       console.error(error);
+      setBulkConfirm(null);
       return;
     }
 
-    // Track history
     const historyEntries = selected.map(o => ({
       order_id: o.id,
       changed_by: authUser?.id,
@@ -234,6 +245,7 @@ export default function Orders() {
 
     toast.success(`${selected.length} orders updated`);
     setSelectedOrders(new Set());
+    setBulkConfirm(null);
     setRefreshKey(k => k + 1);
   };
 
