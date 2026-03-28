@@ -79,6 +79,33 @@ export default function SellerSheets() {
   const [errorsLoading, setErrorsLoading] = useState(false);
   const [serviceEmail, setServiceEmail] = useState("");
   const [copied, setCopied] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("import-sheets");
+      if (error) throw error;
+      const results = data?.results || {};
+      let totalImported = 0;
+      let totalErrors = 0;
+      Object.values(results).forEach((r: any) => {
+        totalImported += r.imported || 0;
+        totalErrors += r.errors || 0;
+      });
+      await fetchSheets();
+      if (totalImported > 0 || totalErrors > 0) {
+        toast.success(`Sync complete: ${totalImported} imported, ${totalErrors} errors`);
+      } else {
+        toast.info("No new orders found");
+      }
+    } catch (err) {
+      console.error("Sync error:", err);
+      toast.error("Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const fetchServiceEmail = async () => {
     const { data } = await supabase
@@ -356,10 +383,11 @@ export default function SellerSheets() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 rounded-full bg-muted text-muted-foreground hover:bg-muted/80"
-                          onClick={fetchSheets}
-                          title="Refresh"
+                          onClick={handleSync}
+                          disabled={syncing}
+                          title="Sync & check for new orders"
                         >
-                          <RefreshCw className="w-3.5 h-3.5" />
+                          <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
                         </Button>
                         {sheet.errors_count > 0 && (
                           <Button
