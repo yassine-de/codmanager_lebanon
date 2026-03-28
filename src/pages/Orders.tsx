@@ -774,7 +774,7 @@ export default function Orders() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={visibleColumns.size + 1} className="py-16 text-center text-muted-foreground text-sm">
+                  <td colSpan={visibleColumns.size + (isAdmin ? 2 : 1)} className="py-16 text-center text-muted-foreground text-sm">
                     No orders found matching your criteria
                   </td>
                 </tr>
