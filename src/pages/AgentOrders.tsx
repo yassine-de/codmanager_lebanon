@@ -99,6 +99,7 @@ const AgentOrders = () => {
   // Editable order items
   const [editItems, setEditItems] = useState<{ name: string; qty: number; price: number }[]>([]);
   const [editMode, setEditMode] = useState(false);
+  const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; product_url: string | null; video_url: string | null }[]>([]);
 
   // Status change form
   const [selectedStatus, setSelectedStatus] = useState<string>("");
