@@ -100,6 +100,8 @@ const AgentOrders = () => {
   const [editItems, setEditItems] = useState<{ name: string; qty: number; price: number }[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; product_url: string | null; video_url: string | null }[]>([]);
+  const [historicalOffers, setHistoricalOffers] = useState<string | null>(null);
+  const [historicalLastPrice, setHistoricalLastPrice] = useState<number | null>(null);
 
   // Status change form
   const [selectedStatus, setSelectedStatus] = useState<string>("");
@@ -453,6 +455,8 @@ const AgentOrders = () => {
     setEditingCustomer(false);
     setEditMode(false);
     resetForm();
+    setHistoricalOffers(null);
+    setHistoricalLastPrice(null);
 
     // Fetch seller's products for add-item and product_url lookup
     supabase
@@ -461,6 +465,29 @@ const AgentOrders = () => {
       .eq("seller_id", order.seller_id)
       .then(({ data }) => {
         setSellerProducts((data || []).map(p => ({ ...p, price: Number(p.price) })));
+      });
+
+    // Fetch historical offers & last_price from previous confirmed orders of same product
+    supabase
+      .from("orders")
+      .select("offers, last_price, price")
+      .eq("seller_id", order.seller_id)
+      .eq("product_name", order.product_name)
+      .eq("confirmation_status", "confirmed")
+      .neq("id", order.id)
+      .order("confirmed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data: histOrder }) => {
+        if (histOrder) {
+          if (histOrder.offers && String(histOrder.offers).trim()) {
+            setHistoricalOffers(String(histOrder.offers));
+          }
+          const lp = histOrder.last_price ?? histOrder.price;
+          if (lp != null && Number(lp) > 0) {
+            setHistoricalLastPrice(Number(lp));
+          }
+        }
       });
   };
 
@@ -882,24 +909,30 @@ const AgentOrders = () => {
                           </div>
                         )}
 
-                        {/* Last Selling Price */}
-                        {currentOrder.last_price != null && Number(currentOrder.last_price) > 0 && (
-                          <div className="rounded-md bg-accent/60 border border-accent px-2.5 py-1.5 flex items-center gap-2">
-                            <DollarSign className="h-3 w-3 text-primary shrink-0" />
-                            <span className="text-[10px] text-muted-foreground">Last sold at</span>
-                            <span className="text-xs font-bold text-primary tabular-nums">{currentOrder.last_price} MAD</span>
-                            {Number(currentOrder.last_price) !== op.price && (
-                              <span className={cn(
-                                "text-[9px] font-semibold px-1.5 py-0.5 rounded-full",
-                                Number(currentOrder.last_price) < op.price
-                                  ? "bg-emerald-500/10 text-emerald-600"
-                                  : "bg-amber-500/10 text-amber-600"
-                              )}>
-                                {Number(currentOrder.last_price) < op.price ? "↓" : "↑"} {Math.abs(op.price - Number(currentOrder.last_price))} MAD
-                              </span>
-                            )}
-                          </div>
-                        )}
+                        {/* Last Selling Price — order-level or historical fallback */}
+                        {(() => {
+                          const effectiveLastPrice = (currentOrder.last_price != null && Number(currentOrder.last_price) > 0)
+                            ? Number(currentOrder.last_price)
+                            : historicalLastPrice;
+                          if (!effectiveLastPrice || effectiveLastPrice <= 0) return null;
+                          return (
+                            <div className="rounded-md bg-accent/60 border border-accent px-2.5 py-1.5 flex items-center gap-2">
+                              <DollarSign className="h-3 w-3 text-primary shrink-0" />
+                              <span className="text-[10px] text-muted-foreground">Last sold at</span>
+                              <span className="text-xs font-bold text-primary tabular-nums">{effectiveLastPrice} MAD</span>
+                              {effectiveLastPrice !== op.price && (
+                                <span className={cn(
+                                  "text-[9px] font-semibold px-1.5 py-0.5 rounded-full",
+                                  effectiveLastPrice < op.price
+                                    ? "bg-emerald-500/10 text-emerald-600"
+                                    : "bg-amber-500/10 text-amber-600"
+                                )}>
+                                  {effectiveLastPrice < op.price ? "↓" : "↑"} {Math.abs(op.price - effectiveLastPrice)} MAD
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Store & Video Links */}
                         <div className="flex flex-wrap gap-2 pt-1">
@@ -933,15 +966,24 @@ const AgentOrders = () => {
                 );
               })}
 
-              {/* Offers Section */}
-              {currentOrder.offers && currentOrder.offers.trim() && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-1">
-                  <p className="text-[10px] uppercase tracking-wider font-semibold text-amber-600 flex items-center gap-1">
-                    <Tag className="h-3 w-3" /> Offers / Promotions
-                  </p>
-                  <p className="text-sm text-foreground font-medium">{currentOrder.offers}</p>
-                </div>
-              )}
+              {/* Offers Section — order-level or historical fallback */}
+              {(() => {
+                const effectiveOffers = (currentOrder.offers && currentOrder.offers.trim())
+                  ? currentOrder.offers.trim()
+                  : historicalOffers;
+                if (!effectiveOffers) return null;
+                return (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-amber-600 flex items-center gap-1">
+                      <Tag className="h-3 w-3" /> Offers / Promotions
+                      {!(currentOrder.offers && currentOrder.offers.trim()) && (
+                        <span className="text-[9px] font-normal text-muted-foreground ml-1">(from previous order)</span>
+                      )}
+                    </p>
+                    <p className="text-sm text-foreground font-medium">{effectiveOffers}</p>
+                  </div>
+                );
+              })()}
 
               {/* Add Item Button */}
               {editMode && sellerProducts.length > 0 && (
