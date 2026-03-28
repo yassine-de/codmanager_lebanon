@@ -43,6 +43,7 @@ const Integrations = () => {
   const [sellers, setSellers] = useState<SellerOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
   // Service account email
   const [serviceEmail, setServiceEmail] = useState("");
@@ -331,9 +332,10 @@ const Integrations = () => {
                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Sheet Name</th>
                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Orders</th>
                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">With Errors</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Last Check</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Last Check</th>
+                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Last Row</th>
+                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                   <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -382,39 +384,89 @@ const Integrations = () => {
                         ? formatDistanceToNow(new Date(sheet.last_check), { addSuffix: true })
                         : "Never"}
                     </td>
-                    <td className="px-4 py-4">
-                      <Badge
-                        className={`text-[11px] font-medium ${
-                          sheet.active
-                            ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                        variant="outline"
-                      >
-                        {sheet.active ? "Active" : "Inactive"}
-                      </Badge>
+                     <td className="px-4 py-4">
+                       <Input
+                         type="number"
+                         min={1}
+                         className="h-7 w-20 text-xs text-center tabular-nums"
+                         defaultValue={sheet.last_imported_row}
+                         onBlur={async (e) => {
+                           const val = parseInt(e.target.value);
+                           if (!val || val === sheet.last_imported_row) return;
+                           const { error } = await supabase
+                             .from("integration_sheets")
+                             .update({ last_imported_row: val })
+                             .eq("id", sheet.id);
+                           if (error) { toast.error("Failed to update"); return; }
+                           toast.success(`Last row updated to ${val}`);
+                           fetchSheets();
+                         }}
+                         onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                       />
+                     </td>
+                     <td className="px-4 py-4">
+                       <Badge
+                         className={`text-[11px] font-medium ${
+                           sheet.active
+                             ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20"
+                             : "bg-muted text-muted-foreground"
+                         }`}
+                         variant="outline"
+                       >
+                         {sheet.active ? "Active" : "Inactive"}
+                       </Badge>
                     </td>
                     <td className="px-4 py-4">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full bg-primary/10 text-primary hover:bg-primary/20"
-                          onClick={() => openEdit(sheet)}
-                          title="Edit"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20"
-                          onClick={() => deleteSheet(sheet.id)}
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
+                       <div className="flex items-center justify-end gap-1.5">
+                         <Button
+                           variant="ghost"
+                           size="icon"
+                           className="h-8 w-8 rounded-full bg-muted text-muted-foreground hover:bg-muted/80"
+                           disabled={syncing}
+                           onClick={async () => {
+                             setSyncing(true);
+                             try {
+                               const { data, error } = await supabase.functions.invoke("import-sheets");
+                               if (error) throw error;
+                               const results = data?.results || {};
+                               let totalImported = 0;
+                               let totalErrors = 0;
+                               Object.values(results).forEach((r: any) => {
+                                 totalImported += r.imported || 0;
+                                 totalErrors += r.errors || 0;
+                               });
+                               await fetchSheets();
+                               if (totalImported > 0 || totalErrors > 0) {
+                                 toast.success(`Sync: ${totalImported} imported, ${totalErrors} errors`);
+                               } else {
+                                 toast.info("No new orders found");
+                               }
+                             } catch { toast.error("Sync failed"); }
+                             finally { setSyncing(false); }
+                           }}
+                           title="Fetch orders"
+                         >
+                           <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+                         </Button>
+                         <Button
+                           variant="ghost"
+                           size="icon"
+                           className="h-8 w-8 rounded-full bg-primary/10 text-primary hover:bg-primary/20"
+                           onClick={() => openEdit(sheet)}
+                           title="Edit"
+                         >
+                           <Pencil className="w-3.5 h-3.5" />
+                         </Button>
+                         <Button
+                           variant="ghost"
+                           size="icon"
+                           className="h-8 w-8 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20"
+                           onClick={() => deleteSheet(sheet.id)}
+                           title="Delete"
+                         >
+                           <Trash2 className="w-3.5 h-3.5" />
+                         </Button>
+                       </div>
                     </td>
                   </tr>
                 ))}
