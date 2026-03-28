@@ -159,6 +159,7 @@ export default function Orders() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const [refreshKey, setRefreshKey] = useState(0);
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
 
   const toggleSelectOrder = (orderId: string) => {
