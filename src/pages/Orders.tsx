@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { eachDayOfInterval, startOfDay, subDays, isAfter, format as fmtDate } from "date-fns";
-import { Search, SlidersHorizontal, X, Columns3, CalendarIcon, Filter, Pencil, History, MessageCircle } from "lucide-react";
+import { Search, SlidersHorizontal, X, Columns3, CalendarIcon, Filter, Pencil, History, MessageCircle, Download, RefreshCw, ChevronDown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import OrderHistoryModal from "@/components/OrderHistoryModal";
@@ -13,6 +13,7 @@ import { SearchableSelect } from "@/components/SearchableSelect";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { type ConfirmationStatus, type DeliveryStatus, type Order } from "@/lib/data";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ import EditOrderModal from "@/components/EditOrderModal";
 import CreateOrderModal from "@/components/CreateOrderModal";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 
 /* ── Status badge configs ── */
 const confirmationConfig: Record<ConfirmationStatus, { label: string; cls: string }> = {
@@ -158,6 +160,82 @@ export default function Orders() {
   const [pageSize, setPageSize] = useState(10);
 
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+
+  const toggleSelectOrder = (orderId: string) => {
+    setSelectedOrders(prev => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedOrders.size === paginatedOrders.length && paginatedOrders.length > 0) {
+      setSelectedOrders(new Set());
+    } else {
+      setSelectedOrders(new Set(paginatedOrders.map(o => o.id)));
+    }
+  };
+
+  const getSelectedOrderObjects = () => orders.filter(o => selectedOrders.has(o.id));
+
+  const handleDownloadCSV = () => {
+    const selected = getSelectedOrderObjects();
+    if (selected.length === 0) return;
+    const headers = ["Order ID", "Customer Name", "Phone", "Product", "Amount", "Confirmation Status", "Delivery Status"];
+    const rows = selected.map(o => [
+      o.id,
+      o.customer,
+      o.phone,
+      o.products.map(p => p.name).join(" | "),
+      String(o.total),
+      o.confirmationStatus,
+      o.deliveryStatus,
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `orders-export-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${selected.length} orders exported`);
+  };
+
+  const handleBulkStatusChange = async (field: "confirmation_status" | "delivery_status", newValue: string) => {
+    const selected = getSelectedOrderObjects();
+    if (selected.length === 0) return;
+    const orderIds = selected.map(o => o.id);
+    
+    const { error } = await supabase
+      .from("orders")
+      .update({ [field]: newValue, updated_at: new Date().toISOString() })
+      .in("order_id", orderIds);
+    
+    if (error) {
+      toast.error("Failed to update orders");
+      console.error(error);
+      return;
+    }
+
+    // Track history
+    const historyEntries = selected.map(o => ({
+      order_id: o.id,
+      changed_by: authUser?.id,
+      changed_by_role: authUser?.role || "admin",
+      field_changed: field,
+      old_value: field === "confirmation_status" ? o.confirmationStatus : o.deliveryStatus,
+      new_value: newValue,
+    }));
+    await supabase.from("order_history").insert(historyEntries);
+
+    toast.success(`${selected.length} orders updated`);
+    setSelectedOrders(new Set());
+    setRefreshKey(k => k + 1);
+  };
 
   // Fetch orders from database
   useEffect(() => {
@@ -489,6 +567,52 @@ export default function Orders() {
       {/* Table Card */}
       <div className="bg-card rounded-lg border animate-slide-up" style={{ animationDelay: '100ms' }}>
         {/* Table toolbar */}
+        {/* Bulk Action Bar */}
+        {isAdmin && selectedOrders.size > 0 && (
+          <div className="flex items-center gap-3 px-4 py-2.5 border-b bg-primary/5">
+            <span className="text-sm font-medium">{selectedOrders.size} selected</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="h-8 gap-1.5 text-xs">
+                  Bulk Actions <ChevronDown className="w-3.5 h-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem onClick={handleDownloadCSV} className="gap-2 text-xs">
+                  <Download className="w-3.5 h-3.5" /> Download CSV
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="gap-2 text-xs">
+                    <RefreshCw className="w-3.5 h-3.5" /> Change Confirmation Status
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {Object.entries(confirmationConfig).map(([key, cfg]) => (
+                      <DropdownMenuItem key={key} onClick={() => handleBulkStatusChange("confirmation_status", key)} className="text-xs">
+                        {cfg.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="gap-2 text-xs">
+                    <RefreshCw className="w-3.5 h-3.5" /> Change Delivery Status
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {Object.entries(deliveryConfig).map(([key, cfg]) => (
+                      <DropdownMenuItem key={key} onClick={() => handleBulkStatusChange("delivery_status", key)} className="text-xs">
+                        {cfg.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setSelectedOrders(new Set())}>
+              Clear selection
+            </Button>
+          </div>
+        )}
         <div className="flex items-center justify-between px-4 py-2.5 border-b">
           <div className="flex items-center gap-3">
             <p className="text-sm font-medium">
@@ -535,6 +659,14 @@ export default function Orders() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/30">
+                {isAdmin && (
+                  <th className="py-2.5 px-3 w-10">
+                    <Checkbox
+                      checked={paginatedOrders.length > 0 && selectedOrders.size === paginatedOrders.length}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </th>
+                )}
                 {isCol('id') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">ID</th>}
                 {isCol('createdAt') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Created</th>}
                 {isCol('updatedAt') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Updated</th>}
@@ -554,9 +686,20 @@ export default function Orders() {
               {paginatedOrders.map((order) => (
                 <tr
                   key={order.id}
-                  className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors active:scale-[0.995]"
+                  className={cn(
+                    "border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors active:scale-[0.995]",
+                    selectedOrders.has(order.id) && "bg-primary/5"
+                  )}
                   onClick={() => navigate(`/orders/${order.id}`)}
                 >
+                  {isAdmin && (
+                    <td className="py-2.5 px-3 w-10" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedOrders.has(order.id)}
+                        onCheckedChange={() => toggleSelectOrder(order.id)}
+                      />
+                    </td>
+                  )}
                   {isCol('id') && <td className="py-2.5 px-4 font-medium text-xs">{order.id}</td>}
                   {isCol('createdAt') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{format(new Date(order.createdAt), 'dd MMM yyyy')}</td>}
                   {isCol('updatedAt') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{format(new Date(order.updatedAt), 'dd MMM yyyy')}</td>}
@@ -631,7 +774,7 @@ export default function Orders() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={visibleColumns.size + 1} className="py-16 text-center text-muted-foreground text-sm">
+                  <td colSpan={visibleColumns.size + (isAdmin ? 2 : 1)} className="py-16 text-center text-muted-foreground text-sm">
                     No orders found matching your criteria
                   </td>
                 </tr>
