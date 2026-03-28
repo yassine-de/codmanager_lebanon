@@ -78,18 +78,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    const syncAuthState = async (sessionUser: User | null) => {
+    const syncAuthState = (sessionUser: User | null) => {
       if (!isMounted) return;
 
       if (sessionUser) {
         setUser(sessionUser);
-        await fetchUserDetails(sessionUser);
+        // Set basic user info immediately so the app renders instantly
+        setAuthUser((prev) => prev?.id === sessionUser.id ? prev : {
+          id: sessionUser.id,
+          email: sessionUser.email || "",
+          name: sessionUser.user_metadata?.name || sessionUser.email?.split("@")[0] || "User",
+          role: "custom",
+          permissions: [],
+          phone: "",
+          active: true,
+        });
+        setLoading(false);
+        // Enrich with DB data in background
+        fetchUserDetails(sessionUser);
       } else {
         setUser(null);
         setAuthUser(null);
-      }
-
-      if (isMounted) {
         setLoading(false);
       }
     };
