@@ -10,6 +10,7 @@ import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetF
 import { DateRange } from "react-day-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { SmartRecommendations } from "@/components/SmartRecommendations";
+import { DailyConfirmationReport } from "@/components/DailyConfirmationReport";
 
 export default function ConfirmationAnalytics() {
   const [agentFilter, setAgentFilter] = useState<string>("all");
@@ -367,6 +368,17 @@ export default function ConfirmationAnalytics() {
         <KPICard title="First Call Avg" value={timeStats.firstCallAvg} icon={Timer} iconBg="bg-accent/10" iconColor="text-accent-foreground" delay={300} />
         <KPICard title="Handling Time" value={timeStats.handlingTime} icon={Hourglass} iconBg="bg-accent/10" iconColor="text-accent-foreground" delay={350} />
       </div>
+
+      {/* Daily Confirmation Report */}
+      <DailyConfirmationReport
+        orders={filteredOrders.map(o => ({
+          agent_id: o.agent_id,
+          confirmation_status: o.confirmation_status,
+          postpone_date: o.postpone_date,
+        }))}
+        profileNameMap={profileNameMap}
+        agentIds={agentIds}
+      />
 
       {/* Agent Scores Table */}
       {agentScores.length > 0 && (
