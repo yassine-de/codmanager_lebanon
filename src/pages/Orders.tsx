@@ -686,9 +686,20 @@ export default function Orders() {
               {paginatedOrders.map((order) => (
                 <tr
                   key={order.id}
-                  className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors active:scale-[0.995]"
+                  className={cn(
+                    "border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors active:scale-[0.995]",
+                    selectedOrders.has(order.id) && "bg-primary/5"
+                  )}
                   onClick={() => navigate(`/orders/${order.id}`)}
                 >
+                  {isAdmin && (
+                    <td className="py-2.5 px-3 w-10" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedOrders.has(order.id)}
+                        onCheckedChange={() => toggleSelectOrder(order.id)}
+                      />
+                    </td>
+                  )}
                   {isCol('id') && <td className="py-2.5 px-4 font-medium text-xs">{order.id}</td>}
                   {isCol('createdAt') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{format(new Date(order.createdAt), 'dd MMM yyyy')}</td>}
                   {isCol('updatedAt') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{format(new Date(order.updatedAt), 'dd MMM yyyy')}</td>}
