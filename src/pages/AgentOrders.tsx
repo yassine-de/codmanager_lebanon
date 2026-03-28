@@ -100,6 +100,8 @@ const AgentOrders = () => {
   const [editItems, setEditItems] = useState<{ name: string; qty: number; price: number }[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; product_url: string | null; video_url: string | null }[]>([]);
+  const [historicalOffers, setHistoricalOffers] = useState<string | null>(null);
+  const [historicalLastPrice, setHistoricalLastPrice] = useState<number | null>(null);
 
   // Status change form
   const [selectedStatus, setSelectedStatus] = useState<string>("");
