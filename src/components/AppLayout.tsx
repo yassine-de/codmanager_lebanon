@@ -13,6 +13,7 @@ import { usePresenceHeartbeat } from "@/hooks/usePresence";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SellerSupportChat } from "@/components/SellerSupportChat";
+import { SellerAlertsBanner } from "@/components/SellerAlertsBanner";
 
 const languages: { value: Language; label: string; flag: string }[] = [
   { value: "en", label: "English", flag: "🇬🇧" },
@@ -167,6 +168,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           <main className="flex-1 overflow-auto p-4">
+            <SellerAlertsBanner />
             {children}
           </main>
         </div>
