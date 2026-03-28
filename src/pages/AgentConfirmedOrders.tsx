@@ -184,6 +184,14 @@ const AgentConfirmedOrders = () => {
       confirmation_status: order.confirmation_status || "",
       note: order.note || "",
     });
+    // Fetch seller's products for links and add-item
+    supabase
+      .from("products")
+      .select("id, name, price, product_url, video_url")
+      .eq("seller_id", order.seller_id)
+      .then(({ data }) => {
+        setSellerProducts((data || []).map(p => ({ ...p, price: Number(p.price) })));
+      });
   };
 
   const updateField = (field: keyof EditForm, value: string | number) => {
