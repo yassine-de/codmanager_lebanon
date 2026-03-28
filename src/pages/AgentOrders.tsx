@@ -353,14 +353,7 @@ const AgentOrders = () => {
       if (!firstOrder.agent_id || firstOrder.agent_id !== authUser!.id) {
         await claimOrder(firstOrder);
       } else {
-        setEditItems([{ name: firstOrder.product_name, qty: firstOrder.quantity, price: Number(firstOrder.price) }]);
-        setEditCustomer({
-          name: firstOrder.customer_name,
-          phone: firstOrder.customer_phone,
-          city: firstOrder.customer_city,
-          address: firstOrder.customer_address || "",
-        });
-        resetForm();
+        initOrderState(firstOrder);
       }
 
       toast.success(`Order claimed successfully — Let's go! 🚀`);
