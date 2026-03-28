@@ -24,11 +24,12 @@ function useInView(threshold = 0.15) {
   return { ref, visible };
 }
 
-function Section({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function Section({ children, className = "", id }: { children: React.ReactNode; className?: string; id?: string }) {
   const { ref, visible } = useInView();
   return (
     <section
       ref={ref}
+      id={id}
       className={`transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"} ${className}`}
     >
       {children}
