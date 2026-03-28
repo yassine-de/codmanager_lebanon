@@ -43,6 +43,7 @@ const Integrations = () => {
   const [sellers, setSellers] = useState<SellerOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
   // Service account email
   const [serviceEmail, setServiceEmail] = useState("");
@@ -416,26 +417,56 @@ const Integrations = () => {
                        </Badge>
                     </td>
                     <td className="px-4 py-4">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full bg-primary/10 text-primary hover:bg-primary/20"
-                          onClick={() => openEdit(sheet)}
-                          title="Edit"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20"
-                          onClick={() => deleteSheet(sheet.id)}
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
+                       <div className="flex items-center justify-end gap-1.5">
+                         <Button
+                           variant="ghost"
+                           size="icon"
+                           className="h-8 w-8 rounded-full bg-muted text-muted-foreground hover:bg-muted/80"
+                           disabled={syncing}
+                           onClick={async () => {
+                             setSyncing(true);
+                             try {
+                               const { data, error } = await supabase.functions.invoke("import-sheets");
+                               if (error) throw error;
+                               const results = data?.results || {};
+                               let totalImported = 0;
+                               let totalErrors = 0;
+                               Object.values(results).forEach((r: any) => {
+                                 totalImported += r.imported || 0;
+                                 totalErrors += r.errors || 0;
+                               });
+                               await fetchSheets();
+                               if (totalImported > 0 || totalErrors > 0) {
+                                 toast.success(`Sync: ${totalImported} imported, ${totalErrors} errors`);
+                               } else {
+                                 toast.info("No new orders found");
+                               }
+                             } catch { toast.error("Sync failed"); }
+                             finally { setSyncing(false); }
+                           }}
+                           title="Fetch orders"
+                         >
+                           <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+                         </Button>
+                         <Button
+                           variant="ghost"
+                           size="icon"
+                           className="h-8 w-8 rounded-full bg-primary/10 text-primary hover:bg-primary/20"
+                           onClick={() => openEdit(sheet)}
+                           title="Edit"
+                         >
+                           <Pencil className="w-3.5 h-3.5" />
+                         </Button>
+                         <Button
+                           variant="ghost"
+                           size="icon"
+                           className="h-8 w-8 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20"
+                           onClick={() => deleteSheet(sheet.id)}
+                           title="Delete"
+                         >
+                           <Trash2 className="w-3.5 h-3.5" />
+                         </Button>
+                       </div>
                     </td>
                   </tr>
                 ))}
