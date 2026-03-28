@@ -455,6 +455,8 @@ const AgentOrders = () => {
     setEditingCustomer(false);
     setEditMode(false);
     resetForm();
+    setHistoricalOffers(null);
+    setHistoricalLastPrice(null);
 
     // Fetch seller's products for add-item and product_url lookup
     supabase
@@ -463,6 +465,29 @@ const AgentOrders = () => {
       .eq("seller_id", order.seller_id)
       .then(({ data }) => {
         setSellerProducts((data || []).map(p => ({ ...p, price: Number(p.price) })));
+      });
+
+    // Fetch historical offers & last_price from previous confirmed orders of same product
+    supabase
+      .from("orders")
+      .select("offers, last_price, price")
+      .eq("seller_id", order.seller_id)
+      .eq("product_name", order.product_name)
+      .eq("confirmation_status", "confirmed")
+      .neq("id", order.id)
+      .order("confirmed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data: histOrder }) => {
+        if (histOrder) {
+          if (histOrder.offers && String(histOrder.offers).trim()) {
+            setHistoricalOffers(String(histOrder.offers));
+          }
+          const lp = histOrder.last_price ?? histOrder.price;
+          if (lp != null && Number(lp) > 0) {
+            setHistoricalLastPrice(Number(lp));
+          }
+        }
       });
   };
 
