@@ -506,6 +506,10 @@ const AgentOrders = () => {
   };
 
   const initOrderState = (order: DbOrder) => {
+    // Touch the lease heartbeat on init
+    if (authUser && order.confirmation_status === "new") {
+      supabase.rpc("touch_order_lock" as any, { p_order_id: order.id, p_agent_id: authUser.id });
+    }
     setEditItems([{ name: order.product_name, qty: order.quantity, price: Number(order.price) }]);
     setEditCustomer({
       name: order.customer_name,
