@@ -140,19 +140,8 @@ const AgentOrders = () => {
     const releaseLock = () => {
       const order = currentOrderRef.current;
       if (order && order.confirmation_status === "new") {
-        // Use fetch with keepalive for reliability on page close
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/release_order_lock`;
-        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        fetch(url, {
-          method: "POST",
-          keepalive: true,
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": anonKey,
-            "Authorization": `Bearer ${anonKey}`,
-          },
-          body: JSON.stringify({ p_order_id: order.id, p_agent_id: authUser.id }),
-        }).catch(() => {});
+        // Best effort: use supabase RPC (works for navigation away / unmount)
+        supabase.rpc("release_order_lock" as any, { p_order_id: order.id, p_agent_id: authUser.id }).then();
       }
     };
 
