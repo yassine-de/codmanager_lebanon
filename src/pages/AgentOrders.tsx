@@ -118,6 +118,9 @@ const AgentOrders = () => {
   // ─── LEASE HEARTBEAT & AUTO-RELEASE ───
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentOrderRef = useRef<DbOrder | null>(null);
+  const [orderElapsedSec, setOrderElapsedSec] = useState(0);
+  const orderTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ORDER_WARNING_SEC = 5 * 60; // 5 minutes warning threshold
 
   const currentOrder = orderQueue[currentIndex];
 
