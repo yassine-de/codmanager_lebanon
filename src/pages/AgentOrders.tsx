@@ -989,11 +989,11 @@ const AgentOrders = () => {
                           </div>
                         )}
 
-                        {/* Last Selling Price — product table price > order last_price > historical fallback */}
+                        {/* Last Selling Price — product.last_price > order last_price > historical fallback */}
                         {(() => {
-                          const productPrice = matchedProduct?.price;
-                          const effectiveLastPrice = (productPrice != null && productPrice > 0)
-                            ? productPrice
+                          const productLastPrice = (matchedProduct as any)?.last_price;
+                          const effectiveLastPrice = (productLastPrice != null && productLastPrice > 0)
+                            ? productLastPrice
                             : (currentOrder.last_price != null && Number(currentOrder.last_price) > 0)
                               ? Number(currentOrder.last_price)
                               : historicalLastPrice;
