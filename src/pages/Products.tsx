@@ -155,7 +155,8 @@ export default function Products() {
         return (
           p.name.toLowerCase().includes(s) ||
           p.sku.toLowerCase().includes(s) ||
-          p.id.toLowerCase().includes(s)
+          p.id.toLowerCase().includes(s) ||
+          (p.displayId && p.displayId.toLowerCase().includes(s))
         );
       }
       return true;
