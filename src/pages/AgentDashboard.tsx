@@ -53,8 +53,10 @@ const AgentDashboard = () => {
   // Filter by confirmed_at date (when the agent actually treated the order)
   const filteredOrders = useMemo(() => {
     return agentOrders.filter((o) => {
-      // Use confirmed_at as the treatment date; fallback to created_at if null
-      const treatDate = o.confirmed_at ? new Date(o.confirmed_at) : new Date(o.created_at);
+      // Use confirmed_at for confirmed orders, updated_at for others (actual treatment timestamp)
+      const treatDate = o.confirmation_status === 'confirmed' && o.confirmed_at
+        ? new Date(o.confirmed_at)
+        : new Date(o.updated_at);
       if (!dateRange?.from) return true;
       const from = startOfDay(dateRange.from);
       const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
