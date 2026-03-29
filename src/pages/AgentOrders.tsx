@@ -118,6 +118,9 @@ const AgentOrders = () => {
   // ─── LEASE HEARTBEAT & AUTO-RELEASE ───
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentOrderRef = useRef<DbOrder | null>(null);
+  const [orderElapsedSec, setOrderElapsedSec] = useState(0);
+  const orderTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ORDER_WARNING_SEC = 5 * 60; // 5 minutes warning threshold
 
   const currentOrder = orderQueue[currentIndex];
 
@@ -149,7 +152,7 @@ const AgentOrders = () => {
     heartbeatRef.current = setInterval(touchLock, 30_000);
 
     // On visibility change: just pause/resume heartbeat, DON'T release
-    // The 2-min backend timeout is the safety net for truly abandoned orders
+    // The 5-min backend timeout is the safety net for truly abandoned orders
     const handleVisibility = () => {
       if (!document.hidden) {
         touchLock(); // Resume heartbeat when tab regains focus
@@ -166,6 +169,7 @@ const AgentOrders = () => {
 
     return () => {
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      if (orderTimerRef.current) clearInterval(orderTimerRef.current);
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       // Release on unmount (navigating away within the app)
@@ -509,6 +513,10 @@ const AgentOrders = () => {
     if (authUser && order.confirmation_status === "new") {
       supabase.rpc("touch_order_lock" as any, { p_order_id: order.id, p_agent_id: authUser.id });
     }
+    // Reset elapsed timer for new order
+    setOrderElapsedSec(0);
+    if (orderTimerRef.current) clearInterval(orderTimerRef.current);
+    orderTimerRef.current = setInterval(() => setOrderElapsedSec(s => s + 1), 1000);
     setEditItems([{ name: order.product_name, qty: order.quantity, price: Number(order.price) }]);
     setEditCustomer({
       name: order.customer_name,
@@ -784,6 +792,14 @@ const AgentOrders = () => {
         </div>
         <span className="text-xs">{Math.round(((currentIndex + 1) / orderQueue.length) * 100)}%</span>
       </div>
+
+      {/* ⚠️ Taking too long warning */}
+      {orderElapsedSec >= ORDER_WARNING_SEC && (
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive animate-pulse">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          ⚠️ You are taking too long on this order ({Math.floor(orderElapsedSec / 60)}:{String(orderElapsedSec % 60).padStart(2, '0')})
+        </div>
+      )}
 
       {/* Context badges */}
       <div className="flex flex-wrap gap-2">
