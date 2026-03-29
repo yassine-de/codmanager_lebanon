@@ -454,7 +454,7 @@ export default function Products() {
                       <div className="flex items-start justify-between">
                         <div>
                           <p className="text-sm font-medium truncate">{product.name}</p>
-                          <p className="text-xs text-muted-foreground">{product.seller} · {product.sku}</p>
+                          <p className="text-xs text-muted-foreground">{product.displayId ? `${product.displayId} · ` : ''}{product.seller} · {product.sku}</p>
                         </div>
                         <Button
                           size="icon"
