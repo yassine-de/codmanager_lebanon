@@ -73,6 +73,7 @@ export default function Products() {
         : [];
       return {
         id: p.id,
+        displayId: (p as any).display_id || undefined,
         seller: dbSellerNameMap[p.seller_id] || authUser?.name || "Unknown",
         sku: p.sku,
         name: p.name,
