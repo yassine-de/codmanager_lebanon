@@ -1049,17 +1049,22 @@ const AgentOrders = () => {
                 );
               })}
 
-              {/* Offers Section — order-level or historical fallback */}
+              {/* Offers Section — product-level > order-level > historical fallback */}
               {(() => {
-                const effectiveOffers = (currentOrder.offers && currentOrder.offers.trim())
-                  ? currentOrder.offers.trim()
-                  : historicalOffers;
+                const productOffers = (matchedProduct as any)?.offers as any[] | undefined;
+                const productOffersText = productOffers && productOffers.length > 0
+                  ? productOffers.map((o: any) => `${o.quantity}x → ${o.price} MAD`).join(" | ")
+                  : null;
+                const effectiveOffers = productOffersText
+                  || (currentOrder.offers && currentOrder.offers.trim() ? currentOrder.offers.trim() : null)
+                  || historicalOffers;
                 if (!effectiveOffers) return null;
+                const source = productOffersText ? "product" : (currentOrder.offers && currentOrder.offers.trim()) ? "order" : "history";
                 return (
                   <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-1">
                     <p className="text-[10px] uppercase tracking-wider font-semibold text-amber-600 flex items-center gap-1">
                       <Tag className="h-3 w-3" /> Offers / Promotions
-                      {!(currentOrder.offers && currentOrder.offers.trim()) && (
+                      {source === "history" && (
                         <span className="text-[9px] font-normal text-muted-foreground ml-1">(from previous order)</span>
                       )}
                     </p>
