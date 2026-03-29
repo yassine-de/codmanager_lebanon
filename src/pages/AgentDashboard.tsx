@@ -41,7 +41,7 @@ const AgentDashboard = () => {
       if (!userId) return [];
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_id, confirmation_status, delivery_status, product_name, price, quantity, total_amount, confirmed_at, created_at")
+        .select("id, order_id, confirmation_status, delivery_status, product_name, price, quantity, total_amount, confirmed_at, created_at, updated_at")
         .eq("agent_id", userId)
         .neq("confirmation_status", "new");
       if (error) throw error;
@@ -53,8 +53,10 @@ const AgentDashboard = () => {
   // Filter by confirmed_at date (when the agent actually treated the order)
   const filteredOrders = useMemo(() => {
     return agentOrders.filter((o) => {
-      // Use confirmed_at as the treatment date; fallback to created_at if null
-      const treatDate = o.confirmed_at ? new Date(o.confirmed_at) : new Date(o.created_at);
+      // Use confirmed_at for confirmed orders, updated_at for others (actual treatment timestamp)
+      const treatDate = o.confirmation_status === 'confirmed' && o.confirmed_at
+        ? new Date(o.confirmed_at)
+        : new Date(o.updated_at);
       if (!dateRange?.from) return true;
       const from = startOfDay(dateRange.from);
       const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
@@ -68,6 +70,9 @@ const AgentDashboard = () => {
     const postponed = filteredOrders.filter((o) => o.confirmation_status === "postponed").length;
     const noAnswer = filteredOrders.filter((o) => o.confirmation_status === "no_answer").length;
     const cancelled = filteredOrders.filter((o) => o.confirmation_status === "cancelled").length;
+    const doubleOrders = filteredOrders.filter((o) => o.confirmation_status === "double").length;
+    const wrongNumber = filteredOrders.filter((o) => o.confirmation_status === "wrong_number").length;
+    const other = doubleOrders + wrongNumber;
     return {
       total,
       confirmed,
@@ -78,6 +83,7 @@ const AgentDashboard = () => {
       noAnswerPct: total ? Math.round((noAnswer / total) * 100) : 0,
       cancelled,
       cancelledPct: total ? Math.round((cancelled / total) * 100) : 0,
+      other,
     };
   }, [filteredOrders]);
 
