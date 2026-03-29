@@ -1051,7 +1051,8 @@ const AgentOrders = () => {
 
               {/* Offers Section — product-level > order-level > historical fallback */}
               {(() => {
-                const productOffers = (matchedProduct as any)?.offers as any[] | undefined;
+                const outerMatchedProduct = sellerProducts.find(p => p.name === currentOrder.product_name);
+                const productOffers = (outerMatchedProduct as any)?.offers as any[] | undefined;
                 const productOffersText = productOffers && productOffers.length > 0
                   ? productOffers.map((o: any) => `${o.quantity}x → ${o.price} MAD`).join(" | ")
                   : null;
