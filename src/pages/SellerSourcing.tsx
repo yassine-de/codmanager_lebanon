@@ -13,7 +13,21 @@ import { toast } from "sonner";
 import { CreateSellerSourcingModal } from "@/components/CreateSellerSourcingModal";
 import { EditSellerSourcingModal } from "@/components/EditSellerSourcingModal";
 
+const paymentStatusConfig: Record<string, { label: string; color: string }> = {
+  unpaid: { label: "Unpaid", color: "bg-destructive/15 text-destructive border-destructive/25" },
+  paid: { label: "Paid", color: "bg-success/15 text-success border-success/25" },
+  partial: { label: "Partial", color: "bg-warning/15 text-warning border-warning/25" },
+};
+
 const statusConfig: Record<string, { label: string; color: string }> = {
+  waiting_quote: { label: "Waiting Quote", color: "bg-warning/15 text-warning border-warning/25" },
+  quoted: { label: "Quoted", color: "bg-info/15 text-info border-info/25" },
+  validated: { label: "Validated", color: "bg-success/15 text-success border-success/25" },
+  cancelled: { label: "Cancelled", color: "bg-destructive/15 text-destructive border-destructive/25" },
+  ordered: { label: "Ordered", color: "bg-primary/15 text-primary border-primary/25" },
+  shipped: { label: "Shipped", color: "bg-primary/15 text-primary border-primary/25" },
+  received: { label: "Received", color: "bg-success/15 text-success border-success/25" },
+};
   waiting_quote: { label: "Waiting Quote", color: "bg-warning/15 text-warning border-warning/25" },
   quoted: { label: "Quoted", color: "bg-info/15 text-info border-info/25" },
   validated: { label: "Validated", color: "bg-success/15 text-success border-success/25" },
