@@ -122,15 +122,6 @@ export default function Support() {
     refetchInterval: 10000,
   });
 
-  // Play sound when new unread messages arrive
-  const totalUnread = tickets.reduce((sum: number, t: Ticket) => sum + (t.unread_count || 0), 0);
-  useEffect(() => {
-    if (totalUnread > prevUnreadRef.current && prevUnreadRef.current >= 0) {
-      playAdminNotificationSound();
-    }
-    prevUnreadRef.current = totalUnread;
-  }, [totalUnread]);
-
   // Fetch messages for selected ticket
   const { data: messages = [] } = useQuery({
     queryKey: ["support-messages", selectedTicketId],
