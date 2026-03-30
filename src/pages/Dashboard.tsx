@@ -431,7 +431,7 @@ export default function Dashboard() {
         <div className={`grid grid-cols-1 ${!isSeller ? 'lg:grid-cols-2' : ''} gap-4`}>
           {/* Top Sellers - admin only */}
           {!isSeller && (
-            <div className="bg-card rounded-xl border animate-slide-up overflow-hidden" style={{ animationDelay: "370ms" }}>
+            <div className="bg-card rounded-xl border shadow-soft animate-slide-up overflow-hidden" style={{ animationDelay: "370ms" }}>
               <div className="px-4 py-2.5 border-b flex items-center gap-2">
                 <div className="p-1 rounded-md bg-primary/10 text-primary"><Store className="w-3.5 h-3.5" /></div>
                 <h2 className="text-xs font-semibold">Top Sellers by Delivered Orders</h2>
