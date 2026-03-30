@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
 
     const { data: allProducts } = await supabase
       .from("products")
-      .select("sku, seller_id, name, price, weight, product_url, video_url");
+      .select("sku, seller_id, name, price, weight, product_url, video_url, active");
 
     const skuMap = new Map<string, typeof allProducts extends (infer T)[] ? T : never>();
     allProducts?.forEach((p) => skuMap.set(p.sku.toLowerCase(), p));
