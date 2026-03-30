@@ -261,7 +261,7 @@ function RadialGauge({ rate, title, delay = 0 }: { rate: number; title: string; 
           <text x={cx} y={cy + 6} textAnchor="middle" dominantBaseline="middle"
             className="text-[10px] font-semibold uppercase tracking-[0.06em]" fill="hsl(30,6%,55%)">{title}</text>
           <text x={cx} y={cy + 20} textAnchor="middle" dominantBaseline="middle"
-            className="text-[9px] font-bold" fill={statusColor}>{status}</text>
+            className="text-[9px] font-bold" fill={statusColor}>{isDataVisible ? status : ''}</text>
         </svg>
       </div>
     </div>
