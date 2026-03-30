@@ -257,7 +257,7 @@ function RadialGauge({ rate, title, delay = 0 }: { rate: number; title: string; 
           ))}
           <text x={cx} y={cy - 16} textAnchor="middle" dominantBaseline="middle"
             className="text-[36px] font-bold tabular-nums" fill="hsl(var(--foreground))"
-            style={{ letterSpacing: "-0.03em" }}>{animatedRate}%</text>
+            style={{ letterSpacing: "-0.03em" }}>{isDataVisible ? `${animatedRate}%` : '••••'}</text>
           <text x={cx} y={cy + 6} textAnchor="middle" dominantBaseline="middle"
             className="text-[10px] font-semibold uppercase tracking-[0.06em]" fill="hsl(30,6%,55%)">{title}</text>
           <text x={cx} y={cy + 20} textAnchor="middle" dominantBaseline="middle"
