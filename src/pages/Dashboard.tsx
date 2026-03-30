@@ -74,14 +74,14 @@ function SectionKPI({
     <Tooltip>
       <TooltipTrigger asChild>
         <div onClick={onClick}
-          className={`relative overflow-hidden rounded-xl border px-5 py-4 animate-slide-up group
-            hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer
-            ${highlight ? 'ring-1 ring-success/30 bg-success/[0.04]' : 'bg-card'}`}
+          className={`relative overflow-hidden rounded-xl border shadow-soft px-5 py-4 animate-slide-up group
+            hover:shadow-elevated hover:-translate-y-0.5 transition-all duration-200 cursor-pointer
+            ${highlight ? 'ring-1 ring-success/20 bg-success/[0.03]' : 'bg-card'}`}
           style={{ animationDelay: `${delay}ms` }}>
           <div className="flex items-start justify-between mb-2">
-            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.06em] leading-none">{title}</p>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider leading-none">{title}</p>
             {change !== undefined && (
-              <div className={`flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
+              <div className={`flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-lg shrink-0 ${
                 isPositive ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
               }`}>
                 {isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
@@ -90,7 +90,7 @@ function SectionKPI({
             )}
           </div>
           <div className="flex items-center gap-3 mt-1">
-            <div className={`p-2.5 rounded-xl ${iconBg} shrink-0`}>
+            <div className={`p-2.5 rounded-xl ${iconBg} shrink-0 transition-transform duration-200 group-hover:scale-105`}>
               <Icon className={`w-5 h-5 ${color}`} />
             </div>
             <div className="min-w-0 flex-1">
@@ -98,16 +98,16 @@ function SectionKPI({
                 <p className={`font-bold tabular-nums tracking-tight leading-none ${highlight ? 'text-3xl' : 'text-2xl'}`}>
                   {isDataVisible ? <AnimatedNumber value={value} prefix={prefix} suffix={suffix} /> : <MaskedValue className="gap-1" />}
                 </p>
-                <span className={`text-sm font-semibold tabular-nums ${color} opacity-70`}>
+                <span className={`text-sm font-semibold tabular-nums ${color} opacity-60`}>
                   {isDataVisible ? `${percentage}%` : <MaskedValue />}
                 </span>
               </div>
-              {percentLabel && <p className="text-[11px] text-muted-foreground/60 mt-1.5">{isDataVisible ? percentLabel : <MaskedValue />}</p>}
+              {percentLabel && <p className="text-[11px] text-muted-foreground/50 mt-1.5">{isDataVisible ? percentLabel : <MaskedValue />}</p>}
             </div>
           </div>
         </div>
       </TooltipTrigger>
-      <TooltipContent side="bottom" className="text-xs">Click to filter by {title.toLowerCase()}</TooltipContent>
+      <TooltipContent side="bottom" className="text-xs rounded-lg">Click to filter by {title.toLowerCase()}</TooltipContent>
     </Tooltip>
   );
 }
@@ -131,7 +131,7 @@ function SparkMiniChart({ data, dataKey, color, gradientId, title, total, delay 
 }) {
   const { isDataVisible } = useDataVisibility();
   return (
-    <div className="bg-card rounded-xl border px-5 py-4 animate-slide-up hover:shadow-lg transition-all duration-300"
+    <div className="bg-card rounded-xl border shadow-soft px-5 py-4 animate-slide-up hover:shadow-elevated transition-all duration-200"
       style={{ animationDelay: `${delay}ms` }}>
       <div className="flex items-center justify-between mb-2">
         <div>
@@ -233,7 +233,7 @@ function RadialGauge({ rate, title, delay = 0 }: { rate: number; title: string; 
   const status = animatedRate < 50 ? "Needs Improvement" : animatedRate < 60 ? "Good" : "Excellent";
 
   return (
-    <div className="bg-card rounded-xl border overflow-hidden animate-slide-up hover:shadow-lg transition-all duration-300"
+    <div className="bg-card rounded-xl border shadow-soft overflow-hidden animate-slide-up hover:shadow-elevated transition-all duration-200"
       style={{ animationDelay: `${delay}ms` }}>
       <div className="flex flex-col items-center justify-center px-2 py-3">
         <svg viewBox="0 0 280 150" className="w-full h-auto max-w-[420px] overflow-visible">
@@ -308,7 +308,7 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-[1400px]">
-      <div className="sticky top-0 z-30 -mx-4 px-4 py-2.5 bg-background/80 backdrop-blur-xl border-b">
+      <div className="sticky top-0 z-30 -mx-5 lg:-mx-6 px-5 lg:px-6 py-3 bg-background/80 glass border-b mb-1">
         <DatePresetFilter
           dateRange={dateRange}
           onDateRangeChange={setDateRange}
@@ -317,12 +317,12 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="space-y-6 mt-4">
+      <div className="space-y-8 mt-5">
         {/* Header */}
         <div className="flex items-end justify-between animate-fade-in">
           <div>
-            <h1 className="text-xl font-bold tracking-tight">{isSeller ? "My Dashboard" : "Dashboard"}</h1>
-            <p className="text-muted-foreground text-xs mt-0.5">{format(new Date(), "EEEE, dd MMMM yyyy")}</p>
+            <h1 className="text-2xl font-bold tracking-tight">{isSeller ? "My Dashboard" : "Dashboard"}</h1>
+            <p className="text-muted-foreground text-sm mt-1">{format(new Date(), "EEEE, dd MMMM yyyy")}</p>
           </div>
         </div>
 
@@ -431,7 +431,7 @@ export default function Dashboard() {
         <div className={`grid grid-cols-1 ${!isSeller ? 'lg:grid-cols-2' : ''} gap-4`}>
           {/* Top Sellers - admin only */}
           {!isSeller && (
-            <div className="bg-card rounded-xl border animate-slide-up overflow-hidden" style={{ animationDelay: "370ms" }}>
+            <div className="bg-card rounded-xl border shadow-soft animate-slide-up overflow-hidden" style={{ animationDelay: "370ms" }}>
               <div className="px-4 py-2.5 border-b flex items-center gap-2">
                 <div className="p-1 rounded-md bg-primary/10 text-primary"><Store className="w-3.5 h-3.5" /></div>
                 <h2 className="text-xs font-semibold">Top Sellers by Delivered Orders</h2>
@@ -458,7 +458,7 @@ export default function Dashboard() {
           )}
 
           {/* Top Products */}
-          <div className="bg-card rounded-xl border animate-slide-up overflow-hidden" style={{ animationDelay: "400ms" }}>
+          <div className="bg-card rounded-xl border shadow-soft animate-slide-up overflow-hidden" style={{ animationDelay: "400ms" }}>
             <div className="px-4 py-2.5 border-b flex items-center gap-2">
               <div className="p-1 rounded-md bg-success/10 text-success"><Award className="w-3.5 h-3.5" /></div>
               <h2 className="text-xs font-semibold">Top Products by Delivery Rate</h2>

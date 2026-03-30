@@ -115,9 +115,9 @@ function OrderSparklineCards({ orders }: { orders: Order[] }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-fade-in">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in">
       {cards.map((c) => (
-        <div key={c.title} className="bg-card rounded-xl border px-5 py-4 hover:shadow-md transition-all duration-300">
+        <div key={c.title} className="bg-card rounded-xl border shadow-soft px-5 py-4 hover:shadow-elevated hover:-translate-y-0.5 transition-all duration-200">
           <p className="text-sm text-muted-foreground font-medium">{c.title}</p>
           <div className="flex items-end justify-between mt-2">
             <div className="flex items-baseline gap-1.5">
@@ -438,12 +438,12 @@ export default function Orders() {
 
   return (
     <TooltipProvider delayDuration={200}>
-    <div className="space-y-4 max-w-7xl">
+    <div className="space-y-5 max-w-7xl">
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in">
         <div>
-          <h1 className="text-2xl font-semibold">Orders</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Manage all your COD orders</p>
+          <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
+          <p className="text-muted-foreground text-sm mt-1">Manage all your COD orders</p>
         </div>
         {!isAdmin && (
           <Button size="sm" className="gap-1.5" onClick={() => setShowCreateModal(true)}>
@@ -582,7 +582,7 @@ export default function Orders() {
       )}
 
       {/* Table Card */}
-      <div className="bg-card rounded-lg border animate-slide-up" style={{ animationDelay: '100ms' }}>
+      <div className="bg-card rounded-xl border shadow-soft animate-slide-up overflow-hidden" style={{ animationDelay: '100ms' }}>
         {/* Table toolbar */}
         {/* Bulk Action Bar */}
         {isAdmin && selectedOrders.size > 0 && (
@@ -675,28 +675,28 @@ export default function Orders() {
         <div className="overflow-x-auto hidden md:block">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b bg-muted/30">
+              <tr className="border-b bg-muted/40">
                 {isAdmin && (
-                  <th className="py-2.5 px-3 w-10">
+                  <th className="py-3 px-3 w-10">
                     <Checkbox
                       checked={paginatedOrders.length > 0 && selectedOrders.size === paginatedOrders.length}
                       onCheckedChange={toggleSelectAll}
                     />
                   </th>
                 )}
-                {isCol('id') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">ID</th>}
-                {isCol('createdAt') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Created</th>}
-                {isCol('updatedAt') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Updated</th>}
-                {isCol('seller') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Seller</th>}
-                {isCol('customer') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Client</th>}
-                {isCol('city') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">City</th>}
-                {isCol('phone') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Phone</th>}
-                {isCol('product') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Product</th>}
-                {isCol('amount') && <th className="text-right py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Amount</th>}
-                {isCol('confirmationStatus') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Confirmation</th>}
-                {isCol('attempts') && isAdmin && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Attempts</th>}
-                {isCol('deliveryStatus') && <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Delivery</th>}
-                <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Actions</th>
+                {isCol('id') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">ID</th>}
+                {isCol('createdAt') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Created</th>}
+                {isCol('updatedAt') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Updated</th>}
+                {isCol('seller') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Seller</th>}
+                {isCol('customer') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Client</th>}
+                {isCol('city') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">City</th>}
+                {isCol('phone') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Phone</th>}
+                {isCol('product') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Product</th>}
+                {isCol('amount') && <th className="text-right py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Amount</th>}
+                {isCol('confirmationStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Confirmation</th>}
+                {isCol('attempts') && isAdmin && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Attempts</th>}
+                {isCol('deliveryStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Delivery</th>}
+                <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -704,8 +704,8 @@ export default function Orders() {
                 <tr
                   key={order.id}
                   className={cn(
-                    "border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors active:scale-[0.995]",
-                    selectedOrders.has(order.id) && "bg-primary/5"
+                    "border-b last:border-0 hover:bg-muted/40 cursor-pointer transition-colors duration-150",
+                    selectedOrders.has(order.id) && "bg-primary/[0.04]"
                   )}
                   onClick={() => navigate(`/orders/${order.id}`)}
                 >
