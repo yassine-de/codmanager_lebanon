@@ -365,6 +365,9 @@ export default function Products() {
                         title={isMissingLinks ? "Missing required links (Product Link / Video Link)" : undefined}
                       >
                         <td className="py-2 px-4 font-mono text-xs text-muted-foreground">{product.displayId || product.id.slice(0, 8)}</td>
+                        <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
+                          {format(new Date(product.createdAt), "dd MMM yyyy")}
+                        </td>
                         <td className="py-2 px-3">
                           {product.image ? (
                             <img
