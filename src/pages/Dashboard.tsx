@@ -129,6 +129,7 @@ function SparkMiniChart({ data, dataKey, color, gradientId, title, total, delay 
   data: { day: string; [k: string]: string | number }[];
   dataKey: string; color: string; gradientId: string; title: string; total: number; delay: number;
 }) {
+  const { isDataVisible } = useDataVisibility();
   return (
     <div className="bg-card rounded-xl border px-5 py-4 animate-slide-up hover:shadow-lg transition-all duration-300"
       style={{ animationDelay: `${delay}ms` }}>
