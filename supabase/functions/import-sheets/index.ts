@@ -246,6 +246,17 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // Check product is active (has product_url and video_url)
+        if (!product.active) {
+          await supabase.from("integration_errors").insert({
+            sheet_id: sheet.id,
+            order_data: orderData as any,
+            error_message: `Product "${product.name}" (SKU: ${sku}) is inactive — missing product link or video link`,
+          });
+          errorsCount++;
+          continue;
+        }
+
         // Duplicate check
         const today = new Date();
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
