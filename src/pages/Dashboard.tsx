@@ -136,7 +136,7 @@ function SparkMiniChart({ data, dataKey, color, gradientId, title, total, delay 
       <div className="flex items-center justify-between mb-2">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground/60">{title}</p>
-          <p className="text-2xl font-bold tabular-nums mt-1"><AnimatedNumber value={total} /></p>
+          <p className="text-2xl font-bold tabular-nums mt-1">{isDataVisible ? <AnimatedNumber value={total} /> : <MaskedValue className="gap-1" />}</p>
         </div>
         <span className="text-[10px] font-bold text-muted-foreground/50 bg-muted rounded-full px-2.5 py-1 uppercase tracking-widest">7d</span>
       </div>
