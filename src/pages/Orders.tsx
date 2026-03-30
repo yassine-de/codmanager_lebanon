@@ -438,12 +438,12 @@ export default function Orders() {
 
   return (
     <TooltipProvider delayDuration={200}>
-    <div className="space-y-4 max-w-7xl">
+    <div className="space-y-5 max-w-7xl">
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in">
         <div>
-          <h1 className="text-2xl font-semibold">Orders</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Manage all your COD orders</p>
+          <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
+          <p className="text-muted-foreground text-sm mt-1">Manage all your COD orders</p>
         </div>
         {!isAdmin && (
           <Button size="sm" className="gap-1.5" onClick={() => setShowCreateModal(true)}>
