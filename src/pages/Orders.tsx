@@ -582,7 +582,7 @@ export default function Orders() {
       )}
 
       {/* Table Card */}
-      <div className="bg-card rounded-lg border animate-slide-up" style={{ animationDelay: '100ms' }}>
+      <div className="bg-card rounded-xl border shadow-soft animate-slide-up overflow-hidden" style={{ animationDelay: '100ms' }}>
         {/* Table toolbar */}
         {/* Bulk Action Bar */}
         {isAdmin && selectedOrders.size > 0 && (
