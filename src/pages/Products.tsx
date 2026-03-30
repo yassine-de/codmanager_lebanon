@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { mockProducts, productSellers, type Product } from "@/lib/products-data";
+import { mockProducts, type Product } from "@/lib/products-data";
 import { CreateProductModal } from "@/components/CreateProductModal";
 import { EditProductModal } from "@/components/EditProductModal";
 import { supabase } from "@/integrations/supabase/client";
