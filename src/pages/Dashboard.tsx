@@ -458,7 +458,7 @@ export default function Dashboard() {
           )}
 
           {/* Top Products */}
-          <div className="bg-card rounded-xl border animate-slide-up overflow-hidden" style={{ animationDelay: "400ms" }}>
+          <div className="bg-card rounded-xl border shadow-soft animate-slide-up overflow-hidden" style={{ animationDelay: "400ms" }}>
             <div className="px-4 py-2.5 border-b flex items-center gap-2">
               <div className="p-1 rounded-md bg-success/10 text-success"><Award className="w-3.5 h-3.5" /></div>
               <h2 className="text-xs font-semibold">Top Products by Delivery Rate</h2>
