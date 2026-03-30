@@ -2,7 +2,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Settings, LogOut, User, Bell, Globe, Check, ShoppingCart, AlertTriangle, Info } from "lucide-react";
+import { Settings, LogOut, User, Bell, Globe, Check, ShoppingCart, AlertTriangle, Info, Eye, EyeOff, Sun, Moon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SellerSupportChat } from "@/components/SellerSupportChat";
 import { SellerAlertsBanner } from "@/components/SellerAlertsBanner";
+import { useDataVisibility } from "@/contexts/DataVisibilityContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const languages: { value: Language; label: string; flag: string }[] = [
   { value: "en", label: "English", flag: "🇬🇧" },
@@ -39,6 +41,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { authUser, signOut } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const { language, setLanguage, t } = useLanguage();
+  const { isDataVisible, toggleDataVisibility } = useDataVisibility();
+  const { theme, toggleTheme } = useTheme();
   usePresenceHeartbeat();
   useGlobalAdminSupportNotifications();
 
@@ -61,6 +65,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   {authUser.name}
                 </span>
               )}
+
+              {/* Data Visibility Toggle */}
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={toggleDataVisibility}
+                title={isDataVisible ? "Hide data" : "Show data"}>
+                {isDataVisible ? <Eye className="h-4 w-4 text-muted-foreground" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
+              </Button>
+
+              {/* Dark/Light Mode Toggle */}
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={toggleTheme}
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+                {theme === "dark" ? <Sun className="h-4 w-4 text-muted-foreground" /> : <Moon className="h-4 w-4 text-muted-foreground" />}
+              </Button>
 
               {/* Language Switcher */}
               <DropdownMenu>

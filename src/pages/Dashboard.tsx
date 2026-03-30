@@ -20,6 +20,7 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import OnlineStatusPanel from "@/components/OnlineStatusPanel";
+import { useDataVisibility } from "@/contexts/DataVisibilityContext";
 
 /* ── Animated Number ── */
 function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
@@ -67,6 +68,7 @@ function SectionKPI({
   title, value, percentage, percentLabel, icon: Icon, color, iconBg,
   highlight = false, prefix = "", suffix = "", change, delay = 0, onClick,
 }: SectionKPIProps) {
+  const { isDataVisible } = useDataVisibility();
   const isPositive = change !== undefined && change >= 0;
   return (
     <Tooltip>
@@ -92,13 +94,13 @@ function SectionKPI({
               <Icon className={`w-5 h-5 ${color}`} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-2">
+              <div className={`flex items-baseline gap-2 ${!isDataVisible ? 'blur-md select-none' : ''} transition-all duration-300`}>
                 <p className={`font-bold tabular-nums tracking-tight leading-none ${highlight ? 'text-3xl' : 'text-2xl'}`}>
                   <AnimatedNumber value={value} prefix={prefix} suffix={suffix} />
                 </p>
                 <span className={`text-sm font-semibold tabular-nums ${color} opacity-70`}>{percentage}%</span>
               </div>
-              {percentLabel && <p className="text-[11px] text-muted-foreground/60 mt-1.5">{percentLabel}</p>}
+              {percentLabel && <p className={`text-[11px] text-muted-foreground/60 mt-1.5 ${!isDataVisible ? 'blur-md select-none' : ''} transition-all duration-300`}>{percentLabel}</p>}
             </div>
           </div>
         </div>
