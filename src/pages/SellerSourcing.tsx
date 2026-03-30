@@ -177,6 +177,7 @@ export default function SellerSourcing() {
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-[40px]"></TableHead>
+              <TableHead>ID</TableHead>
               <TableHead>Product</TableHead>
               <TableHead className="text-center">Qty</TableHead>
               <TableHead>Country</TableHead>
