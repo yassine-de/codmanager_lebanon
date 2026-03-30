@@ -704,8 +704,8 @@ export default function Orders() {
                 <tr
                   key={order.id}
                   className={cn(
-                    "border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors active:scale-[0.995]",
-                    selectedOrders.has(order.id) && "bg-primary/5"
+                    "border-b last:border-0 hover:bg-muted/40 cursor-pointer transition-colors duration-150",
+                    selectedOrders.has(order.id) && "bg-primary/[0.04]"
                   )}
                   onClick={() => navigate(`/orders/${order.id}`)}
                 >
