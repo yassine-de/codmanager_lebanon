@@ -70,7 +70,7 @@ export default function Support() {
   const [newMessage, setNewMessage] = useState("");
   const [mobileShowChat, setMobileShowChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const prevUnreadRef = useRef<number>(0);
+  
 
   // Fetch all tickets with seller names + unread counts
   const { data: tickets = [] } = useQuery({
