@@ -338,6 +338,7 @@ export default function Products() {
                   <thead>
                     <tr className="border-b bg-muted/30">
                       <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">ID</th>
+                      <th className="text-left py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Created</th>
                       <th className="text-left py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Image</th>
                       <th className="text-left py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Seller</th>
                       <th className="text-left py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">SKU</th>
@@ -351,7 +352,6 @@ export default function Products() {
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Available</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Weight</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Variants</th>
-                      <th className="text-left py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Created</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider w-[60px]">Actions</th>
                     </tr>
                   </thead>
@@ -365,6 +365,9 @@ export default function Products() {
                         title={isMissingLinks ? "Missing required links (Product Link / Video Link)" : undefined}
                       >
                         <td className="py-2 px-4 font-mono text-xs text-muted-foreground">{product.displayId || product.id.slice(0, 8)}</td>
+                        <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
+                          {format(new Date(product.createdAt), "dd MMM yyyy")}
+                        </td>
                         <td className="py-2 px-3">
                           {product.image ? (
                             <img
@@ -438,9 +441,6 @@ export default function Products() {
                           ) : (
                             <span className="text-[10px] text-muted-foreground">—</span>
                           )}
-                        </td>
-                        <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
-                          {format(new Date(product.createdAt), "dd MMM yyyy")}
                         </td>
                         <td className="py-2 px-3 text-center">
                           <div className="flex items-center justify-center gap-0.5">
