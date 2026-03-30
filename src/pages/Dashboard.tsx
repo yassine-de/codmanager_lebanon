@@ -20,7 +20,7 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import OnlineStatusPanel from "@/components/OnlineStatusPanel";
-import { useDataVisibility } from "@/contexts/DataVisibilityContext";
+import { useDataVisibility, MaskedValue } from "@/contexts/DataVisibilityContext";
 
 /* ── Animated Number ── */
 function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
@@ -94,13 +94,15 @@ function SectionKPI({
               <Icon className={`w-5 h-5 ${color}`} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className={`flex items-baseline gap-2 ${!isDataVisible ? 'blur-md select-none' : ''} transition-all duration-300`}>
+              <div className="flex items-baseline gap-2">
                 <p className={`font-bold tabular-nums tracking-tight leading-none ${highlight ? 'text-3xl' : 'text-2xl'}`}>
-                  <AnimatedNumber value={value} prefix={prefix} suffix={suffix} />
+                  {isDataVisible ? <AnimatedNumber value={value} prefix={prefix} suffix={suffix} /> : <MaskedValue className="gap-1" />}
                 </p>
-                <span className={`text-sm font-semibold tabular-nums ${color} opacity-70`}>{percentage}%</span>
+                <span className={`text-sm font-semibold tabular-nums ${color} opacity-70`}>
+                  {isDataVisible ? `${percentage}%` : <MaskedValue />}
+                </span>
               </div>
-              {percentLabel && <p className={`text-[11px] text-muted-foreground/60 mt-1.5 ${!isDataVisible ? 'blur-md select-none' : ''} transition-all duration-300`}>{percentLabel}</p>}
+              {percentLabel && <p className="text-[11px] text-muted-foreground/60 mt-1.5">{isDataVisible ? percentLabel : <MaskedValue />}</p>}
             </div>
           </div>
         </div>
