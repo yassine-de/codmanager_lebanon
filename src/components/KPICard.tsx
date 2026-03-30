@@ -1,5 +1,5 @@
 import { type LucideIcon } from "lucide-react";
-import { useDataVisibility } from "@/contexts/DataVisibilityContext";
+import { useDataVisibility, MaskedValue } from "@/contexts/DataVisibilityContext";
 
 interface KPICardProps {
   title: string;
@@ -37,15 +37,19 @@ export function KPICard({
             trend.positive
               ? 'bg-success/10 text-success'
               : 'bg-destructive/10 text-destructive'
-          } ${!isDataVisible ? 'blur-md select-none' : ''} transition-all duration-300`}>
-            {trend.positive ? '↑' : '↓'} {trend.value}
+          }`}>
+            {isDataVisible ? <>{trend.positive ? '↑' : '↓'} {trend.value}</> : <MaskedValue />}
           </span>
         )}
       </div>
       <p className="text-sm text-muted-foreground font-medium">{title}</p>
-      <p className={`text-2xl font-bold tabular-nums tracking-tight mt-1 ${!isDataVisible ? 'blur-md select-none' : ''} transition-all duration-300`}>{value}</p>
+      <p className="text-2xl font-bold tabular-nums tracking-tight mt-1">
+        {isDataVisible ? value : <MaskedValue className="gap-1" />}
+      </p>
       {subtitle && (
-        <p className={`text-xs text-muted-foreground mt-1.5 ${!isDataVisible ? 'blur-md select-none' : ''} transition-all duration-300`}>{subtitle}</p>
+        <p className="text-xs text-muted-foreground mt-1.5">
+          {isDataVisible ? subtitle : <MaskedValue />}
+        </p>
       )}
     </div>
   );

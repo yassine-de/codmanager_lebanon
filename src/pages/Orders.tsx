@@ -78,6 +78,7 @@ const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean }[] =
 
 /* ── Sparkline KPI Cards ── */
 function OrderSparklineCards({ orders }: { orders: Order[] }) {
+  const { isDataVisible } = useDataVisibility();
   const sparkData = useMemo(() => {
     const days = eachDayOfInterval({
       start: startOfDay(subDays(new Date(), 6)),
@@ -120,8 +121,10 @@ function OrderSparklineCards({ orders }: { orders: Order[] }) {
           <p className="text-sm text-muted-foreground font-medium">{c.title}</p>
           <div className="flex items-end justify-between mt-2">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-bold tabular-nums">{c.value.toLocaleString()}</span>
-              <span className="text-success text-xs font-semibold">↑</span>
+              <span className="text-2xl font-bold tabular-nums">
+                {isDataVisible ? c.value.toLocaleString() : <MaskedValue className="gap-1" />}
+              </span>
+              {isDataVisible && <span className="text-success text-xs font-semibold">↑</span>}
             </div>
             <div className="w-20 h-8">
               <ResponsiveContainer width="100%" height="100%">
