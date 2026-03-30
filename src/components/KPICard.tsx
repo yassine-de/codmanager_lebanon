@@ -1,4 +1,5 @@
 import { type LucideIcon } from "lucide-react";
+import { useDataVisibility } from "@/contexts/DataVisibilityContext";
 
 interface KPICardProps {
   title: string;
@@ -21,6 +22,7 @@ export function KPICard({
   trend,
   delay = 0,
 }: KPICardProps) {
+  const { isDataVisible } = useDataVisibility();
   return (
     <div
       className="bg-card rounded-xl border p-5 animate-slide-up hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group"
@@ -35,15 +37,15 @@ export function KPICard({
             trend.positive
               ? 'bg-success/10 text-success'
               : 'bg-destructive/10 text-destructive'
-          }`}>
+          } ${!isDataVisible ? 'blur-md select-none' : ''} transition-all duration-300`}>
             {trend.positive ? '↑' : '↓'} {trend.value}
           </span>
         )}
       </div>
       <p className="text-sm text-muted-foreground font-medium">{title}</p>
-      <p className="text-2xl font-bold tabular-nums tracking-tight mt-1">{value}</p>
+      <p className={`text-2xl font-bold tabular-nums tracking-tight mt-1 ${!isDataVisible ? 'blur-md select-none' : ''} transition-all duration-300`}>{value}</p>
       {subtitle && (
-        <p className="text-xs text-muted-foreground mt-1.5">{subtitle}</p>
+        <p className={`text-xs text-muted-foreground mt-1.5 ${!isDataVisible ? 'blur-md select-none' : ''} transition-all duration-300`}>{subtitle}</p>
       )}
     </div>
   );
