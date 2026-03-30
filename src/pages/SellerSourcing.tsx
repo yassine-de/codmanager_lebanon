@@ -218,6 +218,9 @@ export default function SellerSourcing() {
                         </div>
                       )}
                     </TableCell>
+                    <TableCell className="font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                      {req.display_id || req.id.slice(0, 8)}
+                    </TableCell>
                     <TableCell className="font-medium max-w-[160px] truncate">
                       <div className="flex items-center gap-1.5">
                         {isNew && <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />}
