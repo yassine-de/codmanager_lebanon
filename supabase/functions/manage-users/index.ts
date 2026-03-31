@@ -334,7 +334,7 @@ Deno.serve(async (req) => {
     await verifyAdmin(supabaseAdmin, req);
 
     if (action === "create-user") {
-      const { email, password, name, phone, role, rates, permissions } = payload;
+      const { email, password, name, phone, role, rates, rateSettings, permissions } = payload;
       const { data: createdUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
@@ -358,6 +358,24 @@ Deno.serve(async (req) => {
 
       if (role === "seller") {
         await ensureSellerData(supabaseAdmin, userId, name, rates);
+        // Update rate_settings with confirmation rates if provided
+        if (rateSettings) {
+          // Wait a moment for the trigger to create the rate_settings record
+          const { data: existingRS } = await supabaseAdmin
+            .from("rate_settings")
+            .select("id")
+            .eq("seller_id", userId)
+            .maybeSingle();
+
+          if (existingRS) {
+            await supabaseAdmin.from("rate_settings").update({
+              dropped_order_rate: rateSettings.dropped_order_rate ?? 0,
+              confirmed_order_rate: rateSettings.confirmed_order_rate ?? 0,
+              cod_fee_per_delivery: rateSettings.cod_fee_per_delivery ?? 0,
+              is_custom: true,
+            }).eq("id", existingRS.id);
+          }
+        }
       }
 
       return new Response(JSON.stringify({ success: true, user_id: userId }), {
