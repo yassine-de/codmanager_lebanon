@@ -266,26 +266,49 @@ export default function Invoices() {
     return invoices.map(inv => {
       const orders = ordersByInvoice[inv.id] || [];
       const rates = sellerRatesMap[inv.seller_id] || null;
-      const totalAmountPKR = orders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
-      const totalAmountUSD = pkrToUsd(totalAmountPKR);
-      const totalFees = orders.reduce((sum, o) => sum + calculateFeeFromWeight(getProductWeight(inv.seller_id, o.product_name), rates), 0);
+      const ccRates = callCenterRatesMap[inv.seller_id] || { confirmedRate: 0, droppedRate: 0 };
+      
+      // Delivered orders → revenue
+      const delivered = orders.filter(o => o.delivery_status === "delivered");
+      const deliveredRevenuePKR = delivered.reduce((sum, o) => sum + (o.price * o.quantity), 0);
+      
+      // Shipping: shipped + delivered orders
+      const shippable = orders.filter(o => 
+        o.delivery_status === "delivered" || o.delivery_status === "shipped" || 
+        o.delivery_status === "in_transit" || o.delivery_status === "with_courier"
+      );
+      const shippingFees = shippable.reduce((sum, o) => sum + calcShippingFee(getProductWeightKg(inv.seller_id, o.product_name), o.quantity, rates), 0);
+      
+      // Call center fees
+      const confirmedCount = orders.filter(o => o.confirmation_status === "confirmed").length;
+      const droppedCount = orders.filter(o => o.confirmation_status === "cancelled").length;
+      const callCenterFees = (confirmedCount * ccRates.confirmedRate) + (droppedCount * ccRates.droppedRate);
+      
+      // COD fees
       const codPct = (codFeeMap[inv.seller_id] ?? 5) / 100;
-      const codFees = totalAmountUSD * codPct;
+      const codFees = deliveredRevenuePKR * codPct;
+      
+      // Addons
       const addons = addonsByInvoice[inv.id] || [];
       const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
+      
+      const totalDeductions = shippingFees + callCenterFees + codFees;
+      const netPayable = deliveredRevenuePKR - totalDeductions + addonNet;
+      
       return {
         ...inv,
         ordersCount: orders.length,
-        totalAmountPKR,
-        totalAmountUSD,
-        totalFees,
+        deliveredCount: delivered.length,
+        totalAmountPKR: deliveredRevenuePKR,
+        shippingFees,
+        callCenterFees,
         codFees,
         addonNet,
-        netPayableUSD: totalAmountUSD - totalFees - codFees + addonNet,
+        netPayable,
         sellerName: sellerNameMap[inv.seller_id] || inv.seller_id.slice(0, 8),
       };
     });
-  }, [invoices, invoiceOrders, sellerRatesMap, addonsByInvoice, sellerNameMap, productWeightMap]);
+  }, [invoices, invoiceOrders, sellerRatesMap, callCenterRatesMap, addonsByInvoice, sellerNameMap, productWeightMap, codFeeMap]);
 
   // All invoices as rows (no more virtual drafts)
   const combined = useMemo(() => {
