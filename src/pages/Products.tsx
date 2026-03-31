@@ -394,8 +394,8 @@ export default function Products() {
                             {(product as any).active ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        <td className="py-2 px-3 text-right tabular-nums text-xs font-medium">{product.price} MAD</td>
-                        <td className="py-2 px-3 text-right tabular-nums text-xs font-medium">{product.lastSellingPrice} MAD</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-xs font-medium">${product.price}</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-xs font-medium">${product.lastSellingPrice}</td>
                         <td className="py-2 px-3 text-center tabular-nums text-xs">{product.totalQty}</td>
                         <td className="py-2 px-3 text-center">
                           <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)] border-[hsl(155,50%,42%)]/20">
