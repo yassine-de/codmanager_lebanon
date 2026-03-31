@@ -221,7 +221,7 @@ export function InvoiceDetailModal({ open, onOpenChange, invoiceId, invoiceNumbe
                   )}
                   {codFees > 0 && (
                     <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">COD Fees (5%)</span>
+                      <span className="text-muted-foreground">COD Fees ({codFeePercentage}%)</span>
                       <span className="font-semibold tabular-nums text-destructive">-{formatUSD(codFees)}</span>
                     </div>
                   )}
