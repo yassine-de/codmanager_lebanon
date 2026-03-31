@@ -611,10 +611,10 @@ export default function Invoices() {
                       <TableCell className="text-center">
                         <span className="inline-flex items-center justify-center h-6 min-w-[28px] px-1.5 rounded-md bg-accent text-[11px] font-semibold">{inv.ordersCount}</span>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{inv.totalAmount.toLocaleString()} <span className="text-muted-foreground text-[10px]">PKR</span></TableCell>
-                      <TableCell className="text-right tabular-nums text-destructive">-{inv.totalFees.toFixed(2)}</TableCell>
-                      <TableCell className="text-right tabular-nums text-destructive">-{inv.codFees.toFixed(2)}</TableCell>
-                      <TableCell className="text-right tabular-nums font-bold text-success">{inv.netPayable.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">PKR</span></TableCell>
+                      <TableCell className="text-right tabular-nums">{inv.totalAmountPKR.toLocaleString()} <span className="text-muted-foreground text-[10px]">PKR</span></TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.totalFees)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.codFees)}</TableCell>
+                      <TableCell className="text-right tabular-nums font-bold text-success">{formatUSD(inv.netPayableUSD)}</TableCell>
                       {!isSeller && (
                         <TableCell className="text-center">
                           <Switch
