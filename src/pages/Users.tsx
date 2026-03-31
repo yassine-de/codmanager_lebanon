@@ -430,23 +430,45 @@ const Users = () => {
 
             {/* Seller rates */}
             {form.role === "seller" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Tarifs par poids ($)</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">1 Kg</Label>
-                    <Input className="h-9 text-xs" type="number" placeholder="35" value={form.rate_1kg}
-                      onChange={(e) => setForm((f) => ({ ...f, rate_1kg: e.target.value }))} />
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Tarifs par poids ($)</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">1 Kg</Label>
+                      <Input className="h-9 text-xs" type="number" placeholder="35" value={form.rate_1kg}
+                        onChange={(e) => setForm((f) => ({ ...f, rate_1kg: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">2 Kg</Label>
+                      <Input className="h-9 text-xs" type="number" placeholder="45" value={form.rate_2kg}
+                        onChange={(e) => setForm((f) => ({ ...f, rate_2kg: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">3 Kg</Label>
+                      <Input className="h-9 text-xs" type="number" placeholder="55" value={form.rate_3kg}
+                        onChange={(e) => setForm((f) => ({ ...f, rate_3kg: e.target.value }))} />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">2 Kg</Label>
-                    <Input className="h-9 text-xs" type="number" placeholder="45" value={form.rate_2kg}
-                      onChange={(e) => setForm((f) => ({ ...f, rate_2kg: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">3 Kg</Label>
-                    <Input className="h-9 text-xs" type="number" placeholder="55" value={form.rate_3kg}
-                      onChange={(e) => setForm((f) => ({ ...f, rate_3kg: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Tarifs de confirmation ($)</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Dropped Lead</Label>
+                      <Input className="h-9 text-xs" type="number" step="0.01" placeholder="0" value={form.dropped_order_rate}
+                        onChange={(e) => setForm((f) => ({ ...f, dropped_order_rate: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Confirmed Lead</Label>
+                      <Input className="h-9 text-xs" type="number" step="0.01" placeholder="0" value={form.confirmed_order_rate}
+                        onChange={(e) => setForm((f) => ({ ...f, confirmed_order_rate: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">COD Fees (%)</Label>
+                      <Input className="h-9 text-xs" type="number" step="0.01" placeholder="5" value={form.cod_fee_per_delivery}
+                        onChange={(e) => setForm((f) => ({ ...f, cod_fee_per_delivery: e.target.value }))} />
+                    </div>
                   </div>
                 </div>
               </div>

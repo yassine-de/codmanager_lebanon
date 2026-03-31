@@ -366,7 +366,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "update-user") {
-      const { userId, name, phone, active, role, rates, permissions } = payload;
+      const { userId, name, phone, active, role, rates, rateSettings, permissions } = payload;
       const profileUpdate: Record<string, unknown> = {};
 
       if (name !== undefined) profileUpdate.name = name;
@@ -385,6 +385,35 @@ Deno.serve(async (req) => {
       if (role === "seller") {
         const { data: profile } = await supabaseAdmin.from("profiles").select("name").eq("user_id", userId).maybeSingle();
         await ensureSellerData(supabaseAdmin, userId, profile?.name || "Seller", rates);
+
+        // Update rate_settings if provided
+        if (rateSettings) {
+          const { data: existingRS } = await supabaseAdmin
+            .from("rate_settings")
+            .select("id")
+            .eq("seller_id", userId)
+            .maybeSingle();
+
+          const rsUpdate = {
+            dropped_order_rate: rateSettings.dropped_order_rate ?? 0,
+            confirmed_order_rate: rateSettings.confirmed_order_rate ?? 0,
+            cod_fee_per_delivery: rateSettings.cod_fee_per_delivery ?? 0,
+            is_custom: true,
+          };
+
+          if (existingRS) {
+            await supabaseAdmin.from("rate_settings").update(rsUpdate).eq("id", existingRS.id);
+          } else {
+            await supabaseAdmin.from("rate_settings").insert({
+              seller_id: userId,
+              is_global: false,
+              ...rsUpdate,
+              shipping_rate_1kg: rates?.rate_1kg ?? 0,
+              shipping_rate_2kg: rates?.rate_2kg ?? 0,
+              shipping_rate_3kg: rates?.rate_3kg ?? 0,
+            });
+          }
+        }
       }
 
       if (permissions !== undefined) {
