@@ -63,6 +63,12 @@ export default function OrderDetail() {
         shippingCost: Number(data.shipping_cost || 0),
         attemptCount: data.attempt_count,
         fragile: data.fragile,
+        orioOrderId: (data as any).orio_order_id,
+        orioConsignmentNo: (data as any).orio_consignment_no,
+        orioShippingStatus: (data as any).orio_shipping_status,
+        orioSyncStatus: (data as any).orio_sync_status,
+        orioSyncError: (data as any).orio_sync_error,
+        orioSyncedAt: (data as any).orio_synced_at,
       };
     },
     enabled: !mockOrder && !!id,
