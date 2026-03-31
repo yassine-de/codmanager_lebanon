@@ -6,6 +6,7 @@ import { KPICard } from "@/components/KPICard";
 import { Truck, DollarSign, Package, TrendingUp, ChevronDown, CheckCircle2, Wallet, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatUSD, pkrToUsd } from "@/lib/currency";
 import { DateRange } from "react-day-picker";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";
 import { supabase } from "@/integrations/supabase/client";
@@ -114,12 +115,13 @@ export default function FinanceAnalytics() {
     return { count, profit, rate: CONFIRMATION_RATE };
   }, [filteredOrders]);
 
-  // COD fees (5% of delivered revenue)
+  // COD fees (5% of delivered revenue converted to USD)
   const codStats = useMemo(() => {
     const deliveredOrders = filteredOrders.filter(o => o.delivery_status === "delivered");
-    const deliveredRevenue = deliveredOrders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
-    const codFees = deliveredRevenue * COD_FEE_RATE;
-    return { deliveredRevenue, codFees, deliveredCount: deliveredOrders.length };
+    const deliveredRevenuePKR = deliveredOrders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
+    const deliveredRevenueUSD = pkrToUsd(deliveredRevenuePKR);
+    const codFees = deliveredRevenueUSD * COD_FEE_RATE;
+    return { deliveredRevenueUSD, codFees, deliveredCount: deliveredOrders.length };
   }, [filteredOrders]);
 
   // Sourcing stats
@@ -131,7 +133,9 @@ export default function FinanceAnalytics() {
     return { totalUnits, totalCost, profit };
   }, [filteredSourcing]);
 
-  const totalProfit = shippingRevenue + confirmationStats.profit + codStats.codFees + sourcingStats.profit;
+  const shippingRevenueUSD = pkrToUsd(shippingRevenue);
+  const sourcingProfitUSD = pkrToUsd(sourcingStats.profit);
+  const totalProfitUSD = shippingRevenueUSD + confirmationStats.profit + codStats.codFees + sourcingProfitUSD;
 
   // Top profit by seller
   const profitBySeller = useMemo(() => {
@@ -157,10 +161,10 @@ export default function FinanceAnalytics() {
     return Object.entries(map)
       .map(([id, d]) => ({
         name: profileNameMap[id] || id.slice(0, 8),
-        total: Math.round(d.shippingProfit + d.codProfit + d.sourcingProfit),
-        shipping: Math.round(d.shippingProfit),
-        cod: Math.round(d.codProfit),
-        sourcing: Math.round(d.sourcingProfit),
+        total: Math.round(pkrToUsd(d.shippingProfit + d.codProfit + d.sourcingProfit)),
+        shipping: Math.round(pkrToUsd(d.shippingProfit)),
+        cod: Math.round(pkrToUsd(d.codProfit)),
+        sourcing: Math.round(pkrToUsd(d.sourcingProfit)),
       }))
       .sort((a, b) => b.total - a.total);
   }, [filteredOrders, filteredSourcing, profileNameMap]);
@@ -220,28 +224,28 @@ export default function FinanceAnalytics() {
           </div>
           <div>
             <p className="text-sm text-muted-foreground font-medium">Total Revenue</p>
-            <p className="text-3xl font-bold tabular-nums tracking-tight">{totalProfit.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} PKR</p>
+            <p className="text-3xl font-bold tabular-nums tracking-tight">{formatUSD(totalProfitUSD)}</p>
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
           <div className="bg-background/60 rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground mb-1">Shipping</p>
-            <p className="text-lg font-bold tabular-nums">{shippingRevenue.toLocaleString()} PKR</p>
+            <p className="text-lg font-bold tabular-nums">{formatUSD(shippingRevenueUSD)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">{shippedOrders.length} orders</p>
           </div>
           <div className="bg-background/60 rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground mb-1">Confirmation</p>
-            <p className="text-lg font-bold tabular-nums">${confirmationStats.profit.toFixed(2)}</p>
+            <p className="text-lg font-bold tabular-nums">{formatUSD(confirmationStats.profit)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">{confirmationStats.count} × ${CONFIRMATION_RATE}</p>
           </div>
           <div className="bg-background/60 rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground mb-1">COD Fees (5%)</p>
-            <p className="text-lg font-bold tabular-nums">{codStats.codFees.toLocaleString(undefined, { minimumFractionDigits: 2 })} PKR</p>
+            <p className="text-lg font-bold tabular-nums">{formatUSD(codStats.codFees)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">{codStats.deliveredCount} delivered orders</p>
           </div>
           <div className="bg-background/60 rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground mb-1">Sourcing</p>
-            <p className="text-lg font-bold tabular-nums">{sourcingStats.profit.toLocaleString()} PKR</p>
+            <p className="text-lg font-bold tabular-nums">{formatUSD(sourcingProfitUSD)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">{sourcingStats.totalUnits} units · 30% margin</p>
           </div>
         </div>
@@ -250,10 +254,10 @@ export default function FinanceAnalytics() {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <KPICard title="Shipped Orders" value={shippedOrders.length} icon={Truck} iconBg="bg-primary/10" iconColor="text-primary" delay={0} />
-        <KPICard title="Shipping Revenue" value={`${shippingRevenue.toLocaleString()} PKR`} icon={DollarSign} iconBg="bg-success/10" iconColor="text-success" delay={50} />
-        <KPICard title="Confirmed Orders" value={confirmationStats.count} subtitle={`$${confirmationStats.profit.toFixed(2)} profit`} icon={CheckCircle2} iconBg="bg-info/10" iconColor="text-info" delay={75} />
-        <KPICard title="COD Fees" value={`${codStats.codFees.toFixed(2)} PKR`} subtitle={`5% of ${codStats.deliveredRevenue.toLocaleString()} PKR`} icon={DollarSign} iconBg="bg-warning/10" iconColor="text-warning" delay={100} />
-        <KPICard title="Sourcing Profit" value={`${sourcingStats.profit.toLocaleString()} PKR`} subtitle="~30% margin" icon={TrendingUp} iconBg="bg-success/10" iconColor="text-success" delay={150} />
+        <KPICard title="Shipping Revenue" value={formatUSD(shippingRevenueUSD)} icon={DollarSign} iconBg="bg-success/10" iconColor="text-success" delay={50} />
+        <KPICard title="Confirmed Orders" value={confirmationStats.count} subtitle={`${formatUSD(confirmationStats.profit)} profit`} icon={CheckCircle2} iconBg="bg-info/10" iconColor="text-info" delay={75} />
+        <KPICard title="COD Fees" value={formatUSD(codStats.codFees)} subtitle={`5% of ${formatUSD(codStats.deliveredRevenueUSD)}`} icon={DollarSign} iconBg="bg-warning/10" iconColor="text-warning" delay={100} />
+        <KPICard title="Sourcing Profit" value={formatUSD(sourcingProfitUSD)} subtitle="~30% margin" icon={TrendingUp} iconBg="bg-success/10" iconColor="text-success" delay={150} />
       </div>
 
       {/* Charts */}
@@ -265,10 +269,10 @@ export default function FinanceAnalytics() {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={profitBySeller} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${v} PKR`} />
+                <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => formatUSD(v)} />
                 <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={110} />
                 <Tooltip
-                  formatter={(v: number, name: string) => [`${v.toLocaleString()} PKR`, name]}
+                  formatter={(v: number, name: string) => [formatUSD(v), name]}
                   contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', fontSize: '12px', background: 'hsl(var(--card))' }}
                 />
                 <Bar dataKey="shipping" stackId="a" name="Shipping" fill="hsl(var(--primary))" radius={[0, 0, 0, 0]} />
@@ -311,10 +315,10 @@ function ProductRevenueChart({ data, chartColors }: { data: { name: string; reve
       <ResponsiveContainer width="100%" height={visibleData.length * 44 + 30}>
         <BarChart data={visibleData} layout="vertical">
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+          <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => formatUSD(v)} />
           <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" width={120} />
-          <Tooltip formatter={(v: number) => `${v.toLocaleString()} PKR`} contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', fontSize: '12px', background: 'hsl(var(--card))' }} />
-          <Bar dataKey="revenue" radius={[0, 4, 4, 0]} name="Revenue (PKR)">
+          <Tooltip formatter={(v: number) => formatUSD(pkrToUsd(v))} contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', fontSize: '12px', background: 'hsl(var(--card))' }} />
+          <Bar dataKey="revenue" radius={[0, 4, 4, 0]} name="Revenue ($)">
             {visibleData.map((_, i) => (
               <Cell key={i} fill={chartColors[i % chartColors.length]} />
             ))}
