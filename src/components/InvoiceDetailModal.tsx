@@ -17,6 +17,7 @@ interface Props {
   sellerName: string;
   sellerId?: string;
   sellerRates: { rate_1kg: number; rate_2kg: number; rate_3kg: number; rate_3kg_plus?: number } | null;
+  codFeePercentage?: number;
   isDraft?: boolean;
   draftOrders?: any[];
 }
