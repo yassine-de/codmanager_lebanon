@@ -397,7 +397,7 @@ const Users = () => {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {users.length === 0 && (
+                  {filteredUsers.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8 text-xs text-muted-foreground">
                         Aucun utilisateur. Cliquez sur "Créer Utilisateur" pour commencer.
