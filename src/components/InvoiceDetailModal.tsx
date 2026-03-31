@@ -93,6 +93,7 @@ export function InvoiceDetailModal({
 
   // Revenue
   const deliveredRevenuePKR = deliveredOrders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
+  const deliveredRevenueUSD = pkrToUsd(deliveredRevenuePKR);
 
   // Shipping
   const totalShippingFees = shippableOrders.reduce((sum, o) => {
@@ -105,15 +106,15 @@ export function InvoiceDetailModal({
   const droppedFees = droppedOrders.length * droppedRate;
   const totalCallCenterFees = confirmedFees + droppedFees;
 
-  // COD
-  const codFeesTotal = deliveredRevenuePKR * (codFeePercentage / 100);
+  // COD — 5% of USD revenue
+  const codFeesTotal = deliveredRevenueUSD * (codFeePercentage / 100);
 
   // Addons
   const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
 
-  // Final
+  // Final — all in USD
   const totalDeductions = totalShippingFees + totalCallCenterFees + codFeesTotal;
-  const netPayable = deliveredRevenuePKR - totalDeductions + addonNet;
+  const netPayable = deliveredRevenueUSD - totalDeductions + addonNet;
 
   const SectionHeader = ({ icon: Icon, title, color, count }: { icon: any; title: string; color: string; count?: number }) => (
     <div className="flex items-center gap-2 px-4 py-2.5 border-b border-t bg-muted/30">
@@ -199,7 +200,7 @@ export function InvoiceDetailModal({
               <SectionHeader icon={CreditCard} title={`COD Fees (${codFeePercentage}%)`} color="text-orange-500" />
               <div className="px-4 py-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">{codFeePercentage}% of delivered revenue ({formatPKR(deliveredRevenuePKR)})</span>
+                  <span className="text-muted-foreground">{codFeePercentage}% of delivered revenue ({formatUSD(deliveredRevenueUSD)})</span>
                   <span className="tabular-nums font-semibold text-destructive">-{formatUSD(codFeesTotal)}</span>
                 </div>
               </div>
@@ -229,7 +230,7 @@ export function InvoiceDetailModal({
               <div className="py-3 px-4 space-y-1.5">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Total Delivered Revenue</span>
-                  <span className="tabular-nums font-semibold text-success">{formatUSD(pkrToUsd(deliveredRevenuePKR))}</span>
+                  <span className="tabular-nums font-semibold text-success">{formatUSD(deliveredRevenueUSD)}</span>
                 </div>
                 <div className="border-t my-1" />
                 <div className="flex justify-between text-xs">
@@ -256,7 +257,7 @@ export function InvoiceDetailModal({
                 <div className="flex justify-between py-1.5">
                   <span className="text-sm font-bold">Net Payable</span>
                   <span className={`text-sm font-bold tabular-nums ${netPayable >= 0 ? "text-success" : "text-destructive"}`}>
-                    {netPayable.toLocaleString()} PKR
+                    {formatUSD(netPayable)}
                   </span>
                 </div>
               </div>
