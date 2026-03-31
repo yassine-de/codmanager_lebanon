@@ -4,10 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Package, Truck, Phone, CreditCard, ArrowDownCircle, ArrowUpCircle, BarChart3 } from "lucide-react";
-import { formatUSD, formatPKR } from "@/lib/currency";
+import { formatUSD, formatPKR, pkrToUsd } from "@/lib/currency";
 import { InvoiceOrdersTable } from "@/components/invoice/InvoiceOrdersTable";
-import { InvoiceShippedTable, calcShippingFee } from "@/components/invoice/InvoiceShippedTable";
-import { InvoiceCallCenterTable } from "@/components/invoice/InvoiceCallCenterTable";
+import { calcShippingFee } from "@/components/invoice/InvoiceShippedTable";
+
 
 interface Props {
   open: boolean;
@@ -150,18 +150,50 @@ export function InvoiceDetailModal({
               <SectionHeader icon={Package} title="Delivered Orders Details" color="text-success" count={deliveredOrders.length} />
               <InvoiceOrdersTable orders={deliveredOrders} productWeightMap={productWeightMap} />
 
-              {/* SECTION 2: SHIPPED ORDERS BREAKDOWN */}
-              <SectionHeader icon={Truck} title="Shipped Orders — Shipping Fees" color="text-info" count={shippableOrders.length} />
-              <InvoiceShippedTable orders={shippableOrders} productWeightMap={productWeightMap} sellerRates={sellerRates} />
+              {/* SECTION 2: SHIPPED ORDERS — SUMMARY ONLY */}
+              <SectionHeader icon={Truck} title="Shipping Fees" color="text-info" count={shippableOrders.length} />
+              <div className="px-4 py-2 space-y-1">
+                {(() => {
+                  const brackets: Record<string, { count: number; fee: number }> = {
+                    "≤1 KG": { count: 0, fee: 0 }, "≤2 KG": { count: 0, fee: 0 },
+                    "≤3 KG": { count: 0, fee: 0 }, ">3 KG": { count: 0, fee: 0 },
+                  };
+                  shippableOrders.forEach(o => {
+                    const wKg = productWeightMap[o.product_name] ?? null;
+                    const fee = calcShippingFee(wKg, o.quantity, sellerRates);
+                    const total = wKg ? Math.ceil(wKg * o.quantity) : 0;
+                    const key = total <= 1 ? "≤1 KG" : total <= 2 ? "≤2 KG" : total <= 3 ? "≤3 KG" : ">3 KG";
+                    if (total > 0) { brackets[key].count++; brackets[key].fee += fee; }
+                  });
+                  return Object.entries(brackets).filter(([, d]) => d.count > 0).map(([bracket, data]) => (
+                    <div key={bracket} className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">{bracket} × {data.count} orders</span>
+                      <span className="tabular-nums font-semibold text-destructive">-{formatUSD(data.fee)}</span>
+                    </div>
+                  ));
+                })()}
+                <div className="border-t pt-1 mt-1 flex justify-between text-xs font-bold">
+                  <span>Total Shipping</span>
+                  <span className="tabular-nums text-destructive">-{formatUSD(totalShippingFees)}</span>
+                </div>
+              </div>
 
-              {/* SECTION 3: CALL CENTER FEES */}
+              {/* SECTION 3: CALL CENTER — SUMMARY ONLY */}
               <SectionHeader icon={Phone} title="Call Center Fees" color="text-warning" count={confirmedOrders.length + droppedOrders.length} />
-              <InvoiceCallCenterTable
-                confirmedOrders={confirmedOrders}
-                droppedOrders={droppedOrders}
-                confirmedRate={confirmedRate}
-                droppedRate={droppedRate}
-              />
+              <div className="px-4 py-2 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Confirmed orders ({confirmedOrders.length} × {formatUSD(confirmedRate)})</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(confirmedOrders.length * confirmedRate)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Dropped orders ({droppedOrders.length} × {formatUSD(droppedRate)})</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(droppedOrders.length * droppedRate)}</span>
+                </div>
+                <div className="border-t pt-1 mt-1 flex justify-between text-xs font-bold">
+                  <span>Total Call Center</span>
+                  <span className="tabular-nums text-destructive">-{formatUSD(totalCallCenterFees)}</span>
+                </div>
+              </div>
 
               {/* SECTION 4: COD FEES */}
               <SectionHeader icon={CreditCard} title={`COD Fees (${codFeePercentage}%)`} color="text-orange-500" />
@@ -197,7 +229,7 @@ export function InvoiceDetailModal({
               <div className="py-3 px-4 space-y-1.5">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Total Delivered Revenue</span>
-                  <span className="tabular-nums font-semibold text-success">{formatPKR(deliveredRevenuePKR)}</span>
+                  <span className="tabular-nums font-semibold text-success">{formatUSD(pkrToUsd(deliveredRevenuePKR))}</span>
                 </div>
                 <div className="border-t my-1" />
                 <div className="flex justify-between text-xs">
