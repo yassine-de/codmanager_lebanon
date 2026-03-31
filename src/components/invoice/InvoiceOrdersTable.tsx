@@ -100,7 +100,7 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
                     <td className="px-3 py-1.5">{o.product_name}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{o.quantity}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{totalWeight > 0 ? `${totalWeight.toFixed(1)} KG` : "—"}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{formatPKR(o.price * o.quantity)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{formatUSD(pkrToUsd(o.price * o.quantity))}</td>
                   </tr>
                 );
               })
