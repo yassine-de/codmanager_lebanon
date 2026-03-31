@@ -33,6 +33,7 @@ import AgentOrders from "./pages/AgentOrders";
 import AgentConfirmedOrders from "./pages/AgentConfirmedOrders";
 import Support from "./pages/Support";
 import Alerts from "./pages/Alerts";
+import Adjustments from "./pages/Adjustments";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
