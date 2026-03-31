@@ -486,7 +486,7 @@ export default function Invoices() {
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center justify-end gap-1">
               <CheckCircle2 className="h-3 w-3 text-success" /> {t("paid")}
             </p>
-            <p className="text-base font-bold text-success">{paidAmount.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">PKR</span></p>
+            <p className="text-base font-bold text-success">{formatUSD(paidAmount)}</p>
           </div>
           {!isSeller && (
             <>
@@ -495,7 +495,7 @@ export default function Invoices() {
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center justify-end gap-1">
                   <Clock className="h-3 w-3 text-warning" /> {t("need_to_pay")}
                 </p>
-                <p className="text-base font-bold text-warning">{needToPay.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">PKR</span></p>
+                <p className="text-base font-bold text-warning">{formatUSD(needToPay)}</p>
               </div>
             </>
           )}
