@@ -25,6 +25,7 @@ interface UserData {
   role: string;
   permissions: string[];
   rates: { rate_1kg: number; rate_2kg: number; rate_3kg: number } | null;
+  rate_settings: { dropped_order_rate: number; confirmed_order_rate: number; cod_fee_per_delivery: number } | null;
 }
 
 interface Permission {
