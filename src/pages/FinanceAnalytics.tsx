@@ -167,7 +167,7 @@ export default function FinanceAnalytics() {
         map[id].shippingProfit += (o.shipping_cost || 0);
       }
       if (o.delivery_status === "delivered") {
-        map[id].codProfit += (o.price * o.quantity) * COD_FEE_RATE;
+        map[id].codProfit += (o.price * o.quantity) * getCodRate(id);
       }
     });
 
