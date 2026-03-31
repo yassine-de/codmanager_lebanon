@@ -93,6 +93,7 @@ export function InvoiceDetailModal({
 
   // Revenue
   const deliveredRevenuePKR = deliveredOrders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
+  const deliveredRevenueUSD = pkrToUsd(deliveredRevenuePKR);
 
   // Shipping
   const totalShippingFees = shippableOrders.reduce((sum, o) => {
@@ -105,15 +106,15 @@ export function InvoiceDetailModal({
   const droppedFees = droppedOrders.length * droppedRate;
   const totalCallCenterFees = confirmedFees + droppedFees;
 
-  // COD
-  const codFeesTotal = deliveredRevenuePKR * (codFeePercentage / 100);
+  // COD — 5% of USD revenue
+  const codFeesTotal = deliveredRevenueUSD * (codFeePercentage / 100);
 
   // Addons
   const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
 
-  // Final
+  // Final — all in USD
   const totalDeductions = totalShippingFees + totalCallCenterFees + codFeesTotal;
-  const netPayable = deliveredRevenuePKR - totalDeductions + addonNet;
+  const netPayable = deliveredRevenueUSD - totalDeductions + addonNet;
 
   const SectionHeader = ({ icon: Icon, title, color, count }: { icon: any; title: string; color: string; count?: number }) => (
     <div className="flex items-center gap-2 px-4 py-2.5 border-b border-t bg-muted/30">
