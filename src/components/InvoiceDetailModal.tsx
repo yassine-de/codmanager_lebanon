@@ -7,7 +7,7 @@ import { Loader2, Package, Truck, Phone, CreditCard, ArrowDownCircle, ArrowUpCir
 import { formatUSD, formatPKR, pkrToUsd } from "@/lib/currency";
 import { InvoiceOrdersTable } from "@/components/invoice/InvoiceOrdersTable";
 import { calcShippingFee } from "@/components/invoice/InvoiceShippedTable";
-import { InvoiceCallCenterTable } from "@/components/invoice/InvoiceCallCenterTable";
+
 
 interface Props {
   open: boolean;
