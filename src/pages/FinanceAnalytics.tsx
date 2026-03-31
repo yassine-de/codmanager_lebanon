@@ -133,7 +133,9 @@ export default function FinanceAnalytics() {
     return { totalUnits, totalCost, profit };
   }, [filteredSourcing]);
 
-  const totalProfit = shippingRevenue + confirmationStats.profit + codStats.codFees + sourcingStats.profit;
+  const shippingRevenueUSD = pkrToUsd(shippingRevenue);
+  const sourcingProfitUSD = pkrToUsd(sourcingStats.profit);
+  const totalProfitUSD = shippingRevenueUSD + confirmationStats.profit + codStats.codFees + sourcingProfitUSD;
 
   // Top profit by seller
   const profitBySeller = useMemo(() => {
