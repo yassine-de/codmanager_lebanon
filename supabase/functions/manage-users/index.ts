@@ -334,7 +334,7 @@ Deno.serve(async (req) => {
     await verifyAdmin(supabaseAdmin, req);
 
     if (action === "create-user") {
-      const { email, password, name, phone, role, rates, permissions } = payload;
+      const { email, password, name, phone, role, rates, rateSettings, permissions } = payload;
       const { data: createdUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
@@ -358,6 +358,24 @@ Deno.serve(async (req) => {
 
       if (role === "seller") {
         await ensureSellerData(supabaseAdmin, userId, name, rates);
+        // Update rate_settings with confirmation rates if provided
+        if (rateSettings) {
+          // Wait a moment for the trigger to create the rate_settings record
+          const { data: existingRS } = await supabaseAdmin
+            .from("rate_settings")
+            .select("id")
+            .eq("seller_id", userId)
+            .maybeSingle();
+
+          if (existingRS) {
+            await supabaseAdmin.from("rate_settings").update({
+              dropped_order_rate: rateSettings.dropped_order_rate ?? 0,
+              confirmed_order_rate: rateSettings.confirmed_order_rate ?? 0,
+              cod_fee_per_delivery: rateSettings.cod_fee_per_delivery ?? 0,
+              is_custom: true,
+            }).eq("id", existingRS.id);
+          }
+        }
       }
 
       return new Response(JSON.stringify({ success: true, user_id: userId }), {
@@ -366,7 +384,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "update-user") {
-      const { userId, name, phone, active, role, rates, permissions } = payload;
+      const { userId, name, phone, active, role, rates, rateSettings, permissions } = payload;
       const profileUpdate: Record<string, unknown> = {};
 
       if (name !== undefined) profileUpdate.name = name;
@@ -385,6 +403,35 @@ Deno.serve(async (req) => {
       if (role === "seller") {
         const { data: profile } = await supabaseAdmin.from("profiles").select("name").eq("user_id", userId).maybeSingle();
         await ensureSellerData(supabaseAdmin, userId, profile?.name || "Seller", rates);
+
+        // Update rate_settings if provided
+        if (rateSettings) {
+          const { data: existingRS } = await supabaseAdmin
+            .from("rate_settings")
+            .select("id")
+            .eq("seller_id", userId)
+            .maybeSingle();
+
+          const rsUpdate = {
+            dropped_order_rate: rateSettings.dropped_order_rate ?? 0,
+            confirmed_order_rate: rateSettings.confirmed_order_rate ?? 0,
+            cod_fee_per_delivery: rateSettings.cod_fee_per_delivery ?? 0,
+            is_custom: true,
+          };
+
+          if (existingRS) {
+            await supabaseAdmin.from("rate_settings").update(rsUpdate).eq("id", existingRS.id);
+          } else {
+            await supabaseAdmin.from("rate_settings").insert({
+              seller_id: userId,
+              is_global: false,
+              ...rsUpdate,
+              shipping_rate_1kg: rates?.rate_1kg ?? 0,
+              shipping_rate_2kg: rates?.rate_2kg ?? 0,
+              shipping_rate_3kg: rates?.rate_3kg ?? 0,
+            });
+          }
+        }
       }
 
       if (permissions !== undefined) {
@@ -427,10 +474,11 @@ Deno.serve(async (req) => {
 
       const usersWithDetails = await Promise.all(
         (profiles || []).map(async (profile) => {
-          const [{ data: roles }, { data: perms }, { data: rates }] = await Promise.all([
+          const [{ data: roles }, { data: perms }, { data: rates }, { data: rateSettings }] = await Promise.all([
             supabaseAdmin.from("user_roles").select("role").eq("user_id", profile.user_id),
             supabaseAdmin.from("user_permissions").select("permission_key").eq("user_id", profile.user_id),
             supabaseAdmin.from("seller_rates").select("*").eq("user_id", profile.user_id).maybeSingle(),
+            supabaseAdmin.from("rate_settings").select("dropped_order_rate, confirmed_order_rate, cod_fee_per_delivery").eq("seller_id", profile.user_id).maybeSingle(),
           ]);
 
           return {
@@ -438,6 +486,7 @@ Deno.serve(async (req) => {
             role: roles?.[0]?.role || "custom",
             permissions: perms?.map((item) => item.permission_key) || [],
             rates: rates || null,
+            rate_settings: rateSettings || null,
           };
         }),
       );

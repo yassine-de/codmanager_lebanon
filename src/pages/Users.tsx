@@ -25,6 +25,7 @@ interface UserData {
   role: string;
   permissions: string[];
   rates: { rate_1kg: number; rate_2kg: number; rate_3kg: number } | null;
+  rate_settings: { dropped_order_rate: number; confirmed_order_rate: number; cod_fee_per_delivery: number } | null;
 }
 
 interface Permission {
@@ -57,6 +58,9 @@ const Users = () => {
     rate_1kg: "",
     rate_2kg: "",
     rate_3kg: "",
+    dropped_order_rate: "",
+    confirmed_order_rate: "",
+    cod_fee_per_delivery: "",
     selectedPermissions: [] as string[],
     customRoleName: "",
     agentProductScope: "all" as "all" | "specific",
@@ -92,6 +96,7 @@ const Users = () => {
     setForm({
       name: "", email: "", password: "", phone: "",
       role: "seller", rate_1kg: "", rate_2kg: "", rate_3kg: "",
+      dropped_order_rate: "", confirmed_order_rate: "", cod_fee_per_delivery: "",
       selectedPermissions: [], customRoleName: "",
       agentProductScope: "all", agentProducts: [],
     });
@@ -124,6 +129,9 @@ const Users = () => {
       rate_1kg: user.rates?.rate_1kg?.toString() || "",
       rate_2kg: user.rates?.rate_2kg?.toString() || "",
       rate_3kg: user.rates?.rate_3kg?.toString() || "",
+      dropped_order_rate: user.rate_settings?.dropped_order_rate?.toString() || "",
+      confirmed_order_rate: user.rate_settings?.confirmed_order_rate?.toString() || "",
+      cod_fee_per_delivery: user.rate_settings?.cod_fee_per_delivery?.toString() || "",
       selectedPermissions: user.permissions || [],
       customRoleName: "",
       agentProductScope,
@@ -164,6 +172,11 @@ const Users = () => {
               rate_2kg: Number(form.rate_2kg) || 0,
               rate_3kg: Number(form.rate_3kg) || 0,
             } : undefined,
+            rateSettings: form.role === "seller" ? {
+              dropped_order_rate: Number(form.dropped_order_rate) || 0,
+              confirmed_order_rate: Number(form.confirmed_order_rate) || 0,
+              cod_fee_per_delivery: Number(form.cod_fee_per_delivery) || 0,
+            } : undefined,
             permissions: form.role === "custom" ? form.selectedPermissions : undefined,
           },
         });
@@ -188,6 +201,11 @@ const Users = () => {
               rate_1kg: Number(form.rate_1kg) || 0,
               rate_2kg: Number(form.rate_2kg) || 0,
               rate_3kg: Number(form.rate_3kg) || 0,
+            } : undefined,
+            rateSettings: form.role === "seller" ? {
+              dropped_order_rate: Number(form.dropped_order_rate) || 0,
+              confirmed_order_rate: Number(form.confirmed_order_rate) || 0,
+              cod_fee_per_delivery: Number(form.cod_fee_per_delivery) || 0,
             } : undefined,
             permissions: form.role === "custom" ? form.selectedPermissions : undefined,
           },
@@ -412,23 +430,45 @@ const Users = () => {
 
             {/* Seller rates */}
             {form.role === "seller" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Tarifs par poids ($)</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">1 Kg</Label>
-                    <Input className="h-9 text-xs" type="number" placeholder="35" value={form.rate_1kg}
-                      onChange={(e) => setForm((f) => ({ ...f, rate_1kg: e.target.value }))} />
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Tarifs par poids ($)</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">1 Kg</Label>
+                      <Input className="h-9 text-xs" type="number" placeholder="35" value={form.rate_1kg}
+                        onChange={(e) => setForm((f) => ({ ...f, rate_1kg: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">2 Kg</Label>
+                      <Input className="h-9 text-xs" type="number" placeholder="45" value={form.rate_2kg}
+                        onChange={(e) => setForm((f) => ({ ...f, rate_2kg: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">3 Kg</Label>
+                      <Input className="h-9 text-xs" type="number" placeholder="55" value={form.rate_3kg}
+                        onChange={(e) => setForm((f) => ({ ...f, rate_3kg: e.target.value }))} />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">2 Kg</Label>
-                    <Input className="h-9 text-xs" type="number" placeholder="45" value={form.rate_2kg}
-                      onChange={(e) => setForm((f) => ({ ...f, rate_2kg: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">3 Kg</Label>
-                    <Input className="h-9 text-xs" type="number" placeholder="55" value={form.rate_3kg}
-                      onChange={(e) => setForm((f) => ({ ...f, rate_3kg: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Tarifs de confirmation ($)</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Dropped Lead</Label>
+                      <Input className="h-9 text-xs" type="number" step="0.01" placeholder="0" value={form.dropped_order_rate}
+                        onChange={(e) => setForm((f) => ({ ...f, dropped_order_rate: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Confirmed Lead</Label>
+                      <Input className="h-9 text-xs" type="number" step="0.01" placeholder="0" value={form.confirmed_order_rate}
+                        onChange={(e) => setForm((f) => ({ ...f, confirmed_order_rate: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">COD Fees (%)</Label>
+                      <Input className="h-9 text-xs" type="number" step="0.01" placeholder="5" value={form.cod_fee_per_delivery}
+                        onChange={(e) => setForm((f) => ({ ...f, cod_fee_per_delivery: e.target.value }))} />
+                    </div>
                   </div>
                 </div>
               </div>
