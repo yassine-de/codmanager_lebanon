@@ -112,6 +112,7 @@ function AppRoutes() {
         <Route path="/agent-confirmed" element={<ProtectedRoute><AgentConfirmedOrders /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute permission="access_to_settings"><Support /></ProtectedRoute>} />
         <Route path="/alerts" element={<ProtectedRoute permission="access_to_settings"><Alerts /></ProtectedRoute>} />
+        <Route path="/adjustments" element={<ProtectedRoute permission="access_to_settings"><Adjustments /></ProtectedRoute>} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
