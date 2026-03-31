@@ -200,7 +200,7 @@ export function InvoiceDetailModal({
               <SectionHeader icon={CreditCard} title={`COD Fees (${codFeePercentage}%)`} color="text-orange-500" />
               <div className="px-4 py-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">{codFeePercentage}% of delivered revenue ({formatPKR(deliveredRevenuePKR)})</span>
+                  <span className="text-muted-foreground">{codFeePercentage}% of delivered revenue ({formatUSD(deliveredRevenueUSD)})</span>
                   <span className="tabular-nums font-semibold text-destructive">-{formatUSD(codFeesTotal)}</span>
                 </div>
               </div>
