@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Phone, MapPin, Calendar, StickyNote, Loader2 } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, Calendar, StickyNote, Loader2, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { mockOrders } from "@/lib/data";
@@ -63,6 +63,12 @@ export default function OrderDetail() {
         shippingCost: Number(data.shipping_cost || 0),
         attemptCount: data.attempt_count,
         fragile: data.fragile,
+        orioOrderId: (data as any).orio_order_id,
+        orioConsignmentNo: (data as any).orio_consignment_no,
+        orioShippingStatus: (data as any).orio_shipping_status,
+        orioSyncStatus: (data as any).orio_sync_status,
+        orioSyncError: (data as any).orio_sync_error,
+        orioSyncedAt: (data as any).orio_synced_at,
       };
     },
     enabled: !mockOrder && !!id,
@@ -108,6 +114,12 @@ export default function OrderDetail() {
   const attemptCount = isDbOrder ? dbOrder.attemptCount : 0;
   const fragile = isDbOrder ? dbOrder.fragile : false;
   const offers = isDbOrder ? dbOrder.offers : undefined;
+  const orioOrderId = isDbOrder ? dbOrder.orioOrderId : undefined;
+  const orioConsignmentNo = isDbOrder ? dbOrder.orioConsignmentNo : undefined;
+  const orioShippingStatus = isDbOrder ? dbOrder.orioShippingStatus : undefined;
+  const orioSyncStatus = isDbOrder ? dbOrder.orioSyncStatus : undefined;
+  const orioSyncError = isDbOrder ? dbOrder.orioSyncError : undefined;
+  const orioSyncedAt = isDbOrder ? dbOrder.orioSyncedAt : undefined;
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -227,6 +239,58 @@ export default function OrderDetail() {
           <span className="text-lg font-semibold tabular-nums">{total.toLocaleString()} PKR</span>
         </div>
       </div>
+
+      {/* ORIO Shipping */}
+      {isDbOrder && (orioSyncStatus || orioOrderId) && (
+        <div className="bg-card rounded-lg border p-5 space-y-4 animate-slide-up" style={{ animationDelay: '200ms' }}>
+          <div className="flex items-center gap-2">
+            <Truck className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">ORIO Shipping</h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Sync Status</p>
+              <p className={`text-sm font-semibold mt-0.5 ${
+                orioSyncStatus === 'synced' ? 'text-[hsl(155,50%,42%)]' :
+                orioSyncStatus === 'failed' ? 'text-destructive' :
+                'text-[hsl(38,90%,55%)]'
+              }`}>
+                {orioSyncStatus || 'pending'}
+              </p>
+            </div>
+            {orioOrderId && (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">ORIO Order ID</p>
+                <p className="text-sm font-semibold mt-0.5 tabular-nums">{orioOrderId}</p>
+              </div>
+            )}
+            {orioConsignmentNo && (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Consignment No</p>
+                <p className="text-sm font-semibold mt-0.5 tabular-nums">{orioConsignmentNo}</p>
+              </div>
+            )}
+            {orioShippingStatus && (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Shipping Status</p>
+                <p className="text-sm font-semibold mt-0.5">{orioShippingStatus}</p>
+              </div>
+            )}
+            {orioSyncedAt && (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Synced At</p>
+                <p className="text-sm font-semibold mt-0.5">{format(new Date(orioSyncedAt), 'dd MMM yyyy, HH:mm')}</p>
+              </div>
+            )}
+          </div>
+          {orioSyncError && (
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+              <p className="text-[10px] text-destructive uppercase tracking-wider font-medium">Error</p>
+              <p className="text-sm text-destructive/80 mt-0.5">{orioSyncError}</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Timeline */}
       <div className="bg-card rounded-lg border p-5 space-y-4 animate-slide-up" style={{ animationDelay: '240ms' }}>
