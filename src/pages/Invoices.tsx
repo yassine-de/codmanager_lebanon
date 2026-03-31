@@ -931,6 +931,8 @@ export default function Invoices() {
         sellerId={detailSellerId}
         sellerRates={detailSellerRates}
         codFeePercentage={codFeeMap[detailSellerId] ?? 5}
+        confirmedRate={callCenterRatesMap[detailSellerId]?.confirmedRate ?? 0}
+        droppedRate={callCenterRatesMap[detailSellerId]?.droppedRate ?? 0}
         isDraft={detailIsDraft}
         draftOrders={detailDraftOrders}
       />
