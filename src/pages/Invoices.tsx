@@ -169,7 +169,7 @@ export default function Invoices() {
     return map;
   }, [sellerProfiles]);
 
-  // Fetch seller rates
+  // Fetch seller rates (shipping)
   const { data: sellerRatesData = [] } = useQuery({
     queryKey: ["seller-rates-invoices", allSellerIds],
     queryFn: async () => {
@@ -186,6 +186,31 @@ export default function Invoices() {
     sellerRatesData.forEach(r => { map[r.user_id] = { rate_1kg: r.rate_1kg, rate_2kg: r.rate_2kg, rate_3kg: r.rate_3kg, rate_3kg_plus: (r as any).rate_3kg_plus ?? 6 }; });
     return map;
   }, [sellerRatesData]);
+
+  // Fetch rate_settings for COD fee percentage per seller
+  const { data: rateSettingsData = [] } = useQuery({
+    queryKey: ["rate-settings-invoices", allSellerIds],
+    queryFn: async () => {
+      if (allSellerIds.length === 0) return [];
+      // Fetch seller-specific + global rate settings
+      const { data, error } = await supabase.from("rate_settings").select("seller_id, cod_fee_per_delivery, is_global");
+      if (error) throw error;
+      return data;
+    },
+    enabled: allSellerIds.length > 0,
+  });
+
+  const codFeeMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    const globalRate = rateSettingsData.find(r => r.is_global && !r.seller_id);
+    const globalCod = globalRate?.cod_fee_per_delivery ?? 5;
+    // Set per-seller COD rates, fallback to global
+    allSellerIds.forEach(id => {
+      const sellerRate = rateSettingsData.find(r => r.seller_id === id);
+      map[id] = sellerRate ? sellerRate.cod_fee_per_delivery : globalCod;
+    });
+    return map;
+  }, [rateSettingsData, allSellerIds]);
 
   // Fetch products to get weight info
   const { data: allProducts = [] } = useQuery({
