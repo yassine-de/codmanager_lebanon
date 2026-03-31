@@ -269,10 +269,10 @@ export default function FinanceAnalytics() {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={profitBySeller} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${v} PKR`} />
+                <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => formatUSD(v)} />
                 <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={110} />
                 <Tooltip
-                  formatter={(v: number, name: string) => [`${v.toLocaleString()} PKR`, name]}
+                  formatter={(v: number, name: string) => [formatUSD(v), name]}
                   contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', fontSize: '12px', background: 'hsl(var(--card))' }}
                 />
                 <Bar dataKey="shipping" stackId="a" name="Shipping" fill="hsl(var(--primary))" radius={[0, 0, 0, 0]} />
