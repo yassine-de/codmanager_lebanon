@@ -231,6 +231,75 @@ export type Database = {
           },
         ]
       }
+      invoice_adjustments: {
+        Row: {
+          applied_invoice_id: string | null
+          created_at: string
+          difference: number
+          id: string
+          invoice_id: string | null
+          new_amount: number
+          new_status: string
+          old_status: string
+          order_id: string
+          previous_amount: number
+          reason: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          seller_id: string
+          status: string
+        }
+        Insert: {
+          applied_invoice_id?: string | null
+          created_at?: string
+          difference?: number
+          id?: string
+          invoice_id?: string | null
+          new_amount?: number
+          new_status: string
+          old_status: string
+          order_id: string
+          previous_amount?: number
+          reason?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          seller_id: string
+          status?: string
+        }
+        Update: {
+          applied_invoice_id?: string | null
+          created_at?: string
+          difference?: number
+          id?: string
+          invoice_id?: string | null
+          new_amount?: number
+          new_status?: string
+          old_status?: string
+          order_id?: string
+          previous_amount?: number
+          reason?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          seller_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_adjustments_applied_invoice_id_fkey"
+            columns: ["applied_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_adjustments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_history: {
         Row: {
           changed_by: string | null

@@ -33,6 +33,7 @@ import AgentOrders from "./pages/AgentOrders";
 import AgentConfirmedOrders from "./pages/AgentConfirmedOrders";
 import Support from "./pages/Support";
 import Alerts from "./pages/Alerts";
+import Adjustments from "./pages/Adjustments";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -111,6 +112,7 @@ function AppRoutes() {
         <Route path="/agent-confirmed" element={<ProtectedRoute><AgentConfirmedOrders /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute permission="access_to_settings"><Support /></ProtectedRoute>} />
         <Route path="/alerts" element={<ProtectedRoute permission="access_to_settings"><Alerts /></ProtectedRoute>} />
+        <Route path="/adjustments" element={<ProtectedRoute permission="access_to_settings"><Adjustments /></ProtectedRoute>} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

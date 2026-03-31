@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Package, Truck, Phone, CreditCard, ArrowDownCircle, ArrowUpCircle, BarChart3 } from "lucide-react";
+import { Loader2, Package, Truck, Phone, CreditCard, ArrowDownCircle, ArrowUpCircle, BarChart3, ArrowUpDown } from "lucide-react";
 import { formatUSD, formatPKR, pkrToUsd } from "@/lib/currency";
 import { InvoiceOrdersTable } from "@/components/invoice/InvoiceOrdersTable";
 import { calcShippingFee } from "@/components/invoice/InvoiceShippedTable";
@@ -82,6 +82,23 @@ export function InvoiceDetailModal({
     enabled: !!invoiceId && open,
   });
 
+  // Fetch approved adjustments for this invoice
+  const { data: invoiceAdjustments = [] } = useQuery({
+    queryKey: ["invoice-adjustments-detail", invoiceId],
+    queryFn: async () => {
+      if (!invoiceId) return [];
+      const { data, error } = await supabase
+        .from("invoice_adjustments")
+        .select("*")
+        .eq("applied_invoice_id", invoiceId)
+        .eq("status", "approved")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; order_id: string; difference: number; reason: string; old_status: string; new_status: string }[];
+    },
+    enabled: !!invoiceId && open,
+  });
+
   // Categorize orders
   const deliveredOrders = displayOrders.filter(o => o.delivery_status === "delivered");
   const shippableOrders = displayOrders.filter(o =>
@@ -112,9 +129,12 @@ export function InvoiceDetailModal({
   // Addons
   const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
 
+  // Adjustments net
+  const adjustmentNet = invoiceAdjustments.reduce((sum, a) => sum + pkrToUsd(a.difference), 0);
+
   // Final — all in USD
   const totalDeductions = totalShippingFees + totalCallCenterFees + codFeesTotal;
-  const netPayable = deliveredRevenueUSD - totalDeductions + addonNet;
+  const netPayable = deliveredRevenueUSD - totalDeductions + addonNet + adjustmentNet;
 
   const SectionHeader = ({ icon: Icon, title, color, count }: { icon: any; title: string; color: string; count?: number }) => (
     <div className="flex items-center gap-2 px-4 py-2.5 border-b border-t bg-muted/30">
@@ -225,6 +245,27 @@ export function InvoiceDetailModal({
                 </>
               )}
 
+              {/* ADJUSTMENTS SECTION */}
+              {invoiceAdjustments.length > 0 && (
+                <>
+                  <SectionHeader icon={ArrowUpDown} title="Adjustments" color="text-orange-500" count={invoiceAdjustments.length} />
+                  <div className="py-2">
+                    {invoiceAdjustments.map(adj => (
+                      <div key={adj.id} className="flex justify-between px-4 py-1 text-xs items-center">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <ArrowUpDown className="h-3 w-3" />
+                          <span className="font-mono">{adj.order_id}</span>
+                          <span className="text-muted-foreground/60">({adj.old_status} → {adj.new_status})</span>
+                        </span>
+                        <span className={`font-semibold tabular-nums ${adj.difference >= 0 ? "text-success" : "text-destructive"}`}>
+                          {adj.difference >= 0 ? "+" : ""}{formatUSD(pkrToUsd(adj.difference))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
               {/* SECTION 5: FINAL SUMMARY */}
               <SectionHeader icon={BarChart3} title="Final Summary" color="text-primary" />
               <div className="py-3 px-4 space-y-1.5">
@@ -250,6 +291,14 @@ export function InvoiceDetailModal({
                     <span className="text-muted-foreground">Addons</span>
                     <span className={`tabular-nums font-semibold ${addonNet >= 0 ? "text-success" : "text-destructive"}`}>
                       {addonNet >= 0 ? "+" : ""}{formatUSD(addonNet)}
+                    </span>
+                  </div>
+                )}
+                {adjustmentNet !== 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Adjustments</span>
+                    <span className={`tabular-nums font-semibold ${adjustmentNet >= 0 ? "text-success" : "text-destructive"}`}>
+                      {adjustmentNet >= 0 ? "+" : ""}{formatUSD(adjustmentNet)}
                     </span>
                   </div>
                 )}
