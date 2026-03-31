@@ -456,10 +456,11 @@ Deno.serve(async (req) => {
 
       const usersWithDetails = await Promise.all(
         (profiles || []).map(async (profile) => {
-          const [{ data: roles }, { data: perms }, { data: rates }] = await Promise.all([
+          const [{ data: roles }, { data: perms }, { data: rates }, { data: rateSettings }] = await Promise.all([
             supabaseAdmin.from("user_roles").select("role").eq("user_id", profile.user_id),
             supabaseAdmin.from("user_permissions").select("permission_key").eq("user_id", profile.user_id),
             supabaseAdmin.from("seller_rates").select("*").eq("user_id", profile.user_id).maybeSingle(),
+            supabaseAdmin.from("rate_settings").select("dropped_order_rate, confirmed_order_rate, cod_fee_per_delivery").eq("seller_id", profile.user_id).maybeSingle(),
           ]);
 
           return {
@@ -467,6 +468,7 @@ Deno.serve(async (req) => {
             role: roles?.[0]?.role || "custom",
             permissions: perms?.map((item) => item.permission_key) || [],
             rates: rates || null,
+            rate_settings: rateSettings || null,
           };
         }),
       );
