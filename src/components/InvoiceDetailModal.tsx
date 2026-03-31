@@ -50,7 +50,7 @@ const deliveryStatusConfig: Record<string, { label: string; color: string }> = {
   postponed: { label: "Postponed", color: "bg-warning/15 text-warning" },
 };
 
-export function InvoiceDetailModal({ open, onOpenChange, invoiceId, invoiceNumber, sellerName, sellerId, sellerRates, isDraft, draftOrders }: Props) {
+export function InvoiceDetailModal({ open, onOpenChange, invoiceId, invoiceNumber, sellerName, sellerId, sellerRates, codFeePercentage = 5, isDraft, draftOrders }: Props) {
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["invoice-orders", invoiceId],
     queryFn: async () => {
