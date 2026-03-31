@@ -229,7 +229,7 @@ export function InvoiceDetailModal({
               <div className="py-3 px-4 space-y-1.5">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Total Delivered Revenue</span>
-                  <span className="tabular-nums font-semibold text-success">{formatPKR(deliveredRevenuePKR)}</span>
+                  <span className="tabular-nums font-semibold text-success">{formatUSD(pkrToUsd(deliveredRevenuePKR))}</span>
                 </div>
                 <div className="border-t my-1" />
                 <div className="flex justify-between text-xs">
