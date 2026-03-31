@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUnseen: number, productUnseen: number, supportUnread: number, agentNewOrders: number) => [
+const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUnseen: number, productUnseen: number, supportUnread: number, agentNewOrders: number, pendingAdjustments: number) => [
   { title: "dashboard", url: "/", icon: LayoutDashboard },
   { title: "orders", url: "/orders", icon: ShoppingCart, badge: orderCount, permission: "access_to_orders", sellerVisible: true },
   { title: "products", url: "/products", icon: BoxIcon, permission: "access_to_products", sellerVisible: true, badge: productUnseen > 0 ? productUnseen : undefined },
@@ -29,6 +29,7 @@ const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUn
   { title: "Support", url: "/support", icon: MessageSquare, permission: "access_to_settings", badge: supportUnread > 0 ? supportUnread : undefined },
   { title: "Alerts", url: "/alerts", icon: Megaphone, permission: "access_to_settings" },
   { title: "invoices", url: "/invoices", icon: FileText, permission: "access_to_settings", sellerVisible: true },
+  { title: "Adjustments", url: "/adjustments", icon: ArrowUpDown, permission: "access_to_settings", badge: pendingAdjustments > 0 ? pendingAdjustments : undefined },
   { title: "sourcing", url: "/seller-sourcing", icon: Package2, sellerOnly: true, badge: sourcingUnseen > 0 ? sourcingUnseen : undefined },
   { title: "sheets", url: "/sheets", icon: FileSpreadsheet, sellerOnly: true },
   { title: "simulation", url: "/simulation", icon: Calculator, sellerOnly: true },
