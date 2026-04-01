@@ -351,7 +351,7 @@ export default function FinanceAnalytics() {
     filteredSourcing.forEach(r => {
       const id = r.seller_id;
       if (!map[id]) map[id] = { shipping: 0, confirmation: 0, cod: 0, sourcing: 0 };
-      map[id].sourcing += ((r.seller_price || 0) * r.quantity) - (r.total_price || 0);
+      map[id].sourcing += ((r.seller_price || 0) * r.quantity) - ((r.landed_price || 0) * r.quantity);
     });
     return Object.entries(map)
       .map(([id, d]) => ({
