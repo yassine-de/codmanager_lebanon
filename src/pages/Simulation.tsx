@@ -441,11 +441,11 @@ export default function Simulation() {
                 className="h-10 text-sm"
               />
             </div>
-            {mode === "system" && selectedProduct?.weight && (
+            {mode === "system" && productWeight !== null && (
               <div className="rounded-lg bg-muted/30 border border-border p-3 flex items-center gap-2">
                 <Weight className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">Product Weight:</span>
-                <span className="text-sm font-medium text-foreground">{selectedProduct.weight} kg</span>
+                <span className="text-sm font-medium text-foreground">{productWeight} kg</span>
                 <Badge variant="outline" className="ml-1 text-[9px] font-normal text-info">Auto</Badge>
                 <span className="text-xs text-muted-foreground ml-auto">Shipping: <span className="font-semibold text-foreground">{shippingRate} $</span></span>
               </div>
