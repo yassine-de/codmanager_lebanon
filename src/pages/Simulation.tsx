@@ -72,6 +72,7 @@ export default function Simulation() {
 
   // Real data from DB
   const [sellerRates, setSellerRates] = useState<{ rate_1kg: number; rate_2kg: number; rate_3kg: number } | null>(null);
+  const [rateSettings, setRateSettings] = useState<{ cod_fee_per_delivery: number; dropped_order_rate: number; confirmed_order_rate: number } | null>(null);
   const [realProducts, setRealProducts] = useState<RealProduct[]>([]);
   const [orderMetrics, setOrderMetrics] = useState<{ confirmationRate: number; deliveryRate: number; totalLeads: number }>({ confirmationRate: 0, deliveryRate: 0, totalLeads: 0 });
 
