@@ -222,7 +222,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     if (fetchErr) throw fetchErr;
 
     const currentQty = prod.quantity || 0;
-    const newQty = currentQty + quantity;
+    const newQty = currentQty + n(quantity);
 
     // If sourcing has variants, merge quantities into existing product variants
     const updateData: Record<string, unknown> = {
