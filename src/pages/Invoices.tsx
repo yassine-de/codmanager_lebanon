@@ -268,32 +268,33 @@ export default function Invoices() {
       const rates = sellerRatesMap[inv.seller_id] || null;
       const ccRates = callCenterRatesMap[inv.seller_id] || { confirmedRate: 0, droppedRate: 0 };
       
-      // Delivered orders → revenue
+      // Delivered orders → revenue in USD
       const delivered = orders.filter(o => o.delivery_status === "delivered");
       const deliveredRevenuePKR = delivered.reduce((sum, o) => sum + (o.price * o.quantity), 0);
+      const deliveredRevenueUSD = pkrToUsd(deliveredRevenuePKR);
       
-      // Shipping: shipped + delivered orders
+      // Shipping: shipped + delivered orders (already in USD)
       const shippable = orders.filter(o => 
         o.delivery_status === "delivered" || o.delivery_status === "shipped" || 
         o.delivery_status === "in_transit" || o.delivery_status === "with_courier"
       );
       const shippingFees = shippable.reduce((sum, o) => sum + calcShippingFee(getProductWeightKg(inv.seller_id, o.product_name), o.quantity, rates), 0);
       
-      // Call center fees
+      // Call center fees (already in USD)
       const confirmedCount = orders.filter(o => o.confirmation_status === "confirmed").length;
       const droppedCount = orders.filter(o => o.confirmation_status === "cancelled").length;
       const callCenterFees = (confirmedCount * ccRates.confirmedRate) + (droppedCount * ccRates.droppedRate);
       
-      // COD fees
+      // COD fees (percentage of USD revenue)
       const codPct = (codFeeMap[inv.seller_id] ?? 5) / 100;
-      const codFees = deliveredRevenuePKR * codPct;
+      const codFees = deliveredRevenueUSD * codPct;
       
-      // Addons
+      // Addons (already in USD)
       const addons = addonsByInvoice[inv.id] || [];
       const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
       
       const totalDeductions = shippingFees + callCenterFees + codFees;
-      const netPayable = deliveredRevenuePKR - totalDeductions + addonNet;
+      const netPayable = deliveredRevenueUSD - totalDeductions + addonNet;
       
       return {
         ...inv,
