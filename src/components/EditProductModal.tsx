@@ -264,7 +264,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
               <h3 className={sectionTitle}>Pricing & Stock</h3>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Buying Price ($) *</Label>
+                  <Label className="text-xs">Landed Price ($) *</Label>
                   <Input type="number" min={0.01} step={0.01} value={price} onChange={e => setPrice(Number(e.target.value))} className={`h-9 text-sm ${errors.price ? "border-destructive" : ""}`} disabled={isSeller} />
                   {errors.price && <p className="text-[11px] text-destructive">{errors.price}</p>}
                 </div>
