@@ -492,7 +492,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Unit Price ($)</Label>
-                <Input type="number" min={0} step={0.01} value={unitPrice} onChange={e => setUnitPrice(Number(e.target.value))} className={`h-9 text-sm ${errors.unitPrice ? "border-destructive" : ""}`} />
+                <Input type="number" min={0} step={0.01} value={unitPrice} onChange={e => setUnitPrice(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.unitPrice ? "border-destructive" : ""}`} />
                 {errors.unitPrice && <p className="text-[11px] text-destructive">{errors.unitPrice}</p>}
               </div>
             </div>
