@@ -26,7 +26,7 @@ export default function FinanceAnalytics() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_id, confirmation_status, delivery_status, product_name, seller_id, price, quantity, total_amount, shipping_cost, weight, invoice_id, created_at")
+        .select("id, order_id, confirmation_status, delivery_status, product_name, seller_id, price, last_price, quantity, total_amount, shipping_cost, weight, invoice_id, created_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -176,24 +176,28 @@ export default function FinanceAnalytics() {
 
   const shippingStats = useMemo(() => {
     let total = 0, paid = 0, pending = 0;
-    const details: { orderId: string; product: string; weight: number; fee: number; isPaid: boolean; invoiceNum: string }[] = [];
+    const sellerMap: Record<string, { confirmed: number; dropped: number; upsell: number; revenue: number; paid: number; pending: number }> = {};
     shippedOrders.forEach(o => {
       const weight = Number(o.weight) || 0.5;
       const fee = getShippingFee(o.seller_id, weight);
       const invoicePaid = isInvoicePaid(o.invoice_id);
       total += fee;
       if (invoicePaid) paid += fee; else pending += fee;
-      details.push({
-        orderId: o.order_id,
-        product: o.product_name,
-        weight,
-        fee,
-        isPaid: invoicePaid,
-        invoiceNum: o.invoice_id ? (invoiceStatusMap[o.invoice_id]?.number || '—') : 'No Invoice',
-      });
+
+      if (!sellerMap[o.seller_id]) sellerMap[o.seller_id] = { confirmed: 0, dropped: 0, upsell: 0, revenue: 0, paid: 0, pending: 0 };
+      sellerMap[o.seller_id].revenue += fee;
+      if (invoicePaid) sellerMap[o.seller_id].paid += fee; else sellerMap[o.seller_id].pending += fee;
+      if (o.confirmation_status === 'confirmed') sellerMap[o.seller_id].confirmed++;
+      if (['cancelled', 'wrong_number', 'double'].includes(o.confirmation_status)) sellerMap[o.seller_id].dropped++;
+      if (o.last_price && Number(o.last_price) > 0 && Number(o.last_price) !== Number(o.price)) sellerMap[o.seller_id].upsell++;
     });
-    return { total, paid, pending, details };
-  }, [shippedOrders, getShippingFee, invoiceStatusMap]);
+    const sellerDetails = Object.entries(sellerMap).map(([id, d]) => ({
+      sellerId: id,
+      sellerName: profileNameMap[id] || id.slice(0, 8),
+      ...d,
+    })).sort((a, b) => b.revenue - a.revenue);
+    return { total, paid, pending, sellerDetails };
+  }, [shippedOrders, getShippingFee, invoiceStatusMap, profileNameMap]);
 
   const confirmationStats = useMemo(() => {
     const confirmedOrders = filteredOrders.filter(o => o.confirmation_status === "confirmed");
@@ -202,14 +206,19 @@ export default function FinanceAnalytics() {
     let confirmedRevenue = 0, confirmedPaid = 0, confirmedPending = 0;
     let droppedRevenue = 0, droppedPaid = 0, droppedPending = 0;
 
-    const details: { orderId: string; product: string; type: string; rate: number; isPaid: boolean; invoiceNum: string }[] = [];
+    const sellerMap: Record<string, { confirmed: number; dropped: number; upsell: number; confirmedRev: number; droppedRev: number; paid: number; pending: number }> = {};
 
     confirmedOrders.forEach(o => {
       const rate = rateHelpers.getConfirmedRate(o.seller_id);
       const invoicePaid = isInvoicePaid(o.invoice_id);
       confirmedRevenue += rate;
       if (invoicePaid) confirmedPaid += rate; else confirmedPending += rate;
-      details.push({ orderId: o.order_id, product: o.product_name, type: 'Confirmed', rate, isPaid: invoicePaid, invoiceNum: o.invoice_id ? (invoiceStatusMap[o.invoice_id]?.number || '—') : 'No Invoice' });
+
+      if (!sellerMap[o.seller_id]) sellerMap[o.seller_id] = { confirmed: 0, dropped: 0, upsell: 0, confirmedRev: 0, droppedRev: 0, paid: 0, pending: 0 };
+      sellerMap[o.seller_id].confirmed++;
+      sellerMap[o.seller_id].confirmedRev += rate;
+      if (invoicePaid) sellerMap[o.seller_id].paid += rate; else sellerMap[o.seller_id].pending += rate;
+      if (o.last_price && Number(o.last_price) > 0 && Number(o.last_price) !== Number(o.price)) sellerMap[o.seller_id].upsell++;
     });
 
     droppedOrders.forEach(o => {
@@ -217,8 +226,19 @@ export default function FinanceAnalytics() {
       const invoicePaid = isInvoicePaid(o.invoice_id);
       droppedRevenue += rate;
       if (invoicePaid) droppedPaid += rate; else droppedPending += rate;
-      details.push({ orderId: o.order_id, product: o.product_name, type: 'Dropped', rate, isPaid: invoicePaid, invoiceNum: o.invoice_id ? (invoiceStatusMap[o.invoice_id]?.number || '—') : 'No Invoice' });
+
+      if (!sellerMap[o.seller_id]) sellerMap[o.seller_id] = { confirmed: 0, dropped: 0, upsell: 0, confirmedRev: 0, droppedRev: 0, paid: 0, pending: 0 };
+      sellerMap[o.seller_id].dropped++;
+      sellerMap[o.seller_id].droppedRev += rate;
+      if (invoicePaid) sellerMap[o.seller_id].paid += rate; else sellerMap[o.seller_id].pending += rate;
     });
+
+    const sellerDetails = Object.entries(sellerMap).map(([id, d]) => ({
+      sellerId: id,
+      sellerName: profileNameMap[id] || id.slice(0, 8),
+      ...d,
+      totalRev: d.confirmedRev + d.droppedRev,
+    })).sort((a, b) => b.totalRev - a.totalRev);
 
     return {
       confirmedCount: confirmedOrders.length,
@@ -227,14 +247,15 @@ export default function FinanceAnalytics() {
       totalRevenue: confirmedRevenue + droppedRevenue,
       totalPaid: confirmedPaid + droppedPaid,
       totalPending: confirmedPending + droppedPending,
-      details,
+      sellerDetails,
     };
-  }, [filteredOrders, rateHelpers, invoiceStatusMap]);
+  }, [filteredOrders, rateHelpers, invoiceStatusMap, profileNameMap]);
 
   const codStats = useMemo(() => {
     const deliveredOrders = filteredOrders.filter(o => o.delivery_status === "delivered" || o.delivery_status === "paid");
     let total = 0, paid = 0, pending = 0;
-    const details: { orderId: string; product: string; amount: number; codFee: number; isPaid: boolean; invoiceNum: string }[] = [];
+    // Group by invoice
+    const invoiceMap: Record<string, { invoiceNum: string; sellerId: string; codFees: number; isPaid: boolean; orderCount: number }> = {};
 
     deliveredOrders.forEach(o => {
       const amountUSD = pkrToUsd(Number(o.total_amount));
@@ -242,18 +263,27 @@ export default function FinanceAnalytics() {
       const invoicePaid = isInvoicePaid(o.invoice_id);
       total += codFee;
       if (invoicePaid) paid += codFee; else pending += codFee;
-      details.push({
-        orderId: o.order_id,
-        product: o.product_name,
-        amount: amountUSD,
-        codFee,
-        isPaid: invoicePaid,
-        invoiceNum: o.invoice_id ? (invoiceStatusMap[o.invoice_id]?.number || '—') : 'No Invoice',
-      });
+
+      const invKey = o.invoice_id || `no-invoice-${o.seller_id}`;
+      if (!invoiceMap[invKey]) {
+        invoiceMap[invKey] = {
+          invoiceNum: o.invoice_id ? (invoiceStatusMap[o.invoice_id]?.number || '—') : 'No Invoice',
+          sellerId: o.seller_id,
+          codFees: 0,
+          isPaid: invoicePaid,
+          orderCount: 0,
+        };
+      }
+      invoiceMap[invKey].codFees += codFee;
+      invoiceMap[invKey].orderCount++;
     });
 
-    return { total, paid, pending, deliveredCount: deliveredOrders.length, details };
-  }, [filteredOrders, rateHelpers, invoiceStatusMap]);
+    const invoiceDetails = Object.values(invoiceMap)
+      .map(d => ({ ...d, sellerName: profileNameMap[d.sellerId] || d.sellerId.slice(0, 8) }))
+      .sort((a, b) => b.codFees - a.codFees);
+
+    return { total, paid, pending, deliveredCount: deliveredOrders.length, invoiceDetails };
+  }, [filteredOrders, rateHelpers, invoiceStatusMap, profileNameMap]);
 
   // Sourcing: profit based on payment_status from sourcing_requests
   const sourcingStats = useMemo(() => {
@@ -448,9 +478,9 @@ export default function FinanceAnalytics() {
 
         {/* Tab Content */}
         <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
-          {activeTab === "shipping" && <ShippingDetails details={shippingStats.details} />}
-          {activeTab === "call_center" && <CallCenterDetails details={confirmationStats.details} />}
-          {activeTab === "cod" && <CodDetails details={codStats.details} />}
+          {activeTab === "shipping" && <ShippingDetails details={shippingStats.sellerDetails} />}
+          {activeTab === "call_center" && <CallCenterDetails details={confirmationStats.sellerDetails} />}
+          {activeTab === "cod" && <CodDetails details={codStats.invoiceDetails} />}
           {activeTab === "sourcing" && <SourcingDetails details={sourcingStats.details} />}
         </div>
       </div>
@@ -513,111 +543,96 @@ function EmptyState() {
   );
 }
 
-function ShippingDetails({ details }: { details: { orderId: string; product: string; weight: number; fee: number; isPaid: boolean; invoiceNum: string }[] }) {
+function ShippingDetails({ details }: { details: { sellerId: string; sellerName: string; confirmed: number; dropped: number; upsell: number; revenue: number; paid: number; pending: number }[] }) {
   if (details.length === 0) return <EmptyState />;
   return (
     <table className="w-full">
       <thead className="sticky top-0 bg-card z-10">
         <tr className="border-b bg-muted/20">
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Order</th>
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Product</th>
-          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Weight</th>
-          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Fee</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Invoice</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Status</th>
+          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Seller</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Confirmed</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Dropped</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Upsell</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Revenue</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Paid</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Pending</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-border">
-        {details.slice(0, 50).map((d, i) => (
-          <tr key={i} className="hover:bg-muted/20 transition-colors">
-            <td className="px-5 py-2.5 text-xs font-mono font-medium">{d.orderId}</td>
-            <td className="px-5 py-2.5 text-xs truncate max-w-[200px]">{d.product}</td>
-            <td className="px-5 py-2.5 text-xs text-right tabular-nums">{d.weight}kg</td>
-            <td className="px-5 py-2.5 text-xs text-right font-medium tabular-nums">{formatUSD(d.fee)}</td>
-            <td className="px-5 py-2.5 text-xs text-center text-muted-foreground">{d.invoiceNum}</td>
-            <td className="px-5 py-2.5 text-center"><StatusBadge isPaid={d.isPaid} /></td>
+        {details.map((d) => (
+          <tr key={d.sellerId} className="hover:bg-muted/20 transition-colors">
+            <td className="px-5 py-2.5 text-xs font-medium">{d.sellerName}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums">{d.confirmed}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-destructive">{d.dropped}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-info">{d.upsell}</td>
+            <td className="px-5 py-2.5 text-xs text-right font-semibold tabular-nums">{formatUSD(d.revenue)}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-success">{formatUSD(d.paid)}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-warning">{d.pending > 0 ? formatUSD(d.pending) : '—'}</td>
           </tr>
         ))}
       </tbody>
-      {details.length > 50 && (
-        <tfoot>
-          <tr className="border-t"><td colSpan={6} className="px-5 py-2 text-xs text-muted-foreground text-center">Showing 50 of {details.length} orders</td></tr>
-        </tfoot>
-      )}
     </table>
   );
 }
 
-function CallCenterDetails({ details }: { details: { orderId: string; product: string; type: string; rate: number; isPaid: boolean; invoiceNum: string }[] }) {
+function CallCenterDetails({ details }: { details: { sellerId: string; sellerName: string; confirmed: number; dropped: number; upsell: number; confirmedRev: number; droppedRev: number; paid: number; pending: number; totalRev: number }[] }) {
   if (details.length === 0) return <EmptyState />;
   return (
     <table className="w-full">
       <thead className="sticky top-0 bg-card z-10">
         <tr className="border-b bg-muted/20">
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Order</th>
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Product</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Type</th>
-          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Rate</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Invoice</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Status</th>
+          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Seller</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Confirmed</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Dropped</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Upsell</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Revenue</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Paid</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Pending</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-border">
-        {details.slice(0, 50).map((d, i) => (
-          <tr key={i} className="hover:bg-muted/20 transition-colors">
-            <td className="px-5 py-2.5 text-xs font-mono font-medium">{d.orderId}</td>
-            <td className="px-5 py-2.5 text-xs truncate max-w-[200px]">{d.product}</td>
-            <td className="px-5 py-2.5 text-center">
-              <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", d.type === 'Confirmed' ? "border-success/30 text-success" : "border-destructive/30 text-destructive")}>
-                {d.type}
-              </Badge>
+        {details.map((d) => (
+          <tr key={d.sellerId} className="hover:bg-muted/20 transition-colors">
+            <td className="px-5 py-2.5 text-xs font-medium">{d.sellerName}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums">
+              <span className="text-success">{d.confirmed}</span>
             </td>
-            <td className="px-5 py-2.5 text-xs text-right font-medium tabular-nums">{formatUSD(d.rate)}</td>
-            <td className="px-5 py-2.5 text-xs text-center text-muted-foreground">{d.invoiceNum}</td>
-            <td className="px-5 py-2.5 text-center"><StatusBadge isPaid={d.isPaid} /></td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-destructive">{d.dropped}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-info">{d.upsell}</td>
+            <td className="px-5 py-2.5 text-xs text-right font-semibold tabular-nums">{formatUSD(d.totalRev)}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-success">{formatUSD(d.paid)}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-warning">{d.pending > 0 ? formatUSD(d.pending) : '—'}</td>
           </tr>
         ))}
       </tbody>
-      {details.length > 50 && (
-        <tfoot>
-          <tr className="border-t"><td colSpan={6} className="px-5 py-2 text-xs text-muted-foreground text-center">Showing 50 of {details.length} orders</td></tr>
-        </tfoot>
-      )}
     </table>
   );
 }
 
-function CodDetails({ details }: { details: { orderId: string; product: string; amount: number; codFee: number; isPaid: boolean; invoiceNum: string }[] }) {
+function CodDetails({ details }: { details: { invoiceNum: string; sellerId: string; sellerName: string; codFees: number; isPaid: boolean; orderCount: number }[] }) {
   if (details.length === 0) return <EmptyState />;
   return (
     <table className="w-full">
       <thead className="sticky top-0 bg-card z-10">
         <tr className="border-b bg-muted/20">
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Order</th>
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Product</th>
-          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Amount</th>
-          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">COD Fee</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Invoice</th>
+          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Invoice</th>
+          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Seller</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Orders</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">COD Fees</th>
           <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Status</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-border">
-        {details.slice(0, 50).map((d, i) => (
+        {details.map((d, i) => (
           <tr key={i} className="hover:bg-muted/20 transition-colors">
-            <td className="px-5 py-2.5 text-xs font-mono font-medium">{d.orderId}</td>
-            <td className="px-5 py-2.5 text-xs truncate max-w-[200px]">{d.product}</td>
-            <td className="px-5 py-2.5 text-xs text-right tabular-nums">{formatUSD(d.amount)}</td>
-            <td className="px-5 py-2.5 text-xs text-right font-medium tabular-nums">{formatUSD(d.codFee)}</td>
-            <td className="px-5 py-2.5 text-xs text-center text-muted-foreground">{d.invoiceNum}</td>
+            <td className="px-5 py-2.5 text-xs font-mono font-medium">{d.invoiceNum}</td>
+            <td className="px-5 py-2.5 text-xs">{d.sellerName}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums">{d.orderCount}</td>
+            <td className="px-5 py-2.5 text-xs text-right font-semibold tabular-nums">{formatUSD(d.codFees)}</td>
             <td className="px-5 py-2.5 text-center"><StatusBadge isPaid={d.isPaid} /></td>
           </tr>
         ))}
       </tbody>
-      {details.length > 50 && (
-        <tfoot>
-          <tr className="border-t"><td colSpan={6} className="px-5 py-2 text-xs text-muted-foreground text-center">Showing 50 of {details.length} orders</td></tr>
-        </tfoot>
-      )}
     </table>
   );
 }
