@@ -475,6 +475,30 @@ export default function Simulation() {
                 </p>
               </div>
             )}
+            {/* Fees from system */}
+            {rateSettings && (
+              <div className="rounded-lg bg-muted/30 border border-border p-3 space-y-1.5 animate-in fade-in-0 duration-200">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">System Fees</span>
+                  <Badge variant="outline" className="ml-1 text-[9px] font-normal text-info">From your rates</Badge>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground">COD Fee</span>
+                    <span className="font-semibold text-foreground">{Number(rateSettings.cod_fee_per_delivery)}%</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground">Dropped Rate</span>
+                    <span className="font-semibold text-foreground">{Number(rateSettings.dropped_order_rate)} $</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground">Confirmed Rate</span>
+                    <span className="font-semibold text-foreground">{Number(rateSettings.confirmed_order_rate)} $</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
