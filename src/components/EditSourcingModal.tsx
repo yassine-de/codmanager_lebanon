@@ -66,11 +66,11 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
   });
   const prevLandedPrice = prevPricing?.landed_price;
   const prevSellerPrice = prevPricing?.seller_price;
-  const [unitPrice, setUnitPrice] = useState(0);
-  const [shippingCost, setShippingCost] = useState(0);
-  const [landedPrice, setLandedPrice] = useState(0);
-  const [sellerPrice, setSellerPrice] = useState(0);
-  const [quantity, setQuantity] = useState(0);
+  const [unitPrice, setUnitPrice] = useState<number | "">(0);
+  const [shippingCost, setShippingCost] = useState<number | "">(0);
+  const [landedPrice, setLandedPrice] = useState<number | "">(0);
+  const [sellerPrice, setSellerPrice] = useState<number | "">(0);
+  const [quantity, setQuantity] = useState<number | "">(0);
   const [status, setStatus] = useState("waiting_quote");
   const [notes, setNotes] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("unpaid");
@@ -95,17 +95,18 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     setErrors({});
   }
 
-  const totalPrice = quantity * unitPrice + shippingCost;
-  const sourcingProfit = sellerPrice > 0 && landedPrice > 0 ? sellerPrice - landedPrice : 0;
-  const profitMargin = sellerPrice > 0 ? ((sourcingProfit / sellerPrice) * 100) : 0;
+  const n = (v: number | "") => typeof v === "number" ? v : 0;
+  const totalPrice = n(quantity) * n(unitPrice) + n(shippingCost);
+  const sourcingProfit = n(sellerPrice) > 0 && n(landedPrice) > 0 ? n(sellerPrice) - n(landedPrice) : 0;
+  const profitMargin = n(sellerPrice) > 0 ? ((sourcingProfit / n(sellerPrice)) * 100) : 0;
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
-    if (quantity <= 0) errs.quantity = "Quantity must be greater than 0";
-    if (unitPrice < 0) errs.unitPrice = "Price cannot be negative";
-    if (shippingCost < 0) errs.shippingCost = "Shipping cost cannot be negative";
-    if (landedPrice < 0) errs.landedPrice = "Landed price cannot be negative";
-    if (sellerPrice < 0) errs.sellerPrice = "Seller price cannot be negative";
+    if (n(quantity) <= 0) errs.quantity = "Quantity must be greater than 0";
+    if (n(unitPrice) < 0) errs.unitPrice = "Price cannot be negative";
+    if (n(shippingCost) < 0) errs.shippingCost = "Shipping cost cannot be negative";
+    if (n(landedPrice) < 0) errs.landedPrice = "Landed price cannot be negative";
+    if (n(sellerPrice) < 0) errs.sellerPrice = "Seller price cannot be negative";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -221,7 +222,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     if (fetchErr) throw fetchErr;
 
     const currentQty = prod.quantity || 0;
-    const newQty = currentQty + quantity;
+    const newQty = currentQty + n(quantity);
 
     // If sourcing has variants, merge quantities into existing product variants
     const updateData: Record<string, unknown> = {
@@ -231,7 +232,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     };
 
     // Update landed_price (buying price) from seller_price
-    if (sellerPrice > 0) {
+    if (n(sellerPrice) > 0) {
       updateData.landed_price = sellerPrice;
     }
     if (productWeight) {
@@ -486,12 +487,12 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs">Quantity</Label>
-                <Input type="number" min={1} step={1} value={quantity} onChange={e => setQuantity(Number(e.target.value))} className={`h-9 text-sm ${errors.quantity ? "border-destructive" : ""}`} />
+                <Input type="number" min={1} step={1} value={quantity} onChange={e => setQuantity(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.quantity ? "border-destructive" : ""}`} />
                 {errors.quantity && <p className="text-[11px] text-destructive">{errors.quantity}</p>}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Unit Price ($)</Label>
-                <Input type="number" min={0} step={0.01} value={unitPrice} onChange={e => setUnitPrice(Number(e.target.value))} className={`h-9 text-sm ${errors.unitPrice ? "border-destructive" : ""}`} />
+                <Input type="number" min={0} step={0.01} value={unitPrice} onChange={e => setUnitPrice(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.unitPrice ? "border-destructive" : ""}`} />
                 {errors.unitPrice && <p className="text-[11px] text-destructive">{errors.unitPrice}</p>}
               </div>
             </div>
@@ -499,7 +500,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
             {/* Shipping Cost */}
             <div className="space-y-1.5">
               <Label className="text-xs">Shipping Cost ($)</Label>
-              <Input type="number" min={0} step={0.01} value={shippingCost} onChange={e => setShippingCost(Number(e.target.value))} className={`h-9 text-sm ${errors.shippingCost ? "border-destructive" : ""}`} />
+              <Input type="number" min={0} step={0.01} value={shippingCost} onChange={e => setShippingCost(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.shippingCost ? "border-destructive" : ""}`} />
               {errors.shippingCost && <p className="text-[11px] text-destructive">{errors.shippingCost}</p>}
             </div>
 
@@ -518,12 +519,12 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Landed Price ($)</Label>
-                  <Input type="number" min={0} step={0.01} value={landedPrice} onChange={e => setLandedPrice(Number(e.target.value))} className={`h-9 text-sm ${errors.landedPrice ? "border-destructive" : ""}`} />
+                  <Input type="number" min={0} step={0.01} value={landedPrice} onChange={e => setLandedPrice(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.landedPrice ? "border-destructive" : ""}`} />
                   {errors.landedPrice && <p className="text-[11px] text-destructive">{errors.landedPrice}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Seller Price ($)</Label>
-                  <Input type="number" min={0} step={0.01} value={sellerPrice} onChange={e => setSellerPrice(Number(e.target.value))} className={`h-9 text-sm ${errors.sellerPrice ? "border-destructive" : ""}`} />
+                  <Input type="number" min={0} step={0.01} value={sellerPrice} onChange={e => setSellerPrice(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.sellerPrice ? "border-destructive" : ""}`} />
                   {errors.sellerPrice && <p className="text-[11px] text-destructive">{errors.sellerPrice}</p>}
                 </div>
               </div>
@@ -533,7 +534,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
                   <span className={`text-sm font-semibold tabular-nums ${sourcingProfit > 0 ? "text-success" : sourcingProfit < 0 ? "text-destructive" : ""}`}>
                     {sourcingProfit > 0 ? "+" : ""}{sourcingProfit.toLocaleString()} $
                   </span>
-                  {sellerPrice > 0 && (
+                  {n(sellerPrice) > 0 && (
                     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${sourcingProfit > 0 ? "bg-success/15 text-success" : sourcingProfit < 0 ? "bg-destructive/15 text-destructive" : "bg-muted text-muted-foreground"}`}>
                       {profitMargin.toFixed(1)}%
                     </span>
