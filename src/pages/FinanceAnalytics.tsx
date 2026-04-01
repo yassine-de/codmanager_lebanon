@@ -543,111 +543,128 @@ function EmptyState() {
   );
 }
 
-function ShippingDetails({ details }: { details: { orderId: string; product: string; weight: number; fee: number; isPaid: boolean; invoiceNum: string }[] }) {
+function ShippingDetails({ details }: { details: { sellerId: string; sellerName: string; confirmed: number; dropped: number; upsell: number; revenue: number; paid: number; pending: number }[] }) {
   if (details.length === 0) return <EmptyState />;
   return (
     <table className="w-full">
       <thead className="sticky top-0 bg-card z-10">
         <tr className="border-b bg-muted/20">
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Order</th>
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Product</th>
-          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Weight</th>
-          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Fee</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Invoice</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Status</th>
+          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Seller</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Confirmed</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Dropped</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Upsell</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Revenue</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Paid</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Pending</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-border">
-        {details.slice(0, 50).map((d, i) => (
-          <tr key={i} className="hover:bg-muted/20 transition-colors">
-            <td className="px-5 py-2.5 text-xs font-mono font-medium">{d.orderId}</td>
-            <td className="px-5 py-2.5 text-xs truncate max-w-[200px]">{d.product}</td>
-            <td className="px-5 py-2.5 text-xs text-right tabular-nums">{d.weight}kg</td>
-            <td className="px-5 py-2.5 text-xs text-right font-medium tabular-nums">{formatUSD(d.fee)}</td>
-            <td className="px-5 py-2.5 text-xs text-center text-muted-foreground">{d.invoiceNum}</td>
-            <td className="px-5 py-2.5 text-center"><StatusBadge isPaid={d.isPaid} /></td>
+        {details.map((d) => (
+          <tr key={d.sellerId} className="hover:bg-muted/20 transition-colors">
+            <td className="px-5 py-2.5 text-xs font-medium">{d.sellerName}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums">{d.confirmed}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-destructive">{d.dropped}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-info">{d.upsell}</td>
+            <td className="px-5 py-2.5 text-xs text-right font-semibold tabular-nums">{formatUSD(d.revenue)}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-success">{formatUSD(d.paid)}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-warning">{d.pending > 0 ? formatUSD(d.pending) : '—'}</td>
           </tr>
         ))}
       </tbody>
-      {details.length > 50 && (
-        <tfoot>
-          <tr className="border-t"><td colSpan={6} className="px-5 py-2 text-xs text-muted-foreground text-center">Showing 50 of {details.length} orders</td></tr>
-        </tfoot>
-      )}
     </table>
   );
 }
 
-function CallCenterDetails({ details }: { details: { orderId: string; product: string; type: string; rate: number; isPaid: boolean; invoiceNum: string }[] }) {
+function CallCenterDetails({ details }: { details: { sellerId: string; sellerName: string; confirmed: number; dropped: number; upsell: number; confirmedRev: number; droppedRev: number; paid: number; pending: number; totalRev: number }[] }) {
   if (details.length === 0) return <EmptyState />;
   return (
     <table className="w-full">
       <thead className="sticky top-0 bg-card z-10">
         <tr className="border-b bg-muted/20">
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Order</th>
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Product</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Type</th>
-          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Rate</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Invoice</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Status</th>
+          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Seller</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Confirmed</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Dropped</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Upsell</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Revenue</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Paid</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Pending</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-border">
-        {details.slice(0, 50).map((d, i) => (
-          <tr key={i} className="hover:bg-muted/20 transition-colors">
-            <td className="px-5 py-2.5 text-xs font-mono font-medium">{d.orderId}</td>
-            <td className="px-5 py-2.5 text-xs truncate max-w-[200px]">{d.product}</td>
-            <td className="px-5 py-2.5 text-center">
-              <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", d.type === 'Confirmed' ? "border-success/30 text-success" : "border-destructive/30 text-destructive")}>
-                {d.type}
-              </Badge>
+        {details.map((d) => (
+          <tr key={d.sellerId} className="hover:bg-muted/20 transition-colors">
+            <td className="px-5 py-2.5 text-xs font-medium">{d.sellerName}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums">
+              <span className="text-success">{d.confirmed}</span>
             </td>
-            <td className="px-5 py-2.5 text-xs text-right font-medium tabular-nums">{formatUSD(d.rate)}</td>
-            <td className="px-5 py-2.5 text-xs text-center text-muted-foreground">{d.invoiceNum}</td>
-            <td className="px-5 py-2.5 text-center"><StatusBadge isPaid={d.isPaid} /></td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-destructive">{d.dropped}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-info">{d.upsell}</td>
+            <td className="px-5 py-2.5 text-xs text-right font-semibold tabular-nums">{formatUSD(d.totalRev)}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-success">{formatUSD(d.paid)}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums text-warning">{d.pending > 0 ? formatUSD(d.pending) : '—'}</td>
           </tr>
         ))}
       </tbody>
-      {details.length > 50 && (
-        <tfoot>
-          <tr className="border-t"><td colSpan={6} className="px-5 py-2 text-xs text-muted-foreground text-center">Showing 50 of {details.length} orders</td></tr>
-        </tfoot>
-      )}
     </table>
   );
 }
 
-function CodDetails({ details }: { details: { orderId: string; product: string; amount: number; codFee: number; isPaid: boolean; invoiceNum: string }[] }) {
+function CodDetails({ details }: { details: { invoiceNum: string; sellerId: string; sellerName: string; codFees: number; isPaid: boolean; orderCount: number }[] }) {
   if (details.length === 0) return <EmptyState />;
   return (
     <table className="w-full">
       <thead className="sticky top-0 bg-card z-10">
         <tr className="border-b bg-muted/20">
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Order</th>
-          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Product</th>
-          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Amount</th>
-          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">COD Fee</th>
-          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Invoice</th>
+          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Invoice</th>
+          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Seller</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Orders</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">COD Fees</th>
           <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Status</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-border">
-        {details.slice(0, 50).map((d, i) => (
+        {details.map((d, i) => (
           <tr key={i} className="hover:bg-muted/20 transition-colors">
-            <td className="px-5 py-2.5 text-xs font-mono font-medium">{d.orderId}</td>
-            <td className="px-5 py-2.5 text-xs truncate max-w-[200px]">{d.product}</td>
-            <td className="px-5 py-2.5 text-xs text-right tabular-nums">{formatUSD(d.amount)}</td>
-            <td className="px-5 py-2.5 text-xs text-right font-medium tabular-nums">{formatUSD(d.codFee)}</td>
-            <td className="px-5 py-2.5 text-xs text-center text-muted-foreground">{d.invoiceNum}</td>
+            <td className="px-5 py-2.5 text-xs font-mono font-medium">{d.invoiceNum}</td>
+            <td className="px-5 py-2.5 text-xs">{d.sellerName}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums">{d.orderCount}</td>
+            <td className="px-5 py-2.5 text-xs text-right font-semibold tabular-nums">{formatUSD(d.codFees)}</td>
             <td className="px-5 py-2.5 text-center"><StatusBadge isPaid={d.isPaid} /></td>
           </tr>
         ))}
       </tbody>
-      {details.length > 50 && (
-        <tfoot>
-          <tr className="border-t"><td colSpan={6} className="px-5 py-2 text-xs text-muted-foreground text-center">Showing 50 of {details.length} orders</td></tr>
-        </tfoot>
-      )}
+    </table>
+  );
+}
+
+function SourcingDetails({ details }: { details: { id: string; displayId: string; product: string; quantity: number; sellerPrice: number; totalCost: number; profit: number; isPaid: boolean }[] }) {
+  if (details.length === 0) return <EmptyState />;
+  return (
+    <table className="w-full">
+      <thead className="sticky top-0 bg-card z-10">
+        <tr className="border-b bg-muted/20">
+          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">ID</th>
+          <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Product</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Qty</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Seller Price</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Our Cost</th>
+          <th className="text-right text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Profit</th>
+          <th className="text-center text-[11px] font-semibold text-muted-foreground uppercase px-5 py-2.5">Status</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-border">
+        {details.map((d) => (
+          <tr key={d.id} className="hover:bg-muted/20 transition-colors">
+            <td className="px-5 py-2.5 text-xs font-mono font-medium">{d.displayId}</td>
+            <td className="px-5 py-2.5 text-xs truncate max-w-[200px]">{d.product}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums">{d.quantity}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums">{formatUSD(d.sellerPrice * d.quantity)}</td>
+            <td className="px-5 py-2.5 text-xs text-right tabular-nums">{formatUSD(d.totalCost)}</td>
+            <td className="px-5 py-2.5 text-xs text-right font-medium tabular-nums text-success">{formatUSD(d.profit)}</td>
+            <td className="px-5 py-2.5 text-center"><StatusBadge isPaid={d.isPaid} /></td>
+          </tr>
+        ))}
+      </tbody>
     </table>
   );
 }
