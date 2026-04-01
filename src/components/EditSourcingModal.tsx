@@ -524,7 +524,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Seller Price ($)</Label>
-                  <Input type="number" min={0} step={0.01} value={sellerPrice} onChange={e => setSellerPrice(Number(e.target.value))} className={`h-9 text-sm ${errors.sellerPrice ? "border-destructive" : ""}`} />
+                  <Input type="number" min={0} step={0.01} value={sellerPrice} onChange={e => setSellerPrice(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.sellerPrice ? "border-destructive" : ""}`} />
                   {errors.sellerPrice && <p className="text-[11px] text-destructive">{errors.sellerPrice}</p>}
                 </div>
               </div>
