@@ -232,7 +232,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     };
 
     // Update landed_price (buying price) from seller_price
-    if (sellerPrice > 0) {
+    if (n(sellerPrice) > 0) {
       updateData.landed_price = sellerPrice;
     }
     if (productWeight) {
