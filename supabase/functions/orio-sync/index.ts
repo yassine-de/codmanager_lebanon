@@ -343,8 +343,6 @@ Deno.serve(async (req) => {
         await supabase.from("app_settings").upsert({ key: "supabase_url", value: url }, { onConflict: "key" });
         await supabase.from("app_settings").upsert({ key: "supabase_service_role_key", value: key }, { onConflict: "key" });
         result = { stored: true };
-        break;
-      }
       }
 
       default:
