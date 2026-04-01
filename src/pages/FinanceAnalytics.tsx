@@ -303,7 +303,7 @@ export default function FinanceAnalytics() {
 
     filteredSourcing.forEach(r => {
       const sellerOwes = (r.seller_price || 0) * r.quantity;
-      const ourCost = r.total_price || 0;
+      const ourCost = (r.landed_price || 0) * r.quantity;
       const profit = sellerOwes - ourCost;
       // Check if seller paid us via invoice (not sourcing payment_status)
       const key = `${r.seller_id}|${r.product_name}`;
