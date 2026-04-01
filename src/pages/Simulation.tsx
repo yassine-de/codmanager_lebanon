@@ -81,7 +81,7 @@ export default function Simulation() {
     if (!authUser?.id) return;
     supabase
       .from("products")
-      .select("id, name, sku, price, landed_price, image_url, weight")
+      .select("id, name, sku, price, landed_price, image_url, weight, weight_kg")
       .eq("seller_id", authUser.id)
       .order("created_at", { ascending: false })
       .then(({ data }) => {
