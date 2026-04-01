@@ -247,22 +247,20 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                   <Label className="text-xs">SKU *</Label>
                   <div className="relative">
                     <Input value={sku} onChange={e => setSku(e.target.value)} className={`h-9 text-sm pr-9 ${errors.sku ? "border-destructive" : ""}`} disabled={isDbProduct} readOnly={isDbProduct} />
-                    {!isSeller && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-9 w-9 text-muted-foreground hover:text-foreground"
-                        onClick={() => {
-                          navigator.clipboard.writeText(sku);
-                          setSkuCopied(true);
-                          setTimeout(() => setSkuCopied(false), 1500);
-                          toast.success("SKU copied");
-                        }}
-                      >
-                        {skuCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-9 w-9 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        navigator.clipboard.writeText(sku);
+                        setSkuCopied(true);
+                        setTimeout(() => setSkuCopied(false), 1500);
+                        toast.success("SKU copied");
+                      }}
+                    >
+                      {skuCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    </Button>
                   </div>
                   {errors.sku && <p className="text-[11px] text-destructive">{errors.sku}</p>}
                 </div>
