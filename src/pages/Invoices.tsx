@@ -676,11 +676,11 @@ export default function Invoices() {
                       <TableCell className="text-center">
                         <span className="inline-flex items-center justify-center h-6 min-w-[28px] px-1.5 rounded-md bg-accent text-[11px] font-semibold">{inv.ordersCount}</span>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{inv.totalAmountPKR.toLocaleString()} <span className="text-muted-foreground text-[10px]">PKR</span></TableCell>
-                      <TableCell className="text-right tabular-nums text-destructive">-{inv.shippingFees.toLocaleString()} PKR</TableCell>
-                      <TableCell className="text-right tabular-nums text-destructive">-{inv.callCenterFees.toLocaleString()} PKR</TableCell>
-                      <TableCell className="text-right tabular-nums text-destructive">-{inv.codFees.toLocaleString()} PKR</TableCell>
-                      <TableCell className="text-right tabular-nums font-bold text-success">{inv.netPayable.toLocaleString()} PKR</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatUSD(inv.totalAmountPKR)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.shippingFees)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.callCenterFees)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.codFees)}</TableCell>
+                      <TableCell className="text-right tabular-nums font-bold text-success">{formatUSD(inv.netPayable)}</TableCell>
                       {!isSeller && (
                         <TableCell className="text-center">
                           <Switch
