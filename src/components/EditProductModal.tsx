@@ -247,22 +247,20 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                   <Label className="text-xs">SKU *</Label>
                   <div className="relative">
                     <Input value={sku} onChange={e => setSku(e.target.value)} className={`h-9 text-sm pr-9 ${errors.sku ? "border-destructive" : ""}`} disabled={isDbProduct} readOnly={isDbProduct} />
-                    {!isSeller && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-9 w-9 text-muted-foreground hover:text-foreground"
-                        onClick={() => {
-                          navigator.clipboard.writeText(sku);
-                          setSkuCopied(true);
-                          setTimeout(() => setSkuCopied(false), 1500);
-                          toast.success("SKU copied");
-                        }}
-                      >
-                        {skuCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-9 w-9 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        navigator.clipboard.writeText(sku);
+                        setSkuCopied(true);
+                        setTimeout(() => setSkuCopied(false), 1500);
+                        toast.success("SKU copied");
+                      }}
+                    >
+                      {skuCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    </Button>
                   </div>
                   {errors.sku && <p className="text-[11px] text-destructive">{errors.sku}</p>}
                 </div>
@@ -487,7 +485,24 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[10px] text-muted-foreground">SKU <span className="text-muted-foreground/60">(auto if empty)</span></Label>
-                        <Input value={variant.sku} onChange={e => updateVariant(i, "sku", e.target.value)} placeholder={`${sku}-${variant.name.toUpperCase().replace(/\s/g, '') || '...'}`} className="h-8 text-xs" />
+                        <div className="relative">
+                          <Input value={variant.sku} onChange={e => updateVariant(i, "sku", e.target.value)} placeholder={`${sku}-${variant.name.toUpperCase().replace(/\s/g, '') || '...'}`} className="h-8 text-xs pr-8" />
+                          {(variant.sku || `${sku}-${variant.name.toUpperCase().replace(/\s/g, '')}`) && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-0 top-0 h-8 w-8 text-muted-foreground hover:text-foreground"
+                              onClick={() => {
+                                const variantSku = variant.sku || `${sku}-${variant.name.toUpperCase().replace(/\s/g, '')}`;
+                                navigator.clipboard.writeText(variantSku);
+                                toast.success("Variant SKU copied");
+                              }}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
