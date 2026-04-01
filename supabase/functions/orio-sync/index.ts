@@ -9,7 +9,7 @@ function getOrioConfig() {
   return {
     token,
     acno: "OR-04820",
-    platformId: 7,
+    platformId: 1,
   };
 }
 
@@ -326,13 +326,23 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "platforms": {
+        const cfg = getOrioConfig();
+        const res = await fetch(`${ORIO_BASE}/customer-platforms`, {
+          method: "POST",
+          headers: orioHeaders(cfg.token),
+          body: JSON.stringify({ acno: cfg.acno }),
+        });
+        result = await res.json();
+        break;
+      }
+
       case "store-config": {
         const url = Deno.env.get("SUPABASE_URL")!;
         const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         await supabase.from("app_settings").upsert({ key: "supabase_url", value: url }, { onConflict: "key" });
         await supabase.from("app_settings").upsert({ key: "supabase_service_role_key", value: key }, { onConflict: "key" });
         result = { stored: true };
-        break;
       }
 
       default:
