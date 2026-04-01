@@ -57,7 +57,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { hasPermission, authUser } = useAuth();
+  const { hasPermission, authUser, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const isSeller = authUser?.role === "seller";
   const isAgent = authUser?.role === "agent";
