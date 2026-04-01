@@ -9,7 +9,7 @@ function getOrioConfig() {
   return {
     token,
     acno: "OR-04820",
-    platformId: 1,
+    platformId: 7,
   };
 }
 
