@@ -176,24 +176,28 @@ export default function FinanceAnalytics() {
 
   const shippingStats = useMemo(() => {
     let total = 0, paid = 0, pending = 0;
-    const details: { orderId: string; product: string; weight: number; fee: number; isPaid: boolean; invoiceNum: string }[] = [];
+    const sellerMap: Record<string, { confirmed: number; dropped: number; upsell: number; revenue: number; paid: number; pending: number }> = {};
     shippedOrders.forEach(o => {
       const weight = Number(o.weight) || 0.5;
       const fee = getShippingFee(o.seller_id, weight);
       const invoicePaid = isInvoicePaid(o.invoice_id);
       total += fee;
       if (invoicePaid) paid += fee; else pending += fee;
-      details.push({
-        orderId: o.order_id,
-        product: o.product_name,
-        weight,
-        fee,
-        isPaid: invoicePaid,
-        invoiceNum: o.invoice_id ? (invoiceStatusMap[o.invoice_id]?.number || '—') : 'No Invoice',
-      });
+
+      if (!sellerMap[o.seller_id]) sellerMap[o.seller_id] = { confirmed: 0, dropped: 0, upsell: 0, revenue: 0, paid: 0, pending: 0 };
+      sellerMap[o.seller_id].revenue += fee;
+      if (invoicePaid) sellerMap[o.seller_id].paid += fee; else sellerMap[o.seller_id].pending += fee;
+      if (o.confirmation_status === 'confirmed') sellerMap[o.seller_id].confirmed++;
+      if (['cancelled', 'wrong_number', 'double'].includes(o.confirmation_status)) sellerMap[o.seller_id].dropped++;
+      if (o.last_price && Number(o.last_price) > 0 && Number(o.last_price) !== Number(o.price)) sellerMap[o.seller_id].upsell++;
     });
-    return { total, paid, pending, details };
-  }, [shippedOrders, getShippingFee, invoiceStatusMap]);
+    const sellerDetails = Object.entries(sellerMap).map(([id, d]) => ({
+      sellerId: id,
+      sellerName: profileNameMap[id] || id.slice(0, 8),
+      ...d,
+    })).sort((a, b) => b.revenue - a.revenue);
+    return { total, paid, pending, sellerDetails };
+  }, [shippedOrders, getShippingFee, invoiceStatusMap, profileNameMap]);
 
   const confirmationStats = useMemo(() => {
     const confirmedOrders = filteredOrders.filter(o => o.confirmation_status === "confirmed");
@@ -202,14 +206,19 @@ export default function FinanceAnalytics() {
     let confirmedRevenue = 0, confirmedPaid = 0, confirmedPending = 0;
     let droppedRevenue = 0, droppedPaid = 0, droppedPending = 0;
 
-    const details: { orderId: string; product: string; type: string; rate: number; isPaid: boolean; invoiceNum: string }[] = [];
+    const sellerMap: Record<string, { confirmed: number; dropped: number; upsell: number; confirmedRev: number; droppedRev: number; paid: number; pending: number }> = {};
 
     confirmedOrders.forEach(o => {
       const rate = rateHelpers.getConfirmedRate(o.seller_id);
       const invoicePaid = isInvoicePaid(o.invoice_id);
       confirmedRevenue += rate;
       if (invoicePaid) confirmedPaid += rate; else confirmedPending += rate;
-      details.push({ orderId: o.order_id, product: o.product_name, type: 'Confirmed', rate, isPaid: invoicePaid, invoiceNum: o.invoice_id ? (invoiceStatusMap[o.invoice_id]?.number || '—') : 'No Invoice' });
+
+      if (!sellerMap[o.seller_id]) sellerMap[o.seller_id] = { confirmed: 0, dropped: 0, upsell: 0, confirmedRev: 0, droppedRev: 0, paid: 0, pending: 0 };
+      sellerMap[o.seller_id].confirmed++;
+      sellerMap[o.seller_id].confirmedRev += rate;
+      if (invoicePaid) sellerMap[o.seller_id].paid += rate; else sellerMap[o.seller_id].pending += rate;
+      if (o.last_price && Number(o.last_price) > 0 && Number(o.last_price) !== Number(o.price)) sellerMap[o.seller_id].upsell++;
     });
 
     droppedOrders.forEach(o => {
@@ -217,8 +226,19 @@ export default function FinanceAnalytics() {
       const invoicePaid = isInvoicePaid(o.invoice_id);
       droppedRevenue += rate;
       if (invoicePaid) droppedPaid += rate; else droppedPending += rate;
-      details.push({ orderId: o.order_id, product: o.product_name, type: 'Dropped', rate, isPaid: invoicePaid, invoiceNum: o.invoice_id ? (invoiceStatusMap[o.invoice_id]?.number || '—') : 'No Invoice' });
+
+      if (!sellerMap[o.seller_id]) sellerMap[o.seller_id] = { confirmed: 0, dropped: 0, upsell: 0, confirmedRev: 0, droppedRev: 0, paid: 0, pending: 0 };
+      sellerMap[o.seller_id].dropped++;
+      sellerMap[o.seller_id].droppedRev += rate;
+      if (invoicePaid) sellerMap[o.seller_id].paid += rate; else sellerMap[o.seller_id].pending += rate;
     });
+
+    const sellerDetails = Object.entries(sellerMap).map(([id, d]) => ({
+      sellerId: id,
+      sellerName: profileNameMap[id] || id.slice(0, 8),
+      ...d,
+      totalRev: d.confirmedRev + d.droppedRev,
+    })).sort((a, b) => b.totalRev - a.totalRev);
 
     return {
       confirmedCount: confirmedOrders.length,
@@ -227,14 +247,15 @@ export default function FinanceAnalytics() {
       totalRevenue: confirmedRevenue + droppedRevenue,
       totalPaid: confirmedPaid + droppedPaid,
       totalPending: confirmedPending + droppedPending,
-      details,
+      sellerDetails,
     };
-  }, [filteredOrders, rateHelpers, invoiceStatusMap]);
+  }, [filteredOrders, rateHelpers, invoiceStatusMap, profileNameMap]);
 
   const codStats = useMemo(() => {
     const deliveredOrders = filteredOrders.filter(o => o.delivery_status === "delivered" || o.delivery_status === "paid");
     let total = 0, paid = 0, pending = 0;
-    const details: { orderId: string; product: string; amount: number; codFee: number; isPaid: boolean; invoiceNum: string }[] = [];
+    // Group by invoice
+    const invoiceMap: Record<string, { invoiceNum: string; sellerId: string; codFees: number; isPaid: boolean; orderCount: number }> = {};
 
     deliveredOrders.forEach(o => {
       const amountUSD = pkrToUsd(Number(o.total_amount));
@@ -242,18 +263,27 @@ export default function FinanceAnalytics() {
       const invoicePaid = isInvoicePaid(o.invoice_id);
       total += codFee;
       if (invoicePaid) paid += codFee; else pending += codFee;
-      details.push({
-        orderId: o.order_id,
-        product: o.product_name,
-        amount: amountUSD,
-        codFee,
-        isPaid: invoicePaid,
-        invoiceNum: o.invoice_id ? (invoiceStatusMap[o.invoice_id]?.number || '—') : 'No Invoice',
-      });
+
+      const invKey = o.invoice_id || `no-invoice-${o.seller_id}`;
+      if (!invoiceMap[invKey]) {
+        invoiceMap[invKey] = {
+          invoiceNum: o.invoice_id ? (invoiceStatusMap[o.invoice_id]?.number || '—') : 'No Invoice',
+          sellerId: o.seller_id,
+          codFees: 0,
+          isPaid: invoicePaid,
+          orderCount: 0,
+        };
+      }
+      invoiceMap[invKey].codFees += codFee;
+      invoiceMap[invKey].orderCount++;
     });
 
-    return { total, paid, pending, deliveredCount: deliveredOrders.length, details };
-  }, [filteredOrders, rateHelpers, invoiceStatusMap]);
+    const invoiceDetails = Object.values(invoiceMap)
+      .map(d => ({ ...d, sellerName: profileNameMap[d.sellerId] || d.sellerId.slice(0, 8) }))
+      .sort((a, b) => b.codFees - a.codFees);
+
+    return { total, paid, pending, deliveredCount: deliveredOrders.length, invoiceDetails };
+  }, [filteredOrders, rateHelpers, invoiceStatusMap, profileNameMap]);
 
   // Sourcing: profit based on payment_status from sourcing_requests
   const sourcingStats = useMemo(() => {
