@@ -1,4 +1,5 @@
 import { LayoutDashboard, ShoppingCart, Package, BarChart3, Package2, BoxIcon, Settings, Users, ChevronDown, Link2, CheckSquare, Store, DollarSign, PhoneForwarded, FileText, FileSpreadsheet, Calculator, Headphones, Play, ListChecks, BadgeDollarSign, MessageSquare, Megaphone, ArrowUpDown } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,7 +58,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { hasPermission, authUser } = useAuth();
+  const { hasPermission, authUser, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const isSeller = authUser?.role === "seller";
   const isAgent = authUser?.role === "agent";
@@ -209,6 +210,17 @@ export function AppSidebar() {
           </div>
         )}
 
+        {authLoading ? (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <div className="space-y-2 px-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-9 w-full rounded-lg" />
+                ))}
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : (
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -331,6 +343,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   );
