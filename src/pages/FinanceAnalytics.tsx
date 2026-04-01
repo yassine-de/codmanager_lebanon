@@ -67,7 +67,7 @@ export default function FinanceAnalytics() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sourcing_requests")
-        .select("id, display_id, seller_id, product_name, quantity, unit_price, shipping_cost, total_price, seller_price, payment_status, seller_validated, status, created_at");
+        .select("id, display_id, seller_id, product_name, quantity, unit_price, shipping_cost, total_price, landed_price, seller_price, payment_status, seller_validated, status, created_at");
       if (error) throw error;
       return data;
     },
