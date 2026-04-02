@@ -903,7 +903,7 @@ const AgentOrders = () => {
                         </div>
                       </div>
                       {!editMode && (
-                        <p className="text-sm font-bold text-foreground whitespace-nowrap">{op.qty * op.price} PKR</p>
+                        <p className="text-sm font-bold text-foreground whitespace-nowrap">{orderTotal} PKR</p>
                       )}
                     </div>
                   </div>
