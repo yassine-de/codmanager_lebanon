@@ -720,6 +720,7 @@ export default function Orders() {
                       />
                     </td>
                   )}
+                  {isAdmin && isCol('systemId') && <td className="py-2.5 px-4 font-mono text-xs text-muted-foreground">{order.systemId ?? '—'}</td>}
                   {isCol('id') && <td className="py-2.5 px-4 font-medium text-xs">{order.id}</td>}
                   {isCol('createdAt') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{format(new Date(order.createdAt), 'dd MMM yyyy')}</td>}
                   {isCol('updatedAt') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{format(new Date(order.updatedAt), 'dd MMM yyyy')}</td>}
