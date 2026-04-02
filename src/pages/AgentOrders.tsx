@@ -136,6 +136,8 @@ const AgentOrders = () => {
     currentOrderRef.current = null;
     setCurrentOrder(null);
     setEditItems([]);
+    setIsManualPrice(false);
+    setManualTotal(0);
     setEditCustomer({ name: "", phone: "", city: "", address: "" });
     setSellerProducts([]);
     setHistoricalOffers(null);
