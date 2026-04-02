@@ -179,6 +179,7 @@ const Integrations = () => {
     fetchSheets();
     fetchSellers();
     fetchServiceEmail();
+    fetchApiConfig();
   }, []);
 
   const openCreate = () => {
