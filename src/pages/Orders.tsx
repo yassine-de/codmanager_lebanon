@@ -279,6 +279,7 @@ export default function Orders() {
 
       const mapped: Order[] = (data || []).map(o => ({
         id: o.order_id,
+        systemId: o.system_id || undefined,
         customer: o.customer_name,
         phone: o.customer_phone,
         city: o.customer_city,
