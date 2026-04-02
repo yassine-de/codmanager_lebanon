@@ -398,27 +398,58 @@ const AgentOrders = () => {
   const handleStart = async () => {
     setLoading(true);
     try {
-      const data = await fetchPrioritizedOrders();
+      // Clear all previous state completely before starting
+      setOrderQueue([]);
+      setCurrentIndex(0);
+      resetForm();
+      setEditItems([]);
+      setEditCustomer({ name: "", phone: "", city: "", address: "" });
+      setHistoricalOffers(null);
+      setHistoricalLastPrice(null);
 
-      if (!data || data.length === 0) {
+      // Always use atomic claim for the first order — single source of truth
+      const types: string[] = ["duplicate", "new", "postponed", "no_answer"];
+      let claimedOrder: DbOrder | null = null;
+
+      for (const t of types) {
+        claimedOrder = await claimOrderAtomic(t);
+        if (claimedOrder) break;
+      }
+
+      if (!claimedOrder) {
         toast.info("No orders to process right now! 🎉");
         setLoading(false);
         return;
       }
 
-      setOrderQueue(data);
+      // Verify claimed order data integrity
+      if (!claimedOrder.id || !claimedOrder.order_id) {
+        console.error("[AgentOrders] Invalid claimed order data:", claimedOrder);
+        toast.error("Data integrity error — please try again");
+        setLoading(false);
+        return;
+      }
+
+      // Set queue with the verified claimed order
+      setOrderQueue([claimedOrder]);
       setCurrentIndex(0);
       setStarted(true);
       setNewAssignedCount(0);
+      initOrderState(claimedOrder);
 
-      const firstOrder = data[0];
-      if (!firstOrder.agent_id || firstOrder.agent_id !== authUser!.id) {
-        await claimOrder(firstOrder);
-      } else {
-        initOrderState(firstOrder);
-      }
+      toast.success(`Order ${claimedOrder.order_id} claimed — Let's go! 🚀`);
 
-      toast.success(`Order claimed successfully — Let's go! 🚀`);
+      // Fetch full queue in background (for count display only, not for data)
+      fetchPrioritizedOrders().then(fresh => {
+        if (fresh.length > 0) {
+          // Replace queue but keep index at 0 — current order is already correct
+          const idx = fresh.findIndex(o => o.id === claimedOrder!.id);
+          if (idx >= 0) {
+            setOrderQueue(fresh);
+            setCurrentIndex(idx);
+          }
+        }
+      });
     } catch (err: any) {
       toast.error(err.message || "Failed to load orders");
     } finally {
@@ -443,66 +474,62 @@ const AgentOrders = () => {
     return rows[0];
   };
 
-  const claimOrder = async (order: DbOrder) => {
-    if (!authUser) return false;
+  const claimOrder = async (order: DbOrder): Promise<DbOrder | null> => {
+    if (!authUser) return null;
     setClaiming(true);
     try {
-      // If already assigned to us, just init
+      // If already assigned to us, re-fetch fresh data from DB to ensure consistency
       if (order.agent_id === authUser.id) {
-        initOrderState(order);
-        return true;
-      }
-
-      // If it's a duplicate group, use atomic duplicate claim
-      if (order._isDuplicate && order._duplicateGroup) {
-        const claimed = await claimOrderAtomic("duplicate");
-        if (!claimed) {
-          toast.warning(`Duplicate orders were already taken`);
-          return false;
+        const { data: fresh } = await supabase
+          .from("orders")
+          .select("*")
+          .eq("id", order.id)
+          .eq("agent_id", authUser.id)
+          .maybeSingle();
+        if (fresh) {
+          const freshOrder = fresh as DbOrder;
+          // Validate data consistency
+          if (freshOrder.id !== order.id || freshOrder.order_id !== order.order_id) {
+            console.error("[AgentOrders] Data mismatch on re-fetch!", { expected: order.order_id, got: freshOrder.order_id });
+            toast.error("Data mismatch detected — reloading");
+            return null;
+          }
+          initOrderState(freshOrder);
+          return freshOrder;
         }
-        initOrderState(claimed);
-        toast.info(`📋 Duplicate orders assigned atomically`, { duration: 4000 });
-        return true;
+        return null;
       }
 
       // Determine order type for atomic claim
       let orderType = "new";
-      if (order.confirmation_status === "postponed") orderType = "postponed";
+      if (order._isDuplicate) orderType = "duplicate";
+      else if (order.confirmation_status === "postponed") orderType = "postponed";
       else if (order.confirmation_status === "no_answer") orderType = "no_answer";
 
-      // Try to claim this specific order first (optimistic)
-      const updatePayload: Record<string, any> = {
-        agent_id: authUser.id,
-        assigned_at: new Date().toISOString(),
-        last_activity_at: new Date().toISOString(),
-      };
-      const { data, error } = await supabase
-        .from("orders")
-        .update(updatePayload as any)
-        .eq("id", order.id)
-        .is("agent_id", null)
-        .select()
-        .maybeSingle();
-
-      if (error) throw error;
-      if (data) {
-        initOrderState(data as DbOrder);
-        return true;
+      // Always use atomic claim — single source of truth from backend
+      const claimed = await claimOrderAtomic(orderType);
+      if (!claimed) {
+        toast.warning(`No more ${orderType} orders available`);
+        return null;
       }
 
-      // Order was taken — use atomic function to get next available
-      const fallback = await claimOrderAtomic(orderType);
-      if (fallback) {
-        initOrderState(fallback);
+      // Validate claimed order data
+      if (!claimed.id || !claimed.order_id) {
+        console.error("[AgentOrders] Invalid atomic claim result:", claimed);
+        return null;
+      }
+
+      if (order._isDuplicate) {
+        toast.info(`📋 Duplicate orders assigned atomically`, { duration: 4000 });
+      } else if (claimed.id !== order.id) {
         toast.info(`Order was taken, got next available ✅`);
-        return true;
       }
 
-      toast.warning(`Order ${order.order_id} was already taken, no more available`);
-      return false;
+      initOrderState(claimed);
+      return claimed;
     } catch (err: any) {
       toast.error("Failed to claim order");
-      return false;
+      return null;
     } finally {
       setClaiming(false);
     }
@@ -684,34 +711,53 @@ const AgentOrders = () => {
   };
 
   const moveToNext = async () => {
-    let nextIdx = currentIndex + 1;
+    // Clear previous order state completely before loading next
+    resetForm();
+    setEditItems([]);
+    setEditCustomer({ name: "", phone: "", city: "", address: "" });
+    setHistoricalOffers(null);
+    setHistoricalLastPrice(null);
 
+    // Try claiming from remaining queue entries
+    let nextIdx = currentIndex + 1;
     while (nextIdx < orderQueue.length) {
       const nextOrder = orderQueue[nextIdx];
-      if (nextOrder.agent_id === authUser?.id) {
-        const claimed = await claimOrder(nextOrder);
-        if (claimed) { setCurrentIndex(nextIdx); return; }
-      } else {
-        const claimed = await claimOrder(nextOrder);
-        if (claimed) { setCurrentIndex(nextIdx); return; }
+      const claimed = await claimOrder(nextOrder);
+      if (claimed) {
+        // Update queue entry with actual claimed data to prevent stale references
+        setOrderQueue(prev => {
+          const updated = [...prev];
+          updated[nextIdx] = claimed;
+          return updated;
+        });
+        setCurrentIndex(nextIdx);
+        return;
       }
       nextIdx++;
     }
 
-    // Queue exhausted — try atomic claim directly before refetching
+    // Queue exhausted — try atomic claim directly
     const types = ["duplicate", "new", "postponed", "no_answer"];
     for (const t of types) {
       const order = await claimOrderAtomic(t);
       if (order) {
+        // Validate data integrity
+        if (!order.id || !order.order_id) {
+          console.error("[AgentOrders] Invalid atomic claim in moveToNext:", order);
+          continue;
+        }
         setOrderQueue([order]);
         setCurrentIndex(0);
         initOrderState(order);
-        toast.info(`Got next ${t} order atomically ✅`);
-        // Then refetch full queue in background
+        toast.info(`Got next ${t} order — ${order.order_id} ✅`);
+        // Refetch full queue in background
         fetchPrioritizedOrders().then(fresh => {
           if (fresh.length > 0) {
-            setOrderQueue(fresh);
-            setCurrentIndex(0);
+            const idx = fresh.findIndex(o => o.id === order.id);
+            if (idx >= 0) {
+              setOrderQueue(fresh);
+              setCurrentIndex(idx);
+            }
           }
         });
         return;
