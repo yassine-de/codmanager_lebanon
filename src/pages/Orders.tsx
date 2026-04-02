@@ -59,10 +59,11 @@ function StatusBadge({ label, cls }: { label: string; cls: string }) {
 }
 
 /* ── Column definitions ── */
-type ColumnKey = 'id' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'amount' | 'confirmationStatus' | 'deliveryStatus' | 'attempts';
+type ColumnKey = 'systemId' | 'id' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'amount' | 'confirmationStatus' | 'deliveryStatus' | 'attempts';
 
-const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
-  { key: 'id', label: 'ID', defaultVisible: true },
+const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean; adminOnly?: boolean }[] = [
+  { key: 'systemId', label: 'System ID', defaultVisible: true, adminOnly: true },
+  { key: 'id', label: 'Seller ID', defaultVisible: true },
   { key: 'createdAt', label: 'Created', defaultVisible: true },
   { key: 'updatedAt', label: 'Updated', defaultVisible: true },
   { key: 'seller', label: 'Seller', defaultVisible: true },
