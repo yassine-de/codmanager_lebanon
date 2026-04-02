@@ -398,27 +398,58 @@ const AgentOrders = () => {
   const handleStart = async () => {
     setLoading(true);
     try {
-      const data = await fetchPrioritizedOrders();
+      // Clear all previous state completely before starting
+      setOrderQueue([]);
+      setCurrentIndex(0);
+      resetForm();
+      setEditItems([]);
+      setEditCustomer({ name: "", phone: "", city: "", address: "" });
+      setHistoricalOffers(null);
+      setHistoricalLastPrice(null);
 
-      if (!data || data.length === 0) {
+      // Always use atomic claim for the first order — single source of truth
+      const types: string[] = ["duplicate", "new", "postponed", "no_answer"];
+      let claimedOrder: DbOrder | null = null;
+
+      for (const t of types) {
+        claimedOrder = await claimOrderAtomic(t);
+        if (claimedOrder) break;
+      }
+
+      if (!claimedOrder) {
         toast.info("No orders to process right now! 🎉");
         setLoading(false);
         return;
       }
 
-      setOrderQueue(data);
+      // Verify claimed order data integrity
+      if (!claimedOrder.id || !claimedOrder.order_id) {
+        console.error("[AgentOrders] Invalid claimed order data:", claimedOrder);
+        toast.error("Data integrity error — please try again");
+        setLoading(false);
+        return;
+      }
+
+      // Set queue with the verified claimed order
+      setOrderQueue([claimedOrder]);
       setCurrentIndex(0);
       setStarted(true);
       setNewAssignedCount(0);
+      initOrderState(claimedOrder);
 
-      const firstOrder = data[0];
-      if (!firstOrder.agent_id || firstOrder.agent_id !== authUser!.id) {
-        await claimOrder(firstOrder);
-      } else {
-        initOrderState(firstOrder);
-      }
+      toast.success(`Order ${claimedOrder.order_id} claimed — Let's go! 🚀`);
 
-      toast.success(`Order claimed successfully — Let's go! 🚀`);
+      // Fetch full queue in background (for count display only, not for data)
+      fetchPrioritizedOrders().then(fresh => {
+        if (fresh.length > 0) {
+          // Replace queue but keep index at 0 — current order is already correct
+          const idx = fresh.findIndex(o => o.id === claimedOrder!.id);
+          if (idx >= 0) {
+            setOrderQueue(fresh);
+            setCurrentIndex(idx);
+          }
+        }
+      });
     } catch (err: any) {
       toast.error(err.message || "Failed to load orders");
     } finally {
