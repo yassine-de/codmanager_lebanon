@@ -659,7 +659,7 @@ export default function Orders() {
             </PopoverTrigger>
             <PopoverContent className="w-48 p-2" align="end">
               <div className="space-y-1">
-                {allColumns.map(col => (
+                {allColumns.filter(col => !col.adminOnly || isAdmin).map(col => (
                   <label key={col.key} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm">
                     <Checkbox
                       checked={visibleColumns.has(col.key)}
