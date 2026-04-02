@@ -284,7 +284,63 @@ const Integrations = () => {
         </div>
       </div>
 
-      {/* Service Account Email */}
+      {/* API Configuration */}
+      {apiLoaded && (
+        <div className="bg-card border rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 rounded-lg p-2">
+                <Globe className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">API Configuration</p>
+                <p className="text-xs text-muted-foreground">ORIO OMS API settings for order fulfillment</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">{apiEnabled ? "Enabled" : "Disabled"}</span>
+              <Switch checked={apiEnabled} onCheckedChange={setApiEnabled} />
+            </div>
+          </div>
+
+          {apiEnabled && (
+            <div className="space-y-3 pt-2 border-t">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Key className="w-3 h-3" /> API Key / Token
+                  </Label>
+                  <Input
+                    className="h-9 text-xs font-mono"
+                    type="password"
+                    placeholder="Enter API token..."
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Hash className="w-3 h-3" /> Account Number
+                  </Label>
+                  <Input
+                    className="h-9 text-xs font-mono"
+                    placeholder="Enter account number..."
+                    value={apiAccountNumber}
+                    onChange={(e) => setApiAccountNumber(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" className="h-8 text-xs gap-1.5" onClick={saveApiConfig} disabled={apiSaving}>
+                  {apiSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                  Save API Settings
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {serviceEmailLoaded && (
         <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center gap-3">
           <div className="bg-primary/10 rounded-lg p-2">
