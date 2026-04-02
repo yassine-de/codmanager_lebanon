@@ -3,7 +3,7 @@ import {
   ShoppingCart, CheckCircle2, Truck, DollarSign, XCircle, RotateCcw,
   Sparkles, PhoneOff, CalendarClock, TrendingUp, TrendingDown,
   Package, Copy, PhoneForwarded, Navigation, UserCheck, Banknote,
-  Clock, Store, Award, Loader2,
+  Clock, Store, Award,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, LabelList,
@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import OnlineStatusPanel from "@/components/OnlineStatusPanel";
 import { useDataVisibility, MaskedValue } from "@/contexts/DataVisibilityContext";
 import { formatPKR, formatUSD, pkrToUsd } from "@/lib/currency";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 
 /* ── Animated Number ── */
 function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
@@ -351,11 +352,7 @@ export default function Dashboard() {
   const pct = (val: number, base: number) => base > 0 ? Math.round((val / base) * 100) : 0;
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
