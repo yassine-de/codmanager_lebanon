@@ -736,20 +736,28 @@ const AgentOrders = () => {
       nextIdx++;
     }
 
-    // Queue exhausted — try atomic claim directly before refetching
+    // Queue exhausted — try atomic claim directly
     const types = ["duplicate", "new", "postponed", "no_answer"];
     for (const t of types) {
       const order = await claimOrderAtomic(t);
       if (order) {
+        // Validate data integrity
+        if (!order.id || !order.order_id) {
+          console.error("[AgentOrders] Invalid atomic claim in moveToNext:", order);
+          continue;
+        }
         setOrderQueue([order]);
         setCurrentIndex(0);
         initOrderState(order);
-        toast.info(`Got next ${t} order atomically ✅`);
-        // Then refetch full queue in background
+        toast.info(`Got next ${t} order — ${order.order_id} ✅`);
+        // Refetch full queue in background
         fetchPrioritizedOrders().then(fresh => {
           if (fresh.length > 0) {
-            setOrderQueue(fresh);
-            setCurrentIndex(0);
+            const idx = fresh.findIndex(o => o.id === order.id);
+            if (idx >= 0) {
+              setOrderQueue(fresh);
+              setCurrentIndex(idx);
+            }
           }
         });
         return;
