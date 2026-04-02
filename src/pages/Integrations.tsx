@@ -112,6 +112,8 @@ const Integrations = () => {
     }
     setApiSaving(false);
   };
+
+  const saveServiceEmail = async () => {
     setServiceEmailSaving(true);
     const { error } = await supabase
       .from("app_settings")
