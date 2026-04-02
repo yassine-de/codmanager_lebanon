@@ -98,6 +98,8 @@ const AgentOrders = () => {
   // Editable order items
   const [editItems, setEditItems] = useState<{ name: string; qty: number; price: number }[]>([]);
   const [editMode, setEditMode] = useState(false);
+  const [isManualPrice, setIsManualPrice] = useState(false);
+  const [manualTotal, setManualTotal] = useState(0);
   const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; product_url: string | null; video_url: string | null }[]>([]);
   const [historicalOffers, setHistoricalOffers] = useState<string | null>(null);
   const [historicalLastPrice, setHistoricalLastPrice] = useState<number | null>(null);
