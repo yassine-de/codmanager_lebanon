@@ -200,7 +200,8 @@ const AgentOrders = () => {
     : currentOrder
       ? [{ name: currentOrder.product_name, qty: currentOrder.quantity, price: Number(currentOrder.price) }]
       : [];
-  const orderTotal = activeItems.reduce((s, p) => s + p.qty * p.price, 0);
+  const autoTotal = activeItems.reduce((s, p) => s + p.qty * p.price, 0);
+  const orderTotal = isManualPrice ? manualTotal : autoTotal;
 
   const refreshAvailableCounts = useCallback(async (productNamesParam?: string[] | null) => {
     if (!authUser) return;
