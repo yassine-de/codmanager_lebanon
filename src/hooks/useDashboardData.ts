@@ -139,20 +139,32 @@ export function useDashboardData(dateRange?: DateRange) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_id, confirmation_status, delivery_status, total_amount, price, quantity, product_name, seller_id, created_at, confirmed_at, delivered_at");
+        .select("id, order_id, confirmation_status, delivery_status, total_amount, price, quantity, product_name, seller_id, created_at, confirmed_at, delivered_at, last_attempt_at, last_activity_at, updated_at");
       if (error) throw error;
       return (data || []) as DashboardOrder[];
     },
   });
 
-  // Filter by date range on created_at
+  // Helper: get the treatment date for an order (same logic as Agent Dashboard)
+  const getTreatmentDate = (o: DashboardOrder): Date => {
+    if (o.confirmation_status === 'confirmed' && o.confirmed_at) {
+      return new Date(o.confirmed_at);
+    } else if (o.last_attempt_at) {
+      return new Date(o.last_attempt_at);
+    } else if (o.last_activity_at) {
+      return new Date(o.last_activity_at);
+    }
+    return new Date(o.updated_at);
+  };
+
+  // Filter by date range on treatment date
   const orders = useMemo(() => {
     if (!dateRange?.from) return allOrders;
+    const from = startOfDay(dateRange.from);
+    const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
     return allOrders.filter(o => {
-      const created = new Date(o.created_at);
-      if (dateRange.from && created < dateRange.from) return false;
-      if (dateRange.to && created > dateRange.to) return false;
-      return true;
+      const treatDate = getTreatmentDate(o);
+      return isWithinInterval(treatDate, { start: from, end: to });
     });
   }, [allOrders, dateRange]);
 
