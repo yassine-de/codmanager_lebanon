@@ -676,7 +676,7 @@ const AgentOrders = () => {
           size="lg"
           className="gap-2 text-base px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all"
           onClick={handleStart}
-          disabled={(newOrderCount === 0 && retryCount === 0) || loading}
+          disabled={(newOrderCount === 0 && retryCount === 0) || loading || claiming}
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
           Start Smart Confirmation
