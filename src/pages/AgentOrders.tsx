@@ -146,6 +146,7 @@ const AgentOrders = () => {
     setHistoricalOffers(null);
     setHistoricalLastPrice(null);
     setOrderElapsedSec(0);
+    releasedRef.current = false;
     if (orderTimerRef.current) {
       clearInterval(orderTimerRef.current);
       orderTimerRef.current = null;
