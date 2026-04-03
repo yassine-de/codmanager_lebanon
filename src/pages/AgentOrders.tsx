@@ -514,6 +514,19 @@ const AgentOrders = () => {
     if (selectedStatus === "postponed") {
       if (!postponeDate || !postponeTime.split(":")[1]?.replace(/ (AM|PM)/, "")) return false;
       if (!postponeNote.trim()) return false;
+      // If today, check time is not before now
+      const now = new Date();
+      if (postponeDate.toDateString() === now.toDateString()) {
+        const [hourStr, rest] = postponeTime.split(":");
+        const minuteStr = rest?.replace(/ (AM|PM)/, "") || "0";
+        const ampm = postponeTime.includes("PM") ? "PM" : "AM";
+        let hour = parseInt(hourStr) || 0;
+        if (ampm === "PM" && hour !== 12) hour += 12;
+        if (ampm === "AM" && hour === 12) hour = 0;
+        const selectedTime = new Date(postponeDate);
+        selectedTime.setHours(hour, parseInt(minuteStr) || 0, 0, 0);
+        if (selectedTime <= now) return false;
+      }
     }
     return true;
   }, [selectedStatus, shippingStatus, cancelReason, note, postponeDate, postponeTime, postponeNote]);
