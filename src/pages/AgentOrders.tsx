@@ -523,7 +523,7 @@ const AgentOrders = () => {
 
     try {
       // If agent didn't change the status, release the order back instead of treating it
-      if (selectedStatus === currentOrder.confirmation_status) {
+      if (selectedStatus === currentOrder.confirmation_status && selectedStatus !== "no_answer") {
         await supabase.rpc("release_order_lock" as any, { p_order_id: currentOrder.id, p_agent_id: authUser.id });
         // For non-new orders, also un-assign agent
         if (currentOrder.confirmation_status !== "new") {
