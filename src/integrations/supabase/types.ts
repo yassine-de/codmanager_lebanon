@@ -433,6 +433,7 @@ export type Database = {
           invoice_id: string | null
           is_manual_price: boolean
           last_activity_at: string | null
+          last_attempt_at: string | null
           last_price: number | null
           note: string | null
           offers: string | null
@@ -480,6 +481,7 @@ export type Database = {
           invoice_id?: string | null
           is_manual_price?: boolean
           last_activity_at?: string | null
+          last_attempt_at?: string | null
           last_price?: number | null
           note?: string | null
           offers?: string | null
@@ -527,6 +529,7 @@ export type Database = {
           invoice_id?: string | null
           is_manual_price?: boolean
           last_activity_at?: string | null
+          last_attempt_at?: string | null
           last_price?: number | null
           note?: string | null
           offers?: string | null
@@ -1182,6 +1185,7 @@ export type Database = {
           invoice_id: string | null
           is_manual_price: boolean
           last_activity_at: string | null
+          last_attempt_at: string | null
           last_price: number | null
           note: string | null
           offers: string | null
