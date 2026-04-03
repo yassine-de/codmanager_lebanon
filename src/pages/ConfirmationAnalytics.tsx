@@ -117,25 +117,37 @@ export default function ConfirmationAnalytics() {
     return filtered;
   }, [orders, agentFilter, sellerFilter, productFilter, dateRange]);
 
-  // Stats — same formulas as before, mapped to real DB statuses
+  // Stats
   const stats = useMemo(() => {
     const total = filteredOrders.length;
     const confirmed = filteredOrders.filter(o => o.confirmation_status === "confirmed").length;
     const cancelled = filteredOrders.filter(o => o.confirmation_status === "cancelled").length;
-    const answered = filteredOrders.filter(o => ["confirmed", "cancelled", "reported"].includes(o.confirmation_status) || o.postpone_date !== null).length;
     const postponed = filteredOrders.filter(o => o.postpone_date !== null).length;
     const delivered = filteredOrders.filter(o => o.delivery_status === "delivered").length;
     const shipped = filteredOrders.filter(o => o.delivery_status && ["shipped", "pending", "delivered"].includes(o.delivery_status)).length;
 
+    // Treated = orders where agent took action (status changed from new: no_answer, confirmed, cancelled, postponed, double, wrong_number)
+    const treated = filteredOrders.filter(o => o.confirmation_status !== "new" && (o.agent_id || o.original_agent_id)).length;
+
+    // Claimed = orders that were claimed (assigned to agent) AND status was changed
+    const claimed = filteredOrders.filter(o => (o.agent_id || o.original_agent_id) && o.confirmation_status !== "new").length;
+
+    // Confirmation rate from claimed orders
+    const confirmationRate = claimed > 0 ? Math.round((confirmed / claimed) * 100) : 0;
+
+    const answered = filteredOrders.filter(o => ["confirmed", "cancelled", "reported"].includes(o.confirmation_status) || o.postpone_date !== null).length;
+
     return {
       total,
       confirmed,
-      confirmationRate: answered > 0 ? Math.round((confirmed / answered) * 100) : 0,
+      treated,
+      claimed,
+      confirmationRate,
       answeredRate: total > 0 ? Math.round((answered / total) * 100) : 0,
       cancelled,
-      cancelledRate: total > 0 ? Math.round((cancelled / total) * 100) : 0,
+      cancelledRate: claimed > 0 ? Math.round((cancelled / claimed) * 100) : 0,
       postponed,
-      postponedRate: total > 0 ? Math.round((postponed / total) * 100) : 0,
+      postponedRate: claimed > 0 ? Math.round((postponed / claimed) * 100) : 0,
       delivered,
       deliveredRate: shipped > 0 ? Math.round((delivered / shipped) * 100) : 0,
     };
