@@ -1201,7 +1201,7 @@ const AgentOrders = () => {
                 <Textarea placeholder="Add a note (optional)" value={note} onChange={(e) => setNote(e.target.value)} className="text-xs min-h-[50px]" />
               )}
 
-              <Button className="w-full gap-2" onClick={handleSubmit} disabled={!canSubmit || submitting}>
+              <Button className="w-full gap-2" onClick={handleSubmit} disabled={!canSubmit || submitting || claiming}>
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
                 Confirm & Next Order
               </Button>
