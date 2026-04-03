@@ -126,16 +126,28 @@ export default function ConfirmationAnalytics() {
     const delivered = filteredOrders.filter(o => o.delivery_status === "delivered").length;
     const shipped = filteredOrders.filter(o => o.delivery_status && ["shipped", "pending", "delivered"].includes(o.delivery_status)).length;
 
-    // Treated = orders where agent took action (status changed from new: no_answer, confirmed, cancelled, postponed, double, wrong_number)
-    const treated = filteredOrders.filter(o => o.confirmation_status !== "new" && (o.agent_id || o.original_agent_id)).length;
+    // Build set of filtered order_ids for cross-referencing
+    const filteredOrderIds = new Set(filteredOrders.map(o => o.order_id));
 
-    // Claimed = orders that were claimed (assigned to agent) AND status was changed
+    // Treated = each status change action from order_history (not unique orders)
+    // Count every confirmation_status change entry that matches current filters
+    const treatedActions = orderHistory.filter(h => {
+      if (h.field_changed !== "confirmation_status") return false;
+      if (!filteredOrderIds.has(h.order_id)) return false;
+      // Filter by agent if set
+      if (agentFilter !== "all" && h.changed_by !== agentFilter) return false;
+      // Filter by date range
+      if (dateRange?.from && new Date(h.created_at) < dateRange.from) return false;
+      if (dateRange?.to && new Date(h.created_at) > dateRange.to) return false;
+      return true;
+    });
+    const treated = treatedActions.length;
+
+    // Claimed = unique orders that were claimed (assigned to agent) AND status was changed
     const claimed = filteredOrders.filter(o => (o.agent_id || o.original_agent_id) && o.confirmation_status !== "new").length;
 
     // Confirmation rate from claimed orders
     const confirmationRate = claimed > 0 ? Math.round((confirmed / claimed) * 100) : 0;
-
-    const answered = filteredOrders.filter(o => ["confirmed", "cancelled", "reported"].includes(o.confirmation_status) || o.postpone_date !== null).length;
 
     return {
       total,
@@ -143,7 +155,6 @@ export default function ConfirmationAnalytics() {
       treated,
       claimed,
       confirmationRate,
-      answeredRate: total > 0 ? Math.round((answered / total) * 100) : 0,
       cancelled,
       cancelledRate: claimed > 0 ? Math.round((cancelled / claimed) * 100) : 0,
       postponed,
@@ -151,7 +162,7 @@ export default function ConfirmationAnalytics() {
       delivered,
       deliveredRate: shipped > 0 ? Math.round((delivered / shipped) * 100) : 0,
     };
-  }, [filteredOrders]);
+  }, [filteredOrders, orderHistory, agentFilter, dateRange]);
 
   // Time-based KPIs: First Call Avg & Handling Time
   const timeStats = useMemo(() => {
