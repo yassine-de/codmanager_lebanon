@@ -11,6 +11,7 @@ import {
 
 interface Order {
   agent_id: string | null;
+  original_agent_id: string | null;
   confirmation_status: string;
   postpone_date: string | null;
 }
