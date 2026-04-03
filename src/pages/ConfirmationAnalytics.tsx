@@ -25,7 +25,7 @@ export default function ConfirmationAnalytics() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_id, confirmation_status, delivery_status, cancel_reason, product_name, seller_id, agent_id, created_at, confirmed_at, delivered_at, price, quantity, postpone_date, attempt_count")
+        .select("id, order_id, confirmation_status, delivery_status, cancel_reason, product_name, seller_id, agent_id, original_agent_id, created_at, confirmed_at, delivered_at, assigned_at, price, quantity, postpone_date, attempt_count")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -441,12 +441,15 @@ export default function ConfirmationAnalytics() {
       <SmartRecommendations
         orders={filteredOrders.map(o => ({
           agent_id: o.agent_id || '',
+          original_agent_id: o.original_agent_id || null,
           confirmation_status: o.confirmation_status,
           delivery_status: o.delivery_status,
           created_at: o.created_at,
+          assigned_at: o.assigned_at || null,
+          confirmed_at: o.confirmed_at || null,
           attempt_count: o.attempt_count ?? 0,
           postpone_date: o.postpone_date,
-        })).filter(o => o.agent_id !== '')}
+        })).filter(o => o.agent_id !== '' || o.original_agent_id !== null)}
         orderHistory={orderHistory}
         calls={callsData}
         profileNameMap={profileNameMap}
