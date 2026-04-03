@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { KPICard } from "@/components/KPICard";
-import { Phone, CheckCircle2, PhoneCall, Clock, XCircle, AlertTriangle, Truck, Users, ShoppingCart, Loader2, Timer, Hourglass } from "lucide-react";
+import { Phone, CheckCircle2, PhoneCall, Clock, XCircle, AlertTriangle, Truck, Users, ShoppingCart, Loader2, Timer, Hourglass, ClipboardCheck, MousePointerClick } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";
@@ -117,25 +117,37 @@ export default function ConfirmationAnalytics() {
     return filtered;
   }, [orders, agentFilter, sellerFilter, productFilter, dateRange]);
 
-  // Stats — same formulas as before, mapped to real DB statuses
+  // Stats
   const stats = useMemo(() => {
     const total = filteredOrders.length;
     const confirmed = filteredOrders.filter(o => o.confirmation_status === "confirmed").length;
     const cancelled = filteredOrders.filter(o => o.confirmation_status === "cancelled").length;
-    const answered = filteredOrders.filter(o => ["confirmed", "cancelled", "reported"].includes(o.confirmation_status) || o.postpone_date !== null).length;
     const postponed = filteredOrders.filter(o => o.postpone_date !== null).length;
     const delivered = filteredOrders.filter(o => o.delivery_status === "delivered").length;
     const shipped = filteredOrders.filter(o => o.delivery_status && ["shipped", "pending", "delivered"].includes(o.delivery_status)).length;
 
+    // Treated = orders where agent took action (status changed from new: no_answer, confirmed, cancelled, postponed, double, wrong_number)
+    const treated = filteredOrders.filter(o => o.confirmation_status !== "new" && (o.agent_id || o.original_agent_id)).length;
+
+    // Claimed = orders that were claimed (assigned to agent) AND status was changed
+    const claimed = filteredOrders.filter(o => (o.agent_id || o.original_agent_id) && o.confirmation_status !== "new").length;
+
+    // Confirmation rate from claimed orders
+    const confirmationRate = claimed > 0 ? Math.round((confirmed / claimed) * 100) : 0;
+
+    const answered = filteredOrders.filter(o => ["confirmed", "cancelled", "reported"].includes(o.confirmation_status) || o.postpone_date !== null).length;
+
     return {
       total,
       confirmed,
-      confirmationRate: answered > 0 ? Math.round((confirmed / answered) * 100) : 0,
+      treated,
+      claimed,
+      confirmationRate,
       answeredRate: total > 0 ? Math.round((answered / total) * 100) : 0,
       cancelled,
-      cancelledRate: total > 0 ? Math.round((cancelled / total) * 100) : 0,
+      cancelledRate: claimed > 0 ? Math.round((cancelled / claimed) * 100) : 0,
       postponed,
-      postponedRate: total > 0 ? Math.round((postponed / total) * 100) : 0,
+      postponedRate: claimed > 0 ? Math.round((postponed / claimed) * 100) : 0,
       delivered,
       deliveredRate: shipped > 0 ? Math.round((delivered / shipped) * 100) : 0,
     };
@@ -358,15 +370,16 @@ export default function ConfirmationAnalytics() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
         <KPICard title="Total Orders" value={stats.total} icon={ShoppingCart} iconBg="bg-primary/10" iconColor="text-primary" delay={0} />
-        <KPICard title="Confirmed" value={stats.confirmed} subtitle={`${stats.confirmationRate}% rate`} icon={CheckCircle2} iconBg="bg-success/10" iconColor="text-success" delay={50} />
-        <KPICard title="Answered Rate" value={`${stats.answeredRate}%`} icon={PhoneCall} iconBg="bg-primary/10" iconColor="text-primary" delay={100} />
-        <KPICard title="Cancelled" value={stats.cancelled} subtitle={`${stats.cancelledRate}% rate`} icon={XCircle} iconBg="bg-destructive/10" iconColor="text-destructive" delay={150} />
-        <KPICard title="Reported (Postponed)" value={stats.postponed} subtitle={`${stats.postponedRate}% rate`} icon={AlertTriangle} iconBg="bg-warning/10" iconColor="text-warning" delay={200} />
-        <KPICard title="Delivered" value={stats.delivered} subtitle={`${stats.deliveredRate}% delivery rate`} icon={Truck} iconBg="bg-success/10" iconColor="text-success" delay={250} />
-        <KPICard title="First Call Avg" value={timeStats.firstCallAvg} icon={Timer} iconBg="bg-accent/10" iconColor="text-accent-foreground" delay={300} />
-        <KPICard title="Handling Time" value={timeStats.handlingTime} icon={Hourglass} iconBg="bg-accent/10" iconColor="text-accent-foreground" delay={350} />
+        <KPICard title="Treated Orders" value={stats.treated} subtitle={`${stats.total > 0 ? Math.round((stats.treated / stats.total) * 100) : 0}% of total`} icon={ClipboardCheck} iconBg="bg-accent/10" iconColor="text-accent-foreground" delay={50} />
+        <KPICard title="Claimed Orders" value={stats.claimed} subtitle={`${stats.total > 0 ? Math.round((stats.claimed / stats.total) * 100) : 0}% of total`} icon={MousePointerClick} iconBg="bg-primary/10" iconColor="text-primary" delay={100} />
+        <KPICard title="Confirmed" value={stats.confirmed} subtitle={`${stats.confirmationRate}% of claimed`} icon={CheckCircle2} iconBg="bg-success/10" iconColor="text-success" delay={150} />
+        <KPICard title="Cancelled" value={stats.cancelled} subtitle={`${stats.cancelledRate}% of claimed`} icon={XCircle} iconBg="bg-destructive/10" iconColor="text-destructive" delay={200} />
+        <KPICard title="Postponed" value={stats.postponed} subtitle={`${stats.postponedRate}% of claimed`} icon={AlertTriangle} iconBg="bg-warning/10" iconColor="text-warning" delay={250} />
+        <KPICard title="Delivered" value={stats.delivered} subtitle={`${stats.deliveredRate}% delivery rate`} icon={Truck} iconBg="bg-success/10" iconColor="text-success" delay={300} />
+        <KPICard title="First Call Avg" value={timeStats.firstCallAvg} icon={Timer} iconBg="bg-accent/10" iconColor="text-accent-foreground" delay={350} />
+        <KPICard title="Handling Time" value={timeStats.handlingTime} icon={Hourglass} iconBg="bg-accent/10" iconColor="text-accent-foreground" delay={400} />
       </div>
 
       {/* Daily Confirmation Report */}
