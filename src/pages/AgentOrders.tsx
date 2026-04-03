@@ -236,6 +236,7 @@ const AgentOrders = () => {
       .select("id", { count: "exact", head: true })
       .eq("confirmation_status", "no_answer")
       .is("agent_id", null)
+      .eq("original_agent_id", authUser.id)
       .lt("attempt_count", NO_ANSWER_MAX_ATTEMPTS);
     if (productNames) noAnswerQuery = noAnswerQuery.in("product_name", productNames);
     const { count: noAnswerCount } = await noAnswerQuery;
@@ -245,6 +246,7 @@ const AgentOrders = () => {
       .select("id", { count: "exact", head: true })
       .eq("confirmation_status", "postponed")
       .is("agent_id", null)
+      .eq("original_agent_id", authUser.id)
       .lte("postpone_date", nowIso);
     if (productNames) postponedQuery = postponedQuery.in("product_name", productNames);
     const { count: postponedCount } = await postponedQuery;
