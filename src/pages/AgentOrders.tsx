@@ -308,6 +308,19 @@ const AgentOrders = () => {
       });
     }
 
+    let duplicateGroup: DbOrder[] | undefined;
+    if (orderType === "duplicate" && authUser) {
+      // Fetch all orders in this duplicate group (same phone + product, assigned to this agent)
+      const { data: groupOrders } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("agent_id", authUser.id)
+        .eq("customer_phone", resolvedOrder.customer_phone)
+        .eq("product_name", resolvedOrder.product_name)
+        .eq("confirmation_status", "new");
+      duplicateGroup = (groupOrders as DbOrder[]) || [];
+    }
+
     return {
       ...resolvedOrder,
       _isFollowUp: orderType === "postponed" || orderType === "no_answer",
@@ -315,6 +328,7 @@ const AgentOrders = () => {
         ? !!resolvedOrder.original_agent_id && resolvedOrder.original_agent_id !== authUser?.id
         : false,
       _isDuplicate: orderType === "duplicate",
+      _duplicateGroup: duplicateGroup,
     };
   }, [authUser?.id, fetchFreshAssignedOrder]);
 
