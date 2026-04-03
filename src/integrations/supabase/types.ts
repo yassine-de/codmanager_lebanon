@@ -382,30 +382,39 @@ export type Database = {
       }
       order_history: {
         Row: {
+          action_type: string
+          attempt_number: number | null
           changed_by: string
           changed_by_role: string
           created_at: string
           field_changed: string
+          group_id: string | null
           id: string
           new_value: string | null
           old_value: string | null
           order_id: string
         }
         Insert: {
+          action_type?: string
+          attempt_number?: number | null
           changed_by: string
           changed_by_role: string
           created_at?: string
           field_changed: string
+          group_id?: string | null
           id?: string
           new_value?: string | null
           old_value?: string | null
           order_id: string
         }
         Update: {
+          action_type?: string
+          attempt_number?: number | null
           changed_by?: string
           changed_by_role?: string
           created_at?: string
           field_changed?: string
+          group_id?: string | null
           id?: string
           new_value?: string | null
           old_value?: string | null

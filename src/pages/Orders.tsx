@@ -239,6 +239,7 @@ export default function Orders() {
       return;
     }
 
+    const bulkGroupId = crypto.randomUUID();
     const historyEntries = selected.map(o => ({
       order_id: o.id,
       changed_by: authUser?.id,
@@ -246,8 +247,10 @@ export default function Orders() {
       field_changed: field,
       old_value: field === "confirmation_status" ? o.confirmationStatus : o.deliveryStatus,
       new_value: newValue,
+      action_type: "status_change",
+      group_id: bulkGroupId,
     }));
-    await supabase.from("order_history").insert(historyEntries);
+    await supabase.from("order_history").insert(historyEntries as any);
 
     toast.success(`${selected.length} orders updated`);
     setSelectedOrders(new Set());
@@ -901,6 +904,7 @@ export default function Orders() {
             }
 
             // Track history
+            const editGroupId = crypto.randomUUID();
             const historyEntries: any[] = [];
             const trackChange = (field: string, oldVal: any, newVal: any) => {
               if (String(oldVal ?? '') !== String(newVal ?? '')) {
@@ -911,6 +915,8 @@ export default function Orders() {
                   field_changed: field,
                   old_value: String(oldVal ?? ''),
                   new_value: String(newVal ?? ''),
+                  action_type: 'edit',
+                  group_id: editGroupId,
                 });
               }
             };

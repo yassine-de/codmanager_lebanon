@@ -611,16 +611,26 @@ const AgentOrders = () => {
 
       if (updateError) throw updateError;
 
-      const historyEntries: { order_id: string; changed_by: string; changed_by_role: string; field_changed: string; old_value: string | null; new_value: string | null }[] = [];
+      // Determine action_type and group_id for history
+      const groupId = crypto.randomUUID();
+      const newAttemptCount = currentOrder.attempt_count + (selectedStatus === "no_answer" ? 1 : 0);
+      const finalStatus = newAttemptCount >= NO_ANSWER_MAX_ATTEMPTS && selectedStatus === "no_answer" ? "unreachable" : selectedStatus;
+      let actionType = "edit";
+      if (selectedStatus === "no_answer" || finalStatus === "unreachable") actionType = "retry";
+      else if (selectedStatus === "cancelled") actionType = "cancel";
+      else if (selectedStatus === "postponed") actionType = "postpone";
+      else if (selectedStatus !== currentOrder.confirmation_status) actionType = "status_change";
+
+      const historyEntries: { order_id: string; changed_by: string; changed_by_role: string; field_changed: string; old_value: string | null; new_value: string | null; action_type: string; attempt_number: number | null; group_id: string }[] = [];
       const trackChange = (field: string, oldVal: any, newVal: any) => {
         const oldStr = oldVal != null ? String(oldVal) : null;
         const newStr = newVal != null ? String(newVal) : null;
         if (oldStr !== newStr) {
-          historyEntries.push({ order_id: currentOrder.order_id, changed_by: authUser.id, changed_by_role: "agent", field_changed: field, old_value: oldStr, new_value: newStr });
+          historyEntries.push({ order_id: currentOrder.order_id, changed_by: authUser.id, changed_by_role: "agent", field_changed: field, old_value: oldStr, new_value: newStr, action_type: actionType, attempt_number: actionType === "retry" ? newAttemptCount : null, group_id: groupId });
         }
       };
 
-      trackChange("confirmation_status", currentOrder.confirmation_status, selectedStatus);
+      trackChange("confirmation_status", currentOrder.confirmation_status, finalStatus);
       trackChange("customer_name", currentOrder.customer_name, editCustomer.name);
       trackChange("customer_phone", currentOrder.customer_phone, editCustomer.phone);
       trackChange("customer_city", currentOrder.customer_city, editCustomer.city);
@@ -632,7 +642,10 @@ const AgentOrders = () => {
       if (selectedStatus === "confirmed") trackChange("delivery_status", currentOrder.delivery_status, shippingStatus === "shipped" ? "shipped" : "pending");
       if (selectedStatus === "cancelled") trackChange("cancel_reason", currentOrder.cancel_reason, cancelReason === "other" ? note.trim() : cancelReason);
       if (note.trim() && note.trim() !== (currentOrder.note || "")) trackChange("note", currentOrder.note, note.trim());
-      if (selectedStatus === "postponed" && postponeNote.trim()) trackChange("postpone_note", currentOrder.postpone_note, postponeNote.trim());
+      if (selectedStatus === "postponed") {
+        if (postponeNote.trim()) trackChange("postpone_note", currentOrder.postpone_note, postponeNote.trim());
+        if (updateData.postpone_date) trackChange("postpone_date", currentOrder.postpone_date, updateData.postpone_date);
+      }
 
       // Audit log for manual pricing
       if (isManualPrice && manualTotal !== autoTotal) {
@@ -643,11 +656,14 @@ const AgentOrders = () => {
           field_changed: "manual_price",
           old_value: String(autoTotal),
           new_value: String(manualTotal),
+          action_type: "pricing",
+          attempt_number: null,
+          group_id: groupId,
         });
       }
 
       if (historyEntries.length > 0) {
-        await supabase.from("order_history").insert(historyEntries);
+        await supabase.from("order_history").insert(historyEntries as any);
       }
 
       toast.success(`Order ${currentOrder.order_id} → ${selectedStatus.toUpperCase()} ✅`, {
