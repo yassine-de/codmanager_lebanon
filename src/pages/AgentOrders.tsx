@@ -436,6 +436,7 @@ const AgentOrders = () => {
   }, [authUser, resetForm]);
 
   const loadNextOrder = useCallback(async () => {
+    if (claiming) return; // prevent double invocation
     clearActiveOrderState();
     setClaiming(true);
 
@@ -458,7 +459,16 @@ const AgentOrders = () => {
     } finally {
       setClaiming(false);
     }
-  }, [clearActiveOrderState, claimNextAvailableOrder, initOrderState, refreshAvailableCounts]);
+  }, [claiming, clearActiveOrderState, claimNextAvailableOrder, initOrderState, refreshAvailableCounts]);
+
+  // Auto-release order at 6 minutes
+  useEffect(() => {
+    if (orderElapsedSec >= ORDER_AUTO_RELEASE_SEC && currentOrder && authUser) {
+      toast.warning(`Order ${currentOrder.order_id} auto-released — took too long`);
+      supabase.rpc("release_order_lock" as any, { p_order_id: currentOrder.id, p_agent_id: authUser.id });
+      loadNextOrder();
+    }
+  }, [orderElapsedSec]);
 
   const handleStart = async () => {
     setLoading(true);
