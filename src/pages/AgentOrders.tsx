@@ -1204,7 +1204,26 @@ const AgentOrders = () => {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={postponeDate} onSelect={setPostponeDate} disabled={(d) => d < new Date()} className="p-3 pointer-events-auto" />
+                      <Calendar mode="single" selected={postponeDate} onSelect={(date) => {
+                        setPostponeDate(date);
+                        // If today is selected, auto-set time to now + 30 min
+                        if (date) {
+                          const now = new Date();
+                          const isToday = date.toDateString() === now.toDateString();
+                          if (isToday) {
+                            const future = new Date(now.getTime() + 30 * 60000);
+                            let h = future.getHours();
+                            const m = future.getMinutes();
+                            const ampm = h >= 12 ? "PM" : "AM";
+                            h = h % 12 || 12;
+                            setPostponeTime(`${h}:${String(m).padStart(2, "0")} ${ampm}`);
+                          }
+                        }
+                      }} disabled={(d) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        return d < today;
+                      }} className="p-3 pointer-events-auto" />
                     </PopoverContent>
                   </Popover>
                   <div className="space-y-1">
