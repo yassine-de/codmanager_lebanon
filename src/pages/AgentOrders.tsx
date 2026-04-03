@@ -465,7 +465,8 @@ const AgentOrders = () => {
 
   // Auto-release order at 6 minutes
   useEffect(() => {
-    if (orderElapsedSec >= ORDER_AUTO_RELEASE_SEC && currentOrder && authUser) {
+    if (orderElapsedSec >= ORDER_AUTO_RELEASE_SEC && currentOrder && authUser && !releasedRef.current) {
+      releasedRef.current = true;
       toast.warning(`Order ${currentOrder.order_id} auto-released — took too long`);
       supabase.rpc("release_order_lock" as any, { p_order_id: currentOrder.id, p_agent_id: authUser.id });
       loadNextOrder();
