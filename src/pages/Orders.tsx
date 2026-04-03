@@ -904,6 +904,7 @@ export default function Orders() {
             }
 
             // Track history
+            const editGroupId = crypto.randomUUID();
             const historyEntries: any[] = [];
             const trackChange = (field: string, oldVal: any, newVal: any) => {
               if (String(oldVal ?? '') !== String(newVal ?? '')) {
@@ -914,6 +915,8 @@ export default function Orders() {
                   field_changed: field,
                   old_value: String(oldVal ?? ''),
                   new_value: String(newVal ?? ''),
+                  action_type: 'edit',
+                  group_id: editGroupId,
                 });
               }
             };
