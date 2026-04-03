@@ -379,7 +379,7 @@ const AgentOrders = () => {
     setCurrentOrder(order);
     currentOrderRef.current = order;
 
-    if (authUser && order.confirmation_status === "new") {
+    if (authUser) {
       supabase.rpc("touch_order_lock" as any, { p_order_id: order.id, p_agent_id: authUser.id });
     }
 
