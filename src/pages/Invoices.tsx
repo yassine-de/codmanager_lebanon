@@ -304,8 +304,9 @@ export default function Invoices() {
       const shippingFees = shippable.reduce((sum, o) => sum + calcShippingFee(getProductWeightKg(inv.seller_id, o.product_name), o.quantity, rates), 0);
       
       // Call center fees (already in USD)
+      // Dropped = ALL orders for this seller in system (not just invoice-linked)
       const confirmedCount = orders.filter(o => o.confirmation_status === "confirmed").length;
-      const droppedCount = orders.length;
+      const droppedCount = totalOrdersCountMap[inv.seller_id] || orders.length;
       const callCenterFees = (confirmedCount * ccRates.confirmedRate) + (droppedCount * ccRates.droppedRate);
       
       // COD fees (percentage of USD revenue)
