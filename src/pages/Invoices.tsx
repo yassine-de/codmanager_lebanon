@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { pkrToUsd, formatUSD, USD_TO_PKR } from "@/lib/currency";
+import { calculateInvoiceSummary, calcShippingFee as calcShipFee } from "@/lib/invoice-utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ interface DbInvoice {
   paid_at: string | null;
   paid_by: string | null;
   payment_proof_url: string | null;
+  previous_balance: number;
 }
 
 interface DbAddon {
@@ -50,15 +52,7 @@ interface DbAddon {
   created_at: string;
 }
 
-function calcShippingFee(weightKg: number | null, qty: number, rates: { rate_1kg: number; rate_2kg: number; rate_3kg: number; rate_3kg_plus?: number } | null): number {
-  if (!rates || !weightKg || weightKg <= 0) return 0;
-  const totalWeight = weightKg * qty;
-  const rounded = Math.ceil(totalWeight);
-  if (rounded <= 1) return rates.rate_1kg;
-  if (rounded <= 2) return rates.rate_2kg;
-  if (rounded <= 3) return rates.rate_3kg;
-  return rates.rate_3kg_plus ?? rates.rate_3kg;
-}
+// Shipping fee calculation now imported from @/lib/invoice-utils
 
 export default function Invoices() {
   const { t } = useLanguage();
@@ -143,7 +137,7 @@ export default function Invoices() {
     enabled: invoiceIds.length > 0,
   });
 
-  // No more virtual drafts - DB trigger auto-creates draft invoices
+  // DB trigger auto-creates open invoices
   const loadingDrafts = false;
 
   // Fetch all seller profiles
@@ -277,7 +271,7 @@ export default function Invoices() {
     return productWeightMap[`${sellerId}|${productName}`] ?? null;
   };
 
-  // Compute invoice summaries (all invoices including drafts from DB)
+  // Compute invoice summaries using centralized calculation engine
   const invoiceSummaries = useMemo(() => {
     const ordersByInvoice: Record<string, typeof invoiceOrders> = {};
     invoiceOrders.forEach(o => {
@@ -288,54 +282,40 @@ export default function Invoices() {
 
     return invoices.map(inv => {
       const orders = ordersByInvoice[inv.id] || [];
-      const rates = sellerRatesMap[inv.seller_id] || null;
       const ccRates = callCenterRatesMap[inv.seller_id] || { confirmedRate: 0, droppedRate: 0 };
-      
-      // Delivered orders → revenue in USD
-      const delivered = orders.filter(o => o.delivery_status === "delivered");
-      const deliveredRevenuePKR = delivered.reduce((sum, o) => sum + (o.price * o.quantity), 0);
-      const deliveredRevenueUSD = pkrToUsd(deliveredRevenuePKR);
-      
-      // Shipping: only shipped orders
-      const shippable = orders.filter(o => o.delivery_status === "shipped");
-      const shippingFees = shippable.reduce((sum, o) => sum + calcShippingFee(getProductWeightKg(inv.seller_id, o.product_name), o.quantity, rates), 0);
-      
-      // Call center fees (already in USD)
-      // Dropped = ALL orders for this seller in system (not just invoice-linked)
-      const confirmedCount = orders.filter(o => o.confirmation_status === "confirmed").length;
-      const droppedCount = totalOrdersCountMap[inv.seller_id] || orders.length;
-      const callCenterFees = (confirmedCount * ccRates.confirmedRate) + (droppedCount * ccRates.droppedRate);
-      
-      // COD fees (percentage of USD revenue)
-      const codPct = (codFeeMap[inv.seller_id] ?? 5) / 100;
-      const codFees = deliveredRevenueUSD * codPct;
-      
-      // Addons (already in USD)
-      const addons = addonsByInvoice[inv.id] || [];
-      const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
-      
-      const totalDeductions = shippingFees + callCenterFees + codFees;
-      const netPayable = deliveredRevenueUSD - totalDeductions + addonNet;
-      
+
+      const summary = calculateInvoiceSummary({
+        orders,
+        totalSellerOrders: totalOrdersCountMap[inv.seller_id] || orders.length,
+        shippingRates: sellerRatesMap[inv.seller_id] || null,
+        confirmedRate: ccRates.confirmedRate,
+        droppedRate: ccRates.droppedRate,
+        codFeePercentage: codFeeMap[inv.seller_id] ?? 5,
+        addons: addonsByInvoice[inv.id] || [],
+        previousBalance: inv.previous_balance ?? 0,
+        getProductWeight: (name) => getProductWeightKg(inv.seller_id, name),
+      });
+
       return {
         ...inv,
         ordersCount: orders.length,
-        deliveredCount: delivered.length,
-        totalAmountPKR: deliveredRevenueUSD,
-        shippingFees,
-        callCenterFees,
-        codFees,
-        addonNet,
-        netPayable,
+        deliveredCount: summary.deliveredCount,
+        totalAmountPKR: summary.deliveredRevenueUSD,
+        shippingFees: summary.shippingFees,
+        callCenterFees: summary.callCenterFees,
+        codFees: summary.codFees,
+        addonNet: summary.addonNet,
+        previousBalance: summary.previousBalance,
+        netPayable: summary.netPayable,
         sellerName: sellerNameMap[inv.seller_id] || inv.seller_id.slice(0, 8),
       };
     });
   }, [invoices, invoiceOrders, sellerRatesMap, callCenterRatesMap, addonsByInvoice, sellerNameMap, productWeightMap, codFeeMap, totalOrdersCountMap]);
 
-  // All invoices as rows (no more virtual drafts)
+  // All invoices as rows
   const combined = useMemo(() => {
     return invoiceSummaries
-      .filter(inv => isSeller ? inv.status !== "draft" : true)
+      .filter(inv => isSeller ? inv.status !== "open" : true)
       .map(inv => ({ type: "invoice" as const, data: inv }));
   }, [invoiceSummaries, isSeller]);
 
@@ -390,7 +370,7 @@ export default function Invoices() {
     } as any);
   };
 
-  // Finalize draft invoice → mark as ready
+  // Finalize open invoice → mark as ready (freeze orders, create new open invoice)
   const finalizeMutation = useMutation({
     mutationFn: async (invoiceId: string) => {
       const { error } = await supabase
@@ -398,7 +378,24 @@ export default function Invoices() {
         .update({ status: "ready", finalized_at: new Date().toISOString() } as any)
         .eq("id", invoiceId);
       if (error) throw error;
-      await logInvoiceHistory(invoiceId, "status_change", "status", "draft", "ready");
+      await logInvoiceHistory(invoiceId, "status_change", "status", "open", "ready");
+
+      // Auto-create a new open invoice for this seller
+      const inv = invoices.find(i => i.id === invoiceId);
+      if (inv) {
+        const { data: existingOpen } = await supabase
+          .from("invoices")
+          .select("id")
+          .eq("seller_id", inv.seller_id)
+          .eq("status", "open")
+          .limit(1)
+          .single();
+        if (!existingOpen) {
+          await supabase
+            .from("invoices")
+            .insert({ seller_id: inv.seller_id, status: "open" } as any);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
@@ -423,48 +420,40 @@ export default function Invoices() {
         .eq("id", invoiceId);
       if (error) throw error;
       await logInvoiceHistory(invoiceId, "status_change", "status", currentStatus, newStatus);
-      if (!isPaid) {
-        await logInvoiceHistory(invoiceId, "status_change", "paid_at", null, new Date().toISOString());
 
-        // If netPayable is negative, carry over to next draft invoice as addon
-        if (netPayable !== undefined && netPayable < 0 && sellerId) {
-          const carryAmount = Math.abs(netPayable);
+      // When marking as paid: carry negative balance to next open invoice
+      if (!isPaid && netPayable !== undefined && netPayable < 0 && sellerId) {
+        const carryAmount = netPayable; // negative value
 
-          // Find or create a draft invoice for this seller (exclude current one)
-          const { data: existingDraft } = await supabase
+        // Find or create open invoice for this seller
+        const { data: existingOpen } = await supabase
+          .from("invoices")
+          .select("id")
+          .eq("seller_id", sellerId)
+          .eq("status", "open")
+          .neq("id", invoiceId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        let targetInvoiceId: string;
+        if (existingOpen) {
+          targetInvoiceId = existingOpen.id;
+        } else {
+          const { data: newInv, error: newErr } = await supabase
             .from("invoices")
+            .insert({ seller_id: sellerId, status: "open" } as any)
             .select("id")
-            .eq("seller_id", sellerId)
-            .eq("status", "draft")
-            .neq("id", invoiceId)
-            .order("created_at", { ascending: false })
-            .limit(1)
             .single();
-
-          let targetInvoiceId: string;
-          if (existingDraft) {
-            targetInvoiceId = existingDraft.id;
-          } else {
-            const { data: newInv, error: newErr } = await supabase
-              .from("invoices")
-              .insert({ seller_id: sellerId, status: "draft" } as any)
-              .select("id")
-              .single();
-            if (newErr) throw newErr;
-            targetInvoiceId = newInv.id;
-          }
-
-          // Add the negative carry-over as an "out" addon
-          const { error: addonErr } = await supabase
-            .from("invoice_addons")
-            .insert({
-              invoice_id: targetInvoiceId,
-              type: "out",
-              amount: carryAmount,
-              reason: `From last invoice (${invoiceId.slice(0, 8)})`,
-            } as any);
-          if (addonErr) throw addonErr;
+          if (newErr) throw newErr;
+          targetInvoiceId = newInv.id;
         }
+
+        // Set previous_balance on the next open invoice
+        await supabase
+          .from("invoices")
+          .update({ previous_balance: carryAmount } as any)
+          .eq("id", targetInvoiceId);
       }
     },
     onSuccess: () => {
@@ -475,14 +464,14 @@ export default function Invoices() {
     },
   });
 
-  // Toggle ready (un-ready a ready invoice → revert to draft)
+  // Toggle ready (un-ready a ready invoice → revert to open)
   const toggleReadyMutation = useMutation({
     mutationFn: async ({ invoiceId, currentStatus }: { invoiceId: string; currentStatus: string }) => {
       if (currentStatus === "ready") {
-        await logInvoiceHistory(invoiceId, "status_change", "status", "ready", "draft");
+        await logInvoiceHistory(invoiceId, "status_change", "status", "ready", "open");
         const { error } = await supabase
           .from("invoices")
-          .update({ status: "draft", finalized_at: null } as any)
+          .update({ status: "open", finalized_at: null } as any)
           .eq("id", invoiceId);
         if (error) throw error;
       }
@@ -490,11 +479,11 @@ export default function Invoices() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoice-orders-summary"] });
-      toast.success("Invoice reverted to draft");
+      toast.success("Invoice reverted to open");
     },
   });
 
-  // No more finalizeAndAddonMutation - addons can be added directly to DB draft invoices
+  // Addons can be added directly to open invoices
 
   // Add addon
   const addAddonMutation = useMutation({
@@ -535,7 +524,7 @@ export default function Invoices() {
     setDetailSellerRates(sellerRatesMap[inv.seller_id] || null);
     setDetailSellerId(inv.seller_id);
     setDetailInvoiceId(inv.id);
-    setDetailInvoiceNumber(inv.status === "draft" ? "Draft Invoice" : inv.invoice_number);
+    setDetailInvoiceNumber(inv.status === "open" ? "Open Invoice" : inv.invoice_number);
     setDetailIsDraft(false);
     setDetailDraftOrders([]);
   };
@@ -626,7 +615,7 @@ export default function Invoices() {
                 value={statusFilter}
                 onValueChange={v => { setStatusFilter(v); setCurrentPage(1); }}
                 options={[
-                  ...(isSeller ? [] : [{ value: "draft", label: "📝 Draft" }]),
+                  ...(isSeller ? [] : [{ value: "open", label: "📝 Open" }]),
                   { value: "ready", label: "✅ Ready" },
                   { value: "paid", label: "💰 Paid" },
                 ]}
@@ -677,11 +666,11 @@ export default function Invoices() {
                 paginated.map((row) => {
                   const inv = row.data;
                   const proofUrl = inv.payment_proof_url;
-                  const isDraft = inv.status === "draft";
+                  const isOpen = inv.status === "open";
                   return (
-                    <TableRow key={inv.id} className={`text-xs ${isDraft ? "bg-warning/5 hover:bg-warning/10" : ""}`}>
-                      <TableCell className={`font-semibold ${isDraft ? "text-warning" : "text-primary"}`}>
-                        {isDraft ? "Draft" : inv.invoice_number}
+                    <TableRow key={inv.id} className={`text-xs ${isOpen ? "bg-warning/5 hover:bg-warning/10" : ""}`}>
+                      <TableCell className={`font-semibold ${isOpen ? "text-warning" : "text-primary"}`}>
+                        {isOpen ? "Open" : inv.invoice_number}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-[11px]">{format(new Date(inv.created_at), "dd MMM yyyy")}</TableCell>
                       {!isSeller && (
@@ -704,12 +693,12 @@ export default function Invoices() {
                       <TableCell className="text-right tabular-nums font-bold text-success">{formatUSD(inv.netPayable)}</TableCell>
                       {!isSeller && (
                         <TableCell className="text-center">
-                          <Switch
+                         <Switch
                             checked={inv.status === "ready" || inv.status === "paid"}
                             onCheckedChange={() => {
                               if (inv.status === "ready") {
                                 toggleReadyMutation.mutate({ invoiceId: inv.id, currentStatus: inv.status });
-                              } else if (inv.status === "draft") {
+                              } else if (inv.status === "open") {
                                 finalizeMutation.mutate(inv.id);
                               }
                             }}
@@ -719,7 +708,7 @@ export default function Invoices() {
                         </TableCell>
                       )}
                       <TableCell className="text-center">
-                      {inv.status === "draft" && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning bg-warning/10">Draft</Badge>}
+                      {inv.status === "open" && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning bg-warning/10">Open</Badge>}
                         {inv.status === "ready" && <Badge variant="outline" className="text-[10px] border-info/30 text-info bg-info/10">Ready</Badge>}
                         {inv.status === "paid" && <Badge variant="outline" className="text-[10px] border-success/30 text-success bg-success/10">Paid</Badge>}
                       </TableCell>
@@ -955,6 +944,7 @@ export default function Invoices() {
         codFeePercentage={codFeeMap[detailSellerId] ?? 5}
         confirmedRate={callCenterRatesMap[detailSellerId]?.confirmedRate ?? 0}
         droppedRate={callCenterRatesMap[detailSellerId]?.droppedRate ?? 0}
+        previousBalance={invoiceSummaries.find(i => i.id === detailInvoiceId)?.previousBalance ?? 0}
         isDraft={detailIsDraft}
         draftOrders={detailDraftOrders}
       />

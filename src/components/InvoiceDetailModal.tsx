@@ -3,11 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Package, Truck, Phone, CreditCard, ArrowDownCircle, ArrowUpCircle, BarChart3, ArrowUpDown } from "lucide-react";
-import { formatUSD, formatPKR, pkrToUsd } from "@/lib/currency";
+import { Loader2, Package, Truck, Phone, CreditCard, ArrowDownCircle, ArrowUpCircle, BarChart3, ArrowUpDown, Wallet } from "lucide-react";
+import { formatUSD, pkrToUsd } from "@/lib/currency";
 import { InvoiceOrdersTable } from "@/components/invoice/InvoiceOrdersTable";
-import { calcShippingFee } from "@/components/invoice/InvoiceShippedTable";
-
+import { calculateInvoiceSummary, calcShippingFee } from "@/lib/invoice-utils";
 
 interface Props {
   open: boolean;
@@ -20,6 +19,7 @@ interface Props {
   codFeePercentage?: number;
   confirmedRate?: number;
   droppedRate?: number;
+  previousBalance?: number;
   isDraft?: boolean;
   draftOrders?: any[];
 }
@@ -27,8 +27,9 @@ interface Props {
 export function InvoiceDetailModal({
   open, onOpenChange, invoiceId, invoiceNumber, sellerName, sellerId,
   sellerRates, codFeePercentage = 5, confirmedRate = 0, droppedRate = 0,
-  isDraft, draftOrders
+  previousBalance = 0, isDraft, draftOrders
 }: Props) {
+  // Fetch invoice orders
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["invoice-detail-orders", invoiceId],
     queryFn: async () => {
@@ -47,6 +48,7 @@ export function InvoiceDetailModal({
   const displayOrders = isDraft ? (draftOrders || []) : orders;
   const resolvedSellerId = sellerId || (displayOrders.length > 0 ? displayOrders[0].seller_id : null);
 
+  // Fetch products for weight info
   const { data: products = [] } = useQuery({
     queryKey: ["products-for-invoice-detail", resolvedSellerId],
     queryFn: async () => {
@@ -67,6 +69,7 @@ export function InvoiceDetailModal({
     return map;
   }, [products]);
 
+  // Fetch addons
   const { data: addons = [] } = useQuery({
     queryKey: ["invoice-addons-detail", invoiceId],
     queryFn: async () => {
@@ -82,7 +85,7 @@ export function InvoiceDetailModal({
     enabled: !!invoiceId && open,
   });
 
-  // Fetch approved adjustments for this invoice
+  // Fetch approved adjustments
   const { data: invoiceAdjustments = [] } = useQuery({
     queryKey: ["invoice-adjustments-detail", invoiceId],
     queryFn: async () => {
@@ -99,7 +102,7 @@ export function InvoiceDetailModal({
     enabled: !!invoiceId && open,
   });
 
-  // Fetch ALL orders for this seller (dropped = total orders in system)
+  // Fetch ALL orders for this seller (for call center dropped count)
   const { data: allSellerOrders = [] } = useQuery({
     queryKey: ["all-seller-orders-count", resolvedSellerId],
     queryFn: async () => {
@@ -114,40 +117,30 @@ export function InvoiceDetailModal({
     enabled: !!resolvedSellerId && open,
   });
 
-  // Categorize orders
-  const deliveredOrders = displayOrders.filter(o => o.delivery_status === "delivered");
-  const shippableOrders = displayOrders.filter(o => o.delivery_status === "shipped");
-  const confirmedOrders = displayOrders.filter(o => o.confirmation_status === "confirmed");
-  // Dropped = ALL orders for this seller in system
-  const droppedOrders = allSellerOrders;
-
-  // Revenue
-  const deliveredRevenuePKR = deliveredOrders.reduce((sum, o) => sum + (o.price * o.quantity), 0);
-  const deliveredRevenueUSD = pkrToUsd(deliveredRevenuePKR);
-
-  // Shipping
-  const totalShippingFees = shippableOrders.reduce((sum, o) => {
-    const wKg = productWeightMap[o.product_name] ?? null;
-    return sum + calcShippingFee(wKg, o.quantity, sellerRates);
-  }, 0);
-
-  // Call center
-  const confirmedFees = confirmedOrders.length * confirmedRate;
-  const droppedFees = droppedOrders.length * droppedRate;
-  const totalCallCenterFees = confirmedFees + droppedFees;
-
-  // COD — 5% of USD revenue
-  const codFeesTotal = deliveredRevenueUSD * (codFeePercentage / 100);
-
-  // Addons
-  const addonNet = addons.reduce((sum, a) => a.type === "out" ? sum - a.amount : sum + a.amount, 0);
-
-  // Adjustments net
+  // Use centralized calculation engine
   const adjustmentNet = invoiceAdjustments.reduce((sum, a) => sum + pkrToUsd(a.difference), 0);
 
-  // Final — all in USD
-  const totalDeductions = totalShippingFees + totalCallCenterFees + codFeesTotal;
-  const netPayable = deliveredRevenueUSD - totalDeductions + addonNet + adjustmentNet;
+  const summary = useMemo(() => {
+    return calculateInvoiceSummary({
+      orders: displayOrders,
+      totalSellerOrders: allSellerOrders.length || displayOrders.length,
+      shippingRates: sellerRates,
+      confirmedRate,
+      droppedRate,
+      codFeePercentage,
+      addons,
+      previousBalance,
+      getProductWeight: (name) => productWeightMap[name] ?? null,
+    });
+  }, [displayOrders, allSellerOrders, sellerRates, confirmedRate, droppedRate, codFeePercentage, addons, previousBalance, productWeightMap]);
+
+  // Final net includes adjustments
+  const netPayable = summary.netPayable + adjustmentNet;
+
+  // Categorize orders for display
+  const deliveredOrders = displayOrders.filter(o => o.delivery_status === "delivered");
+  const shippedOrders = displayOrders.filter(o => o.delivery_status === "shipped");
+  const confirmedOrders = displayOrders.filter(o => o.confirmation_status === "confirmed");
 
   const SectionHeader = ({ icon: Icon, title, color, count }: { icon: any; title: string; color: string; count?: number }) => (
     <div className="flex items-center gap-2 px-4 py-2.5 border-b border-t bg-muted/30">
@@ -167,7 +160,7 @@ export function InvoiceDetailModal({
             <Package className="h-4 w-4 text-primary" />
             {invoiceNumber}
             <span className="text-xs font-normal text-muted-foreground">— {sellerName}</span>
-            {isDraft && <span className="text-[10px] bg-warning/20 text-warning px-1.5 py-0.5 rounded font-semibold">DRAFT</span>}
+            {isDraft && <span className="text-[10px] bg-warning/20 text-warning px-1.5 py-0.5 rounded font-semibold">OPEN</span>}
           </DialogTitle>
         </DialogHeader>
 
@@ -180,19 +173,19 @@ export function InvoiceDetailModal({
             <div className="text-center py-16 text-muted-foreground text-xs">No orders in this invoice.</div>
           ) : (
             <div>
-              {/* SECTION 1: DELIVERED ORDERS DETAIL TABLE */}
-              <SectionHeader icon={Package} title="Delivered Orders Details" color="text-success" count={deliveredOrders.length} />
+              {/* SECTION 1: DELIVERED ORDERS (listed individually) */}
+              <SectionHeader icon={Package} title="Delivered Orders" color="text-success" count={deliveredOrders.length} />
               <InvoiceOrdersTable orders={deliveredOrders} productWeightMap={productWeightMap} />
 
-              {/* SECTION 2: SHIPPED ORDERS — SUMMARY ONLY */}
-              <SectionHeader icon={Truck} title="Shipping Fees" color="text-info" count={shippableOrders.length} />
+              {/* SECTION 2: SHIPPING FEES (summary only — count × rate by weight bracket) */}
+              <SectionHeader icon={Truck} title="Shipping Fees" color="text-info" count={shippedOrders.length} />
               <div className="px-4 py-2 space-y-1">
                 {(() => {
                   const brackets: Record<string, { count: number; fee: number }> = {
                     "≤1 KG": { count: 0, fee: 0 }, "≤2 KG": { count: 0, fee: 0 },
                     "≤3 KG": { count: 0, fee: 0 }, ">3 KG": { count: 0, fee: 0 },
                   };
-                  shippableOrders.forEach(o => {
+                  shippedOrders.forEach(o => {
                     const wKg = productWeightMap[o.product_name] ?? null;
                     const fee = calcShippingFee(wKg, o.quantity, sellerRates);
                     const total = wKg ? Math.ceil(wKg * o.quantity) : 0;
@@ -208,24 +201,24 @@ export function InvoiceDetailModal({
                 })()}
                 <div className="border-t pt-1 mt-1 flex justify-between text-xs font-bold">
                   <span>Total Shipping</span>
-                  <span className="tabular-nums text-destructive">-{formatUSD(totalShippingFees)}</span>
+                  <span className="tabular-nums text-destructive">-{formatUSD(summary.shippingFees)}</span>
                 </div>
               </div>
 
-              {/* SECTION 3: CALL CENTER — SUMMARY ONLY */}
-              <SectionHeader icon={Phone} title="Call Center Fees" color="text-warning" count={confirmedOrders.length + droppedOrders.length} />
+              {/* SECTION 3: CALL CENTER FEES (summary only) */}
+              <SectionHeader icon={Phone} title="Call Center Fees" color="text-warning" count={confirmedOrders.length + allSellerOrders.length} />
               <div className="px-4 py-2 space-y-1">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Confirmed orders ({confirmedOrders.length} × {formatUSD(confirmedRate)})</span>
                   <span className="tabular-nums font-semibold text-destructive">-{formatUSD(confirmedOrders.length * confirmedRate)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Dropped orders ({droppedOrders.length} × {formatUSD(droppedRate)})</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(droppedOrders.length * droppedRate)}</span>
+                  <span className="text-muted-foreground">Dropped orders ({allSellerOrders.length} × {formatUSD(droppedRate)})</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(allSellerOrders.length * droppedRate)}</span>
                 </div>
                 <div className="border-t pt-1 mt-1 flex justify-between text-xs font-bold">
                   <span>Total Call Center</span>
-                  <span className="tabular-nums text-destructive">-{formatUSD(totalCallCenterFees)}</span>
+                  <span className="tabular-nums text-destructive">-{formatUSD(summary.callCenterFees)}</span>
                 </div>
               </div>
 
@@ -233,8 +226,8 @@ export function InvoiceDetailModal({
               <SectionHeader icon={CreditCard} title={`COD Fees (${codFeePercentage}%)`} color="text-orange-500" />
               <div className="px-4 py-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">{codFeePercentage}% of delivered revenue ({formatUSD(deliveredRevenueUSD)})</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(codFeesTotal)}</span>
+                  <span className="text-muted-foreground">{codFeePercentage}% of delivered revenue ({formatUSD(summary.deliveredRevenueUSD)})</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(summary.codFees)}</span>
                 </div>
               </div>
 
@@ -258,7 +251,7 @@ export function InvoiceDetailModal({
                 </>
               )}
 
-              {/* ADJUSTMENTS SECTION */}
+              {/* ADJUSTMENTS */}
               {invoiceAdjustments.length > 0 && (
                 <>
                   <SectionHeader icon={ArrowUpDown} title="Adjustments" color="text-orange-500" count={invoiceAdjustments.length} />
@@ -279,31 +272,31 @@ export function InvoiceDetailModal({
                 </>
               )}
 
-              {/* SECTION 5: FINAL SUMMARY */}
+              {/* FINAL SUMMARY */}
               <SectionHeader icon={BarChart3} title="Final Summary" color="text-primary" />
               <div className="py-3 px-4 space-y-1.5">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Total Delivered Revenue</span>
-                  <span className="tabular-nums font-semibold text-success">{formatUSD(deliveredRevenueUSD)}</span>
+                  <span className="tabular-nums font-semibold text-success">{formatUSD(summary.deliveredRevenueUSD)}</span>
                 </div>
                 <div className="border-t my-1" />
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Shipping Fees</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(totalShippingFees)}</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(summary.shippingFees)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">COD Fees</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(codFeesTotal)}</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(summary.codFees)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Call Center Fees</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(totalCallCenterFees)}</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(summary.callCenterFees)}</span>
                 </div>
-                {addonNet !== 0 && (
+                {summary.addonNet !== 0 && (
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Addons</span>
-                    <span className={`tabular-nums font-semibold ${addonNet >= 0 ? "text-success" : "text-destructive"}`}>
-                      {addonNet >= 0 ? "+" : ""}{formatUSD(addonNet)}
+                    <span className={`tabular-nums font-semibold ${summary.addonNet >= 0 ? "text-success" : "text-destructive"}`}>
+                      {summary.addonNet >= 0 ? "+" : ""}{formatUSD(summary.addonNet)}
                     </span>
                   </div>
                 )}
@@ -312,6 +305,16 @@ export function InvoiceDetailModal({
                     <span className="text-muted-foreground">Adjustments</span>
                     <span className={`tabular-nums font-semibold ${adjustmentNet >= 0 ? "text-success" : "text-destructive"}`}>
                       {adjustmentNet >= 0 ? "+" : ""}{formatUSD(adjustmentNet)}
+                    </span>
+                  </div>
+                )}
+                {previousBalance !== 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <Wallet className="h-3 w-3" /> Previous Balance
+                    </span>
+                    <span className={`tabular-nums font-semibold ${previousBalance >= 0 ? "text-success" : "text-destructive"}`}>
+                      {previousBalance >= 0 ? "+" : ""}{formatUSD(previousBalance)}
                     </span>
                   </div>
                 )}
