@@ -153,6 +153,29 @@ export default function Invoices() {
     return [...ids];
   }, [invoices]);
 
+  // Fetch TOTAL orders per seller (for dropped orders = all orders in system)
+  const { data: totalOrdersPerSeller = [] } = useQuery({
+    queryKey: ["total-orders-per-seller", allSellerIds],
+    queryFn: async () => {
+      if (allSellerIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("orders")
+        .select("seller_id, id")
+        .in("seller_id", allSellerIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: allSellerIds.length > 0,
+  });
+
+  const totalOrdersCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    totalOrdersPerSeller.forEach(o => {
+      map[o.seller_id] = (map[o.seller_id] || 0) + 1;
+    });
+    return map;
+  }, [totalOrdersPerSeller]);
+
   const { data: sellerProfiles = [] } = useQuery({
     queryKey: ["seller-profiles-invoices", allSellerIds],
     queryFn: async () => {
@@ -281,8 +304,9 @@ export default function Invoices() {
       const shippingFees = shippable.reduce((sum, o) => sum + calcShippingFee(getProductWeightKg(inv.seller_id, o.product_name), o.quantity, rates), 0);
       
       // Call center fees (already in USD)
+      // Dropped = ALL orders for this seller in system (not just invoice-linked)
       const confirmedCount = orders.filter(o => o.confirmation_status === "confirmed").length;
-      const droppedCount = orders.length;
+      const droppedCount = totalOrdersCountMap[inv.seller_id] || orders.length;
       const callCenterFees = (confirmedCount * ccRates.confirmedRate) + (droppedCount * ccRates.droppedRate);
       
       // COD fees (percentage of USD revenue)
@@ -309,7 +333,7 @@ export default function Invoices() {
         sellerName: sellerNameMap[inv.seller_id] || inv.seller_id.slice(0, 8),
       };
     });
-  }, [invoices, invoiceOrders, sellerRatesMap, callCenterRatesMap, addonsByInvoice, sellerNameMap, productWeightMap, codFeeMap]);
+  }, [invoices, invoiceOrders, sellerRatesMap, callCenterRatesMap, addonsByInvoice, sellerNameMap, productWeightMap, codFeeMap, totalOrdersCountMap]);
 
   // All invoices as rows (no more virtual drafts)
   const combined = useMemo(() => {
