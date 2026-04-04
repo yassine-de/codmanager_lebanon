@@ -153,6 +153,29 @@ export default function Invoices() {
     return [...ids];
   }, [invoices]);
 
+  // Fetch TOTAL orders per seller (for dropped orders = all orders in system)
+  const { data: totalOrdersPerSeller = [] } = useQuery({
+    queryKey: ["total-orders-per-seller", allSellerIds],
+    queryFn: async () => {
+      if (allSellerIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("orders")
+        .select("seller_id, id")
+        .in("seller_id", allSellerIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: allSellerIds.length > 0,
+  });
+
+  const totalOrdersCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    totalOrdersPerSeller.forEach(o => {
+      map[o.seller_id] = (map[o.seller_id] || 0) + 1;
+    });
+    return map;
+  }, [totalOrdersPerSeller]);
+
   const { data: sellerProfiles = [] } = useQuery({
     queryKey: ["seller-profiles-invoices", allSellerIds],
     queryFn: async () => {
