@@ -7,8 +7,8 @@ import {
   Loader2, ChevronLeft, ChevronRight, Package, Download, Printer
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { pkrToUsd, formatUSD, USD_TO_PKR } from "@/lib/currency";
-import { calculateInvoiceSummary, calcShippingFee as calcShipFee } from "@/lib/invoice-utils";
+import { formatUSD } from "@/lib/currency";
+import { fetchInvoiceSummary, type InvoiceSummaryResponse } from "@/lib/invoice-summary";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -43,17 +43,6 @@ interface DbInvoice {
   previous_balance: number;
 }
 
-interface DbAddon {
-  id: string;
-  invoice_id: string;
-  type: string;
-  amount: number;
-  reason: string;
-  created_at: string;
-}
-
-// Shipping fee calculation now imported from @/lib/invoice-utils
-
 export default function Invoices() {
   const { t } = useLanguage();
   const { authUser } = useAuth();
@@ -72,10 +61,6 @@ export default function Invoices() {
   const [detailInvoiceId, setDetailInvoiceId] = useState<string | null>(null);
   const [detailInvoiceNumber, setDetailInvoiceNumber] = useState("");
   const [detailSellerName, setDetailSellerName] = useState("");
-  const [detailSellerRates, setDetailSellerRates] = useState<any>(null);
-  const [detailIsDraft, setDetailIsDraft] = useState(false);
-  const [detailSellerId, setDetailSellerId] = useState<string>("");
-  const [detailDraftOrders, setDetailDraftOrders] = useState<any[]>([]);
 
   // Addon dialog
   const [addonInvoiceId, setAddonInvoiceId] = useState<string | null>(null);
@@ -99,46 +84,18 @@ export default function Invoices() {
     },
   });
 
-  // Fetch addons for all invoices
   const invoiceIds = useMemo(() => invoices.map(i => i.id), [invoices]);
-  const { data: allAddons = [] } = useQuery({
-    queryKey: ["invoice-addons", invoiceIds],
+  const { data: invoiceSummaryMap = {}, isLoading: loadingSummaries } = useQuery({
+    queryKey: ["invoice-summaries", invoiceIds],
     queryFn: async () => {
-      if (invoiceIds.length === 0) return [];
-      const { data, error } = await supabase.from("invoice_addons").select("*").in("invoice_id", invoiceIds);
-      if (error) throw error;
-      return data as DbAddon[];
+      if (invoiceIds.length === 0) return {} as Record<string, InvoiceSummaryResponse>;
+      const summaries = await Promise.all(
+        invoiceIds.map(async (invoiceId) => [invoiceId, await fetchInvoiceSummary(invoiceId)] as const)
+      );
+      return Object.fromEntries(summaries) as Record<string, InvoiceSummaryResponse>;
     },
     enabled: invoiceIds.length > 0,
   });
-
-  // Group addons by invoice
-  const addonsByInvoice = useMemo(() => {
-    const map: Record<string, DbAddon[]> = {};
-    allAddons.forEach(a => {
-      if (!map[a.invoice_id]) map[a.invoice_id] = [];
-      map[a.invoice_id].push(a);
-    });
-    return map;
-  }, [allAddons]);
-
-  // Fetch orders with invoice_id to compute totals (need more fields now)
-  const { data: invoiceOrders = [] } = useQuery({
-    queryKey: ["invoice-orders-summary", invoiceIds],
-    queryFn: async () => {
-      if (invoiceIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("orders")
-        .select("id, invoice_id, price, quantity, product_name, seller_id, confirmation_status, delivery_status")
-        .in("invoice_id", invoiceIds);
-      if (error) throw error;
-      return data;
-    },
-    enabled: invoiceIds.length > 0,
-  });
-
-  // DB trigger auto-creates open invoices
-  const loadingDrafts = false;
 
   // Fetch all seller profiles
   const allSellerIds = useMemo(() => {
@@ -146,29 +103,6 @@ export default function Invoices() {
     invoices.forEach(i => ids.add(i.seller_id));
     return [...ids];
   }, [invoices]);
-
-  // Fetch TOTAL orders per seller (for dropped orders = all orders in system)
-  const { data: totalOrdersPerSeller = [] } = useQuery({
-    queryKey: ["total-orders-per-seller", allSellerIds],
-    queryFn: async () => {
-      if (allSellerIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("orders")
-        .select("seller_id, id")
-        .in("seller_id", allSellerIds);
-      if (error) throw error;
-      return data;
-    },
-    enabled: allSellerIds.length > 0,
-  });
-
-  const totalOrdersCountMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    totalOrdersPerSeller.forEach(o => {
-      map[o.seller_id] = (map[o.seller_id] || 0) + 1;
-    });
-    return map;
-  }, [totalOrdersPerSeller]);
 
   const { data: sellerProfiles = [] } = useQuery({
     queryKey: ["seller-profiles-invoices", allSellerIds],
@@ -186,131 +120,25 @@ export default function Invoices() {
     sellerProfiles.forEach(p => { map[p.user_id] = p.name; });
     return map;
   }, [sellerProfiles]);
-
-  // Fetch seller rates (shipping)
-  const { data: sellerRatesData = [] } = useQuery({
-    queryKey: ["seller-rates-invoices", allSellerIds],
-    queryFn: async () => {
-      if (allSellerIds.length === 0) return [];
-      const { data, error } = await supabase.from("seller_rates").select("*").in("user_id", allSellerIds);
-      if (error) throw error;
-      return data;
-    },
-    enabled: allSellerIds.length > 0,
-  });
-
-  const sellerRatesMap = useMemo(() => {
-    const map: Record<string, { rate_1kg: number; rate_2kg: number; rate_3kg: number; rate_3kg_plus: number }> = {};
-    sellerRatesData.forEach(r => { map[r.user_id] = { rate_1kg: r.rate_1kg, rate_2kg: r.rate_2kg, rate_3kg: r.rate_3kg, rate_3kg_plus: (r as any).rate_3kg_plus ?? 6 }; });
-    return map;
-  }, [sellerRatesData]);
-
-  // Fetch rate_settings for COD fee + call center rates per seller
-  const { data: rateSettingsData = [] } = useQuery({
-    queryKey: ["rate-settings-invoices", allSellerIds],
-    queryFn: async () => {
-      if (allSellerIds.length === 0) return [];
-      const { data, error } = await supabase.from("rate_settings").select("seller_id, cod_fee_per_delivery, confirmed_order_rate, dropped_order_rate, is_global");
-      if (error) throw error;
-      return data;
-    },
-    enabled: allSellerIds.length > 0,
-  });
-
-  const codFeeMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    const globalRate = rateSettingsData.find(r => r.is_global && !r.seller_id);
-    const globalCod = globalRate?.cod_fee_per_delivery ?? 5;
-    allSellerIds.forEach(id => {
-      const sellerRate = rateSettingsData.find(r => r.seller_id === id);
-      map[id] = sellerRate ? sellerRate.cod_fee_per_delivery : globalCod;
-    });
-    return map;
-  }, [rateSettingsData, allSellerIds]);
-
-  const callCenterRatesMap = useMemo(() => {
-    const map: Record<string, { confirmedRate: number; droppedRate: number }> = {};
-    const globalRate = rateSettingsData.find(r => r.is_global && !r.seller_id);
-    const gConfirmed = globalRate?.confirmed_order_rate ?? 0;
-    const gDropped = globalRate?.dropped_order_rate ?? 0;
-    allSellerIds.forEach(id => {
-      const sellerRate = rateSettingsData.find(r => r.seller_id === id);
-      map[id] = {
-        confirmedRate: sellerRate ? sellerRate.confirmed_order_rate : gConfirmed,
-        droppedRate: sellerRate ? sellerRate.dropped_order_rate : gDropped,
-      };
-    });
-    return map;
-  }, [rateSettingsData, allSellerIds]);
-
-  // Fetch products to get weight_kg info
-  const { data: allProducts = [] } = useQuery({
-    queryKey: ["products-for-invoices", allSellerIds],
-    queryFn: async () => {
-      if (allSellerIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("products")
-        .select("name, seller_id, weight_kg")
-        .in("seller_id", allSellerIds);
-      if (error) throw error;
-      return data as { name: string; seller_id: string; weight_kg: number | null }[];
-    },
-    enabled: allSellerIds.length > 0,
-  });
-
-  // Map: "sellerId|productName" -> weight_kg
-  const productWeightMap = useMemo(() => {
-    const map: Record<string, number | null> = {};
-    allProducts.forEach(p => {
-      map[`${p.seller_id}|${p.name}`] = p.weight_kg;
-    });
-    return map;
-  }, [allProducts]);
-
-  const getProductWeightKg = (sellerId: string, productName: string): number | null => {
-    return productWeightMap[`${sellerId}|${productName}`] ?? null;
-  };
-
-  // Compute invoice summaries using centralized calculation engine
   const invoiceSummaries = useMemo(() => {
-    const ordersByInvoice: Record<string, typeof invoiceOrders> = {};
-    invoiceOrders.forEach(o => {
-      const key = o.invoice_id!;
-      if (!ordersByInvoice[key]) ordersByInvoice[key] = [];
-      ordersByInvoice[key].push(o);
-    });
-
     return invoices.map(inv => {
-      const orders = ordersByInvoice[inv.id] || [];
-      const ccRates = callCenterRatesMap[inv.seller_id] || { confirmedRate: 0, droppedRate: 0 };
-
-      const summary = calculateInvoiceSummary({
-        orders,
-        totalSellerOrders: totalOrdersCountMap[inv.seller_id] || orders.length,
-        shippingRates: sellerRatesMap[inv.seller_id] || null,
-        confirmedRate: ccRates.confirmedRate,
-        droppedRate: ccRates.droppedRate,
-        codFeePercentage: codFeeMap[inv.seller_id] ?? 5,
-        addons: addonsByInvoice[inv.id] || [],
-        previousBalance: inv.previous_balance ?? 0,
-        getProductWeight: (name) => getProductWeightKg(inv.seller_id, name),
-      });
+      const summary = invoiceSummaryMap[inv.id];
 
       return {
         ...inv,
-        ordersCount: orders.length,
-        deliveredCount: summary.deliveredCount,
-        totalAmountPKR: summary.deliveredRevenueUSD,
-        shippingFees: summary.shippingFees,
-        callCenterFees: summary.callCenterFees,
-        codFees: summary.codFees,
-        addonNet: summary.addonNet,
-        previousBalance: summary.previousBalance,
-        netPayable: summary.netPayable,
+        ordersCount: summary?.counts.total_orders_count ?? 0,
+        deliveredCount: summary?.counts.delivered_count ?? 0,
+        totalAmountPKR: summary?.totals.delivered_revenue_usd ?? 0,
+        shippingFees: summary?.totals.shipping_fees ?? 0,
+        callCenterFees: summary?.totals.call_center_fees ?? 0,
+        codFees: summary?.totals.cod_fees ?? 0,
+        addonNet: summary?.totals.addon_net ?? 0,
+        previousBalance: summary?.totals.previous_balance ?? inv.previous_balance ?? 0,
+        netPayable: summary?.totals.net_payable ?? 0,
         sellerName: sellerNameMap[inv.seller_id] || inv.seller_id.slice(0, 8),
       };
     });
-  }, [invoices, invoiceOrders, sellerRatesMap, callCenterRatesMap, addonsByInvoice, sellerNameMap, productWeightMap, codFeeMap, totalOrdersCountMap]);
+  }, [invoices, invoiceSummaryMap, sellerNameMap]);
 
   // All invoices as rows
   const combined = useMemo(() => {
@@ -399,7 +227,8 @@ export default function Invoices() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["invoice-orders-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-summaries"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-summary"] });
       toast.success("Invoice finalized and sent to seller");
     },
     onError: () => toast.error("Failed to finalize invoice"),
@@ -458,8 +287,8 @@ export default function Invoices() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["invoice-addons"] });
-      queryClient.invalidateQueries({ queryKey: ["invoice-orders-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-summaries"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-summary"] });
       toast.success("Payment status updated");
     },
   });
@@ -478,7 +307,8 @@ export default function Invoices() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["invoice-orders-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-summaries"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-summary"] });
       toast.success("Invoice reverted to open");
     },
   });
@@ -492,7 +322,8 @@ export default function Invoices() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["invoice-addons"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-summaries"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-summary"] });
       setAddonInvoiceId(null);
       setAddonAmount("");
       setAddonReason("");
@@ -521,12 +352,8 @@ export default function Invoices() {
 
   const openDetail = (inv: typeof invoiceSummaries[0]) => {
     setDetailSellerName(sellerNameMap[inv.seller_id] || "—");
-    setDetailSellerRates(sellerRatesMap[inv.seller_id] || null);
-    setDetailSellerId(inv.seller_id);
     setDetailInvoiceId(inv.id);
     setDetailInvoiceNumber(inv.status === "open" ? "Open Invoice" : inv.invoice_number);
-    setDetailIsDraft(false);
-    setDetailDraftOrders([]);
   };
 
   const handleReset = () => {
@@ -534,7 +361,7 @@ export default function Invoices() {
     setDatePreset("maximum"); setDateRange(undefined); setCurrentPage(1);
   };
 
-  if (loadingInvoices || loadingDrafts) {
+  if (loadingInvoices || loadingSummaries) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -934,19 +761,11 @@ export default function Invoices() {
 
       {/* Detail Modal */}
       <InvoiceDetailModal
-        open={detailInvoiceId !== null || detailIsDraft}
-        onOpenChange={open => { if (!open) { setDetailInvoiceId(null); setDetailIsDraft(false); } }}
+        open={detailInvoiceId !== null}
+        onOpenChange={open => { if (!open) { setDetailInvoiceId(null); } }}
         invoiceId={detailInvoiceId}
         invoiceNumber={detailInvoiceNumber}
         sellerName={detailSellerName}
-        sellerId={detailSellerId}
-        sellerRates={detailSellerRates}
-        codFeePercentage={codFeeMap[detailSellerId] ?? 5}
-        confirmedRate={callCenterRatesMap[detailSellerId]?.confirmedRate ?? 0}
-        droppedRate={callCenterRatesMap[detailSellerId]?.droppedRate ?? 0}
-        previousBalance={invoiceSummaries.find(i => i.id === detailInvoiceId)?.previousBalance ?? 0}
-        isDraft={detailIsDraft}
-        draftOrders={detailDraftOrders}
       />
 
       {/* History Modal */}
