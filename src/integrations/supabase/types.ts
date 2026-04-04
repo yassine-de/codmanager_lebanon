@@ -1259,6 +1259,7 @@ export type Database = {
           confirmed_count: number
         }[]
       }
+      get_invoice_summary: { Args: { p_invoice_id: string }; Returns: Json }
       get_user_permissions: { Args: { _user_id: string }; Returns: string[] }
       get_user_role: {
         Args: { _user_id: string }

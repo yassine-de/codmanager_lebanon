@@ -1,12 +1,10 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Package, Truck, Phone, CreditCard, ArrowDownCircle, ArrowUpCircle, BarChart3, ArrowUpDown, Wallet } from "lucide-react";
-import { formatUSD, pkrToUsd } from "@/lib/currency";
+import { formatUSD } from "@/lib/currency";
 import { InvoiceOrdersTable } from "@/components/invoice/InvoiceOrdersTable";
-import { calculateInvoiceSummary, calcShippingFee } from "@/lib/invoice-utils";
+import { fetchInvoiceSummary } from "@/lib/invoice-summary";
 
 interface Props {
   open: boolean;
@@ -14,133 +12,29 @@ interface Props {
   invoiceId: string | null;
   invoiceNumber: string;
   sellerName: string;
-  sellerId?: string;
-  sellerRates: { rate_1kg: number; rate_2kg: number; rate_3kg: number; rate_3kg_plus?: number } | null;
-  codFeePercentage?: number;
-  confirmedRate?: number;
-  droppedRate?: number;
-  previousBalance?: number;
-  isDraft?: boolean;
-  draftOrders?: any[];
 }
 
 export function InvoiceDetailModal({
-  open, onOpenChange, invoiceId, invoiceNumber, sellerName, sellerId,
-  sellerRates, codFeePercentage = 5, confirmedRate = 0, droppedRate = 0,
-  previousBalance = 0, isDraft, draftOrders
+  open, onOpenChange, invoiceId, invoiceNumber, sellerName,
 }: Props) {
-  // Fetch invoice orders
-  const { data: orders = [], isLoading } = useQuery({
-    queryKey: ["invoice-detail-orders", invoiceId],
+  const { data: summary, isLoading } = useQuery({
+    queryKey: ["invoice-summary", invoiceId],
     queryFn: async () => {
-      if (!invoiceId) return [];
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("invoice_id", invoiceId)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!invoiceId && !isDraft,
-  });
-
-  const displayOrders = isDraft ? (draftOrders || []) : orders;
-  const resolvedSellerId = sellerId || (displayOrders.length > 0 ? displayOrders[0].seller_id : null);
-
-  // Fetch products for weight info
-  const { data: products = [] } = useQuery({
-    queryKey: ["products-for-invoice-detail", resolvedSellerId],
-    queryFn: async () => {
-      if (!resolvedSellerId) return [];
-      const { data, error } = await supabase
-        .from("products")
-        .select("name, weight_kg")
-        .eq("seller_id", resolvedSellerId);
-      if (error) throw error;
-      return data as { name: string; weight_kg: number | null }[];
-    },
-    enabled: !!resolvedSellerId && open,
-  });
-
-  const productWeightMap = useMemo(() => {
-    const map: Record<string, number | null> = {};
-    products.forEach(p => { map[p.name] = p.weight_kg; });
-    return map;
-  }, [products]);
-
-  // Fetch addons
-  const { data: addons = [] } = useQuery({
-    queryKey: ["invoice-addons-detail", invoiceId],
-    queryFn: async () => {
-      if (!invoiceId) return [];
-      const { data, error } = await supabase
-        .from("invoice_addons")
-        .select("*")
-        .eq("invoice_id", invoiceId)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return data as { id: string; type: string; amount: number; reason: string }[];
+      if (!invoiceId) return null;
+      return fetchInvoiceSummary(invoiceId);
     },
     enabled: !!invoiceId && open,
   });
 
-  // Fetch approved adjustments
-  const { data: invoiceAdjustments = [] } = useQuery({
-    queryKey: ["invoice-adjustments-detail", invoiceId],
-    queryFn: async () => {
-      if (!invoiceId) return [];
-      const { data, error } = await supabase
-        .from("invoice_adjustments")
-        .select("*")
-        .eq("applied_invoice_id", invoiceId)
-        .eq("status", "approved")
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return data as { id: string; order_id: string; difference: number; reason: string; old_status: string; new_status: string }[];
-    },
-    enabled: !!invoiceId && open,
-  });
-
-  // Fetch ALL orders for this seller (for call center dropped count)
-  const { data: allSellerOrders = [] } = useQuery({
-    queryKey: ["all-seller-orders-count", resolvedSellerId],
-    queryFn: async () => {
-      if (!resolvedSellerId) return [];
-      const { data, error } = await supabase
-        .from("orders")
-        .select("id, order_id, confirmation_status")
-        .eq("seller_id", resolvedSellerId);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!resolvedSellerId && open,
-  });
-
-  // Use centralized calculation engine
-  const adjustmentNet = invoiceAdjustments.reduce((sum, a) => sum + pkrToUsd(a.difference), 0);
-
-  const summary = useMemo(() => {
-    return calculateInvoiceSummary({
-      orders: displayOrders,
-      totalSellerOrders: allSellerOrders.length || displayOrders.length,
-      shippingRates: sellerRates,
-      confirmedRate,
-      droppedRate,
-      codFeePercentage,
-      addons,
-      previousBalance,
-      getProductWeight: (name) => productWeightMap[name] ?? null,
-    });
-  }, [displayOrders, allSellerOrders, sellerRates, confirmedRate, droppedRate, codFeePercentage, addons, previousBalance, productWeightMap]);
-
-  // Final net includes adjustments
-  const netPayable = summary.netPayable + adjustmentNet;
-
-  // Categorize orders for display
-  const deliveredOrders = displayOrders.filter(o => o.delivery_status === "delivered");
-  const shippedOrders = displayOrders.filter(o => o.delivery_status === "shipped");
-  const confirmedOrders = displayOrders.filter(o => o.confirmation_status === "confirmed");
+  const deliveredOrders = summary?.delivered_orders ?? [];
+  const shippingBreakdown = summary?.shipping_breakdown ?? [];
+  const addons = summary?.addons ?? [];
+  const invoiceAdjustments = summary?.adjustments ?? [];
+  const counts = summary?.counts;
+  const totals = summary?.totals;
+  const rates = summary?.rates;
+  const callCenterBreakdown = summary?.call_center_breakdown;
+  const productWeightMap = Object.fromEntries(deliveredOrders.map((order) => [order.product_name, order.weight_kg ?? null]));
 
   const SectionHeader = ({ icon: Icon, title, color, count }: { icon: any; title: string; color: string; count?: number }) => (
     <div className="flex items-center gap-2 px-4 py-2.5 border-b border-t bg-muted/30">
@@ -160,7 +54,7 @@ export function InvoiceDetailModal({
             <Package className="h-4 w-4 text-primary" />
             {invoiceNumber}
             <span className="text-xs font-normal text-muted-foreground">— {sellerName}</span>
-            {isDraft && <span className="text-[10px] bg-warning/20 text-warning px-1.5 py-0.5 rounded font-semibold">OPEN</span>}
+            {summary?.invoice.status === "open" && <span className="text-[10px] bg-warning/20 text-warning px-1.5 py-0.5 rounded font-semibold">OPEN</span>}
           </DialogTitle>
         </DialogHeader>
 
@@ -169,65 +63,52 @@ export function InvoiceDetailModal({
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : displayOrders.length === 0 ? (
+          ) : deliveredOrders.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground text-xs">No orders in this invoice.</div>
           ) : (
             <div>
               {/* SECTION 1: DELIVERED ORDERS (listed individually) */}
-              <SectionHeader icon={Package} title="Delivered Orders" color="text-success" count={deliveredOrders.length} />
+              <SectionHeader icon={Package} title="Delivered Orders" color="text-success" count={counts?.delivered_count ?? 0} />
               <InvoiceOrdersTable orders={deliveredOrders} productWeightMap={productWeightMap} />
 
               {/* SECTION 2: SHIPPING FEES (summary only — count × rate by weight bracket) */}
-              <SectionHeader icon={Truck} title="Shipping Fees" color="text-info" count={shippedOrders.length} />
+              <SectionHeader icon={Truck} title="Shipping Fees" color="text-info" count={counts?.shipped_count ?? 0} />
               <div className="px-4 py-2 space-y-1">
-                {(() => {
-                  const brackets: Record<string, { count: number; fee: number }> = {
-                    "≤1 KG": { count: 0, fee: 0 }, "≤2 KG": { count: 0, fee: 0 },
-                    "≤3 KG": { count: 0, fee: 0 }, ">3 KG": { count: 0, fee: 0 },
-                  };
-                  shippedOrders.forEach(o => {
-                    const wKg = productWeightMap[o.product_name] ?? null;
-                    const fee = calcShippingFee(wKg, o.quantity, sellerRates);
-                    const total = wKg ? Math.ceil(wKg * o.quantity) : 0;
-                    const key = total <= 1 ? "≤1 KG" : total <= 2 ? "≤2 KG" : total <= 3 ? "≤3 KG" : ">3 KG";
-                    if (total > 0) { brackets[key].count++; brackets[key].fee += fee; }
-                  });
-                  return Object.entries(brackets).filter(([, d]) => d.count > 0).map(([bracket, data]) => (
-                    <div key={bracket} className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">{bracket} × {data.count} orders</span>
-                      <span className="tabular-nums font-semibold text-destructive">-{formatUSD(data.fee)}</span>
-                    </div>
-                  ));
-                })()}
+                {shippingBreakdown.map((item) => (
+                  <div key={item.bracket} className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">{item.bracket} × {item.count} orders</span>
+                    <span className="tabular-nums font-semibold text-destructive">-{formatUSD(item.fee)}</span>
+                  </div>
+                ))}
                 <div className="border-t pt-1 mt-1 flex justify-between text-xs font-bold">
                   <span>Total Shipping</span>
-                  <span className="tabular-nums text-destructive">-{formatUSD(summary.shippingFees)}</span>
+                  <span className="tabular-nums text-destructive">-{formatUSD(totals?.shipping_fees ?? 0)}</span>
                 </div>
               </div>
 
               {/* SECTION 3: CALL CENTER FEES (summary only) */}
-              <SectionHeader icon={Phone} title="Call Center Fees" color="text-warning" count={confirmedOrders.length + allSellerOrders.length} />
+              <SectionHeader icon={Phone} title="Call Center Fees" color="text-warning" count={counts?.total_orders_count ?? 0} />
               <div className="px-4 py-2 space-y-1">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Confirmed orders ({confirmedOrders.length} × {formatUSD(confirmedRate)})</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(confirmedOrders.length * confirmedRate)}</span>
+                  <span className="text-muted-foreground">Confirmed orders ({callCenterBreakdown?.confirmed_count ?? 0} × {formatUSD(callCenterBreakdown?.confirmed_rate ?? 0)})</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(callCenterBreakdown?.confirmed_fees ?? 0)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Dropped orders ({allSellerOrders.length} × {formatUSD(droppedRate)})</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(allSellerOrders.length * droppedRate)}</span>
+                  <span className="text-muted-foreground">Dropped orders ({callCenterBreakdown?.dropped_count ?? 0} × {formatUSD(callCenterBreakdown?.dropped_rate ?? 0)})</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(callCenterBreakdown?.dropped_fees ?? 0)}</span>
                 </div>
                 <div className="border-t pt-1 mt-1 flex justify-between text-xs font-bold">
                   <span>Total Call Center</span>
-                  <span className="tabular-nums text-destructive">-{formatUSD(summary.callCenterFees)}</span>
+                  <span className="tabular-nums text-destructive">-{formatUSD(totals?.call_center_fees ?? 0)}</span>
                 </div>
               </div>
 
               {/* SECTION 4: COD FEES */}
-              <SectionHeader icon={CreditCard} title={`COD Fees (${codFeePercentage}%)`} color="text-orange-500" />
+              <SectionHeader icon={CreditCard} title={`COD Fees (${rates?.cod_fee_percentage ?? 0}%)`} color="text-orange-500" />
               <div className="px-4 py-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">{codFeePercentage}% of delivered revenue ({formatUSD(summary.deliveredRevenueUSD)})</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(summary.codFees)}</span>
+                  <span className="text-muted-foreground">{rates?.cod_fee_percentage ?? 0}% of delivered revenue ({formatUSD(totals?.delivered_revenue_usd ?? 0)})</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(totals?.cod_fees ?? 0)}</span>
                 </div>
               </div>
 
@@ -263,8 +144,8 @@ export function InvoiceDetailModal({
                           <span className="font-mono">{adj.order_id}</span>
                           <span className="text-muted-foreground/60">({adj.old_status} → {adj.new_status})</span>
                         </span>
-                        <span className={`font-semibold tabular-nums ${adj.difference >= 0 ? "text-success" : "text-destructive"}`}>
-                          {adj.difference >= 0 ? "+" : ""}{formatUSD(pkrToUsd(adj.difference))}
+                        <span className={`font-semibold tabular-nums ${adj.difference_usd >= 0 ? "text-success" : "text-destructive"}`}>
+                          {adj.difference_usd >= 0 ? "+" : ""}{formatUSD(adj.difference_usd)}
                         </span>
                       </div>
                     ))}
@@ -277,52 +158,52 @@ export function InvoiceDetailModal({
               <div className="py-3 px-4 space-y-1.5">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Total Delivered Revenue</span>
-                  <span className="tabular-nums font-semibold text-success">{formatUSD(summary.deliveredRevenueUSD)}</span>
+                  <span className="tabular-nums font-semibold text-success">{formatUSD(totals?.delivered_revenue_usd ?? 0)}</span>
                 </div>
                 <div className="border-t my-1" />
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Shipping Fees</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(summary.shippingFees)}</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(totals?.shipping_fees ?? 0)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">COD Fees</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(summary.codFees)}</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(totals?.cod_fees ?? 0)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Call Center Fees</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(summary.callCenterFees)}</span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(totals?.call_center_fees ?? 0)}</span>
                 </div>
-                {summary.addonNet !== 0 && (
+                {(totals?.addon_net ?? 0) !== 0 && (
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Addons</span>
-                    <span className={`tabular-nums font-semibold ${summary.addonNet >= 0 ? "text-success" : "text-destructive"}`}>
-                      {summary.addonNet >= 0 ? "+" : ""}{formatUSD(summary.addonNet)}
+                    <span className={`tabular-nums font-semibold ${(totals?.addon_net ?? 0) >= 0 ? "text-success" : "text-destructive"}`}>
+                      {(totals?.addon_net ?? 0) >= 0 ? "+" : ""}{formatUSD(totals?.addon_net ?? 0)}
                     </span>
                   </div>
                 )}
-                {adjustmentNet !== 0 && (
+                {(totals?.adjustment_net ?? 0) !== 0 && (
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Adjustments</span>
-                    <span className={`tabular-nums font-semibold ${adjustmentNet >= 0 ? "text-success" : "text-destructive"}`}>
-                      {adjustmentNet >= 0 ? "+" : ""}{formatUSD(adjustmentNet)}
+                    <span className={`tabular-nums font-semibold ${(totals?.adjustment_net ?? 0) >= 0 ? "text-success" : "text-destructive"}`}>
+                      {(totals?.adjustment_net ?? 0) >= 0 ? "+" : ""}{formatUSD(totals?.adjustment_net ?? 0)}
                     </span>
                   </div>
                 )}
-                {previousBalance !== 0 && (
+                {(totals?.previous_balance ?? 0) !== 0 && (
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground flex items-center gap-1">
                       <Wallet className="h-3 w-3" /> Previous Balance
                     </span>
-                    <span className={`tabular-nums font-semibold ${previousBalance >= 0 ? "text-success" : "text-destructive"}`}>
-                      {previousBalance >= 0 ? "+" : ""}{formatUSD(previousBalance)}
+                    <span className={`tabular-nums font-semibold ${(totals?.previous_balance ?? 0) >= 0 ? "text-success" : "text-destructive"}`}>
+                      {(totals?.previous_balance ?? 0) >= 0 ? "+" : ""}{formatUSD(totals?.previous_balance ?? 0)}
                     </span>
                   </div>
                 )}
                 <div className="border-t my-1" />
                 <div className="flex justify-between py-1.5">
                   <span className="text-sm font-bold">Net Payable</span>
-                  <span className={`text-sm font-bold tabular-nums ${netPayable >= 0 ? "text-success" : "text-destructive"}`}>
-                    {formatUSD(netPayable)}
+                  <span className={`text-sm font-bold tabular-nums ${(totals?.net_payable ?? 0) >= 0 ? "text-success" : "text-destructive"}`}>
+                    {formatUSD(totals?.net_payable ?? 0)}
                   </span>
                 </div>
               </div>
