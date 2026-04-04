@@ -370,7 +370,7 @@ export default function Invoices() {
     } as any);
   };
 
-  // Finalize draft invoice → mark as ready
+  // Finalize open invoice → mark as ready (freeze orders, create new open invoice)
   const finalizeMutation = useMutation({
     mutationFn: async (invoiceId: string) => {
       const { error } = await supabase
@@ -378,7 +378,24 @@ export default function Invoices() {
         .update({ status: "ready", finalized_at: new Date().toISOString() } as any)
         .eq("id", invoiceId);
       if (error) throw error;
-      await logInvoiceHistory(invoiceId, "status_change", "status", "draft", "ready");
+      await logInvoiceHistory(invoiceId, "status_change", "status", "open", "ready");
+
+      // Auto-create a new open invoice for this seller
+      const inv = invoices.find(i => i.id === invoiceId);
+      if (inv) {
+        const { data: existingOpen } = await supabase
+          .from("invoices")
+          .select("id")
+          .eq("seller_id", inv.seller_id)
+          .eq("status", "open")
+          .limit(1)
+          .single();
+        if (!existingOpen) {
+          await supabase
+            .from("invoices")
+            .insert({ seller_id: inv.seller_id, status: "open" } as any);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
