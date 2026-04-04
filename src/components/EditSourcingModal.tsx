@@ -145,27 +145,27 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
       request.payment_status !== "paid" &&
       totalPrice > 0
     ) {
-      // Find or create draft invoice for this seller
-      let draftInvoiceId: string | null = null;
-      const { data: draftInvoice } = await supabase
+      // Find or create open invoice for this seller
+      let openInvoiceId: string | null = null;
+      const { data: openInvoice } = await supabase
         .from("invoices")
         .select("id")
         .eq("seller_id", request.seller_id)
-        .eq("status", "draft")
+        .eq("status", "open")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (draftInvoice) {
-        draftInvoiceId = draftInvoice.id;
+      if (openInvoice) {
+        openInvoiceId = openInvoice.id;
       } else {
         const { data: newInvoice, error: invErr } = await supabase
           .from("invoices")
-          .insert({ seller_id: request.seller_id, status: "draft" })
+          .insert({ seller_id: request.seller_id, status: "open" })
           .select("id")
           .single();
         if (invErr) throw invErr;
-        draftInvoiceId = newInvoice.id;
+        openInvoiceId = newInvoice.id;
       }
 
       // Add deduction addon

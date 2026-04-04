@@ -62,31 +62,31 @@ export default function Adjustments() {
 
   const approveMutation = useMutation({
     mutationFn: async (adj: Adjustment) => {
-      // Find seller's current draft invoice to apply adjustment
-      let draftInvoiceId: string | null = null;
-      const { data: draftInv } = await supabase
+      // Find seller's current open invoice to apply adjustment
+      let openInvoiceId: string | null = null;
+      const { data: openInv } = await supabase
         .from("invoices")
         .select("id")
         .eq("seller_id", adj.seller_id)
-        .eq("status", "draft")
+        .eq("status", "open")
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
 
-      if (draftInv) {
-        draftInvoiceId = draftInv.id;
+      if (openInv) {
+        openInvoiceId = openInv.id;
       } else {
-        // Create a new draft invoice
+        // Create a new open invoice
         const { data: newInv, error } = await supabase
           .from("invoices")
-          .insert({ seller_id: adj.seller_id, status: "draft" })
+          .insert({ seller_id: adj.seller_id, status: "open" })
           .select("id")
           .single();
         if (error) throw error;
-        draftInvoiceId = newInv.id;
+        openInvoiceId = newInv.id;
       }
 
-      // Add as addon to the draft invoice
+      // Add as addon to the open invoice
       const { error: addonErr } = await supabase.from("invoice_addons").insert({
         invoice_id: draftInvoiceId,
         type: adj.difference >= 0 ? "in" : "out",
