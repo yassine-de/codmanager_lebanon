@@ -615,7 +615,7 @@ export default function Invoices() {
                 value={statusFilter}
                 onValueChange={v => { setStatusFilter(v); setCurrentPage(1); }}
                 options={[
-                  ...(isSeller ? [] : [{ value: "draft", label: "📝 Draft" }]),
+                  ...(isSeller ? [] : [{ value: "open", label: "📝 Open" }]),
                   { value: "ready", label: "✅ Ready" },
                   { value: "paid", label: "💰 Paid" },
                 ]}
