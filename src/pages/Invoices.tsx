@@ -693,12 +693,12 @@ export default function Invoices() {
                       <TableCell className="text-right tabular-nums font-bold text-success">{formatUSD(inv.netPayable)}</TableCell>
                       {!isSeller && (
                         <TableCell className="text-center">
-                          <Switch
+                         <Switch
                             checked={inv.status === "ready" || inv.status === "paid"}
                             onCheckedChange={() => {
                               if (inv.status === "ready") {
                                 toggleReadyMutation.mutate({ invoiceId: inv.id, currentStatus: inv.status });
-                              } else if (inv.status === "draft") {
+                              } else if (inv.status === "open") {
                                 finalizeMutation.mutate(inv.id);
                               }
                             }}
