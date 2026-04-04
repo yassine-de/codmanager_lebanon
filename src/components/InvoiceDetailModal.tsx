@@ -63,13 +63,15 @@ export function InvoiceDetailModal({
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : deliveredOrders.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground text-xs">No orders in this invoice.</div>
           ) : (
             <div>
               {/* SECTION 1: DELIVERED ORDERS (listed individually) */}
               <SectionHeader icon={Package} title="Delivered Orders" color="text-success" count={counts?.delivered_count ?? 0} />
-              <InvoiceOrdersTable orders={deliveredOrders} productWeightMap={productWeightMap} />
+              {deliveredOrders.length > 0 ? (
+                <InvoiceOrdersTable orders={deliveredOrders} productWeightMap={productWeightMap} />
+              ) : (
+                <div className="text-center py-4 text-muted-foreground text-xs">No delivered orders.</div>
+              )}
 
               {/* SECTION 2: SHIPPING FEES (summary only — count × rate by weight bracket) */}
               <SectionHeader icon={Truck} title="Shipping Fees" color="text-info" count={counts?.shipped_count ?? 0} />
