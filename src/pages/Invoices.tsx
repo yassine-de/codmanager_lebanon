@@ -315,7 +315,7 @@ export default function Invoices() {
   // All invoices as rows (no more virtual drafts)
   const combined = useMemo(() => {
     return invoiceSummaries
-      .filter(inv => isSeller ? inv.status !== "draft" : true)
+      .filter(inv => isSeller ? inv.status !== "open" : true)
       .map(inv => ({ type: "invoice" as const, data: inv }));
   }, [invoiceSummaries, isSeller]);
 
