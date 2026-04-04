@@ -708,7 +708,7 @@ export default function Invoices() {
                         </TableCell>
                       )}
                       <TableCell className="text-center">
-                      {inv.status === "draft" && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning bg-warning/10">Draft</Badge>}
+                      {inv.status === "open" && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning bg-warning/10">Open</Badge>}
                         {inv.status === "ready" && <Badge variant="outline" className="text-[10px] border-info/30 text-info bg-info/10">Ready</Badge>}
                         {inv.status === "paid" && <Badge variant="outline" className="text-[10px] border-success/30 text-success bg-success/10">Paid</Badge>}
                       </TableCell>
