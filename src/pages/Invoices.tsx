@@ -464,14 +464,14 @@ export default function Invoices() {
     },
   });
 
-  // Toggle ready (un-ready a ready invoice → revert to draft)
+  // Toggle ready (un-ready a ready invoice → revert to open)
   const toggleReadyMutation = useMutation({
     mutationFn: async ({ invoiceId, currentStatus }: { invoiceId: string; currentStatus: string }) => {
       if (currentStatus === "ready") {
-        await logInvoiceHistory(invoiceId, "status_change", "status", "ready", "draft");
+        await logInvoiceHistory(invoiceId, "status_change", "status", "ready", "open");
         const { error } = await supabase
           .from("invoices")
-          .update({ status: "draft", finalized_at: null } as any)
+          .update({ status: "open", finalized_at: null } as any)
           .eq("id", invoiceId);
         if (error) throw error;
       }
@@ -479,7 +479,7 @@ export default function Invoices() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoice-orders-summary"] });
-      toast.success("Invoice reverted to draft");
+      toast.success("Invoice reverted to open");
     },
   });
 
