@@ -22,6 +22,22 @@ interface Props {
 export function InvoiceDetailModal({
   open, onOpenChange, invoiceId, invoiceNumber, sellerName,
 }: Props) {
+  const queryClient = useQueryClient();
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const removeAddonMutation = useMutation({
+    mutationFn: async (addonId: string) => {
+      const { error } = await supabase.rpc("remove_invoice_addon", { p_addon_id: addonId } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoice-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-summaries"] });
+      setConfirmDeleteId(null);
+      toast.success("Addon removed");
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to remove addon"),
+  });
   const { data: summary, isLoading } = useQuery({
     queryKey: ["invoice-summary", invoiceId],
     queryFn: async () => {
