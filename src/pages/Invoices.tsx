@@ -666,11 +666,11 @@ export default function Invoices() {
                 paginated.map((row) => {
                   const inv = row.data;
                   const proofUrl = inv.payment_proof_url;
-                  const isDraft = inv.status === "draft";
+                  const isOpen = inv.status === "open";
                   return (
-                    <TableRow key={inv.id} className={`text-xs ${isDraft ? "bg-warning/5 hover:bg-warning/10" : ""}`}>
-                      <TableCell className={`font-semibold ${isDraft ? "text-warning" : "text-primary"}`}>
-                        {isDraft ? "Draft" : inv.invoice_number}
+                    <TableRow key={inv.id} className={`text-xs ${isOpen ? "bg-warning/5 hover:bg-warning/10" : ""}`}>
+                      <TableCell className={`font-semibold ${isOpen ? "text-warning" : "text-primary"}`}>
+                        {isOpen ? "Open" : inv.invoice_number}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-[11px]">{format(new Date(inv.created_at), "dd MMM yyyy")}</TableCell>
                       {!isSeller && (
