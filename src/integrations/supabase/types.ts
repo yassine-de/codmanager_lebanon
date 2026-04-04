@@ -202,6 +202,7 @@ export type Database = {
           created_at: string | null
           id: string
           invoice_id: string
+          product_id: string | null
           reason: string
           type: string
         }
@@ -210,6 +211,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           invoice_id: string
+          product_id?: string | null
           reason?: string
           type?: string
         }
@@ -218,6 +220,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           invoice_id?: string
+          product_id?: string | null
           reason?: string
           type?: string
         }
@@ -227,6 +230,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_addons_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -304,10 +314,12 @@ export type Database = {
         Row: {
           changed_by: string | null
           created_at: string
+          description: string | null
           event_type: string
           field_changed: string | null
           id: string
           invoice_id: string
+          metadata: Json | null
           new_value: string | null
           old_value: string | null
           order_id: string | null
@@ -315,10 +327,12 @@ export type Database = {
         Insert: {
           changed_by?: string | null
           created_at?: string
+          description?: string | null
           event_type?: string
           field_changed?: string | null
           id?: string
           invoice_id: string
+          metadata?: Json | null
           new_value?: string | null
           old_value?: string | null
           order_id?: string | null
@@ -326,10 +340,12 @@ export type Database = {
         Update: {
           changed_by?: string | null
           created_at?: string
+          description?: string | null
           event_type?: string
           field_changed?: string | null
           id?: string
           invoice_id?: string
+          metadata?: Json | null
           new_value?: string | null
           old_value?: string | null
           order_id?: string | null
@@ -1178,6 +1194,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_invoice_addon: {
+        Args: {
+          p_amount: number
+          p_invoice_id: string
+          p_product_id?: string
+          p_reason: string
+          p_type: string
+        }
+        Returns: Json
+      }
       approve_invoice_adjustment: {
         Args: { p_adjustment_id: string }
         Returns: Json
@@ -1286,6 +1312,7 @@ export type Database = {
         Args: { p_agent_id: string; p_order_id: string }
         Returns: undefined
       }
+      remove_invoice_addon: { Args: { p_addon_id: string }; Returns: Json }
       resolve_duplicate_group: {
         Args: { p_agent_id: string; p_valid_order_id: string }
         Returns: undefined
