@@ -296,11 +296,8 @@ export default function Invoices() {
       const deliveredRevenuePKR = delivered.reduce((sum, o) => sum + (o.price * o.quantity), 0);
       const deliveredRevenueUSD = pkrToUsd(deliveredRevenuePKR);
       
-      // Shipping: shipped + delivered orders (already in USD)
-      const shippable = orders.filter(o => 
-        o.delivery_status === "delivered" || o.delivery_status === "shipped" || 
-        o.delivery_status === "in_transit" || o.delivery_status === "with_courier"
-      );
+      // Shipping: only shipped orders
+      const shippable = orders.filter(o => o.delivery_status === "shipped");
       const shippingFees = shippable.reduce((sum, o) => sum + calcShippingFee(getProductWeightKg(inv.seller_id, o.product_name), o.quantity, rates), 0);
       
       // Call center fees (already in USD)
