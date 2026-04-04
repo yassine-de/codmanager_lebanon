@@ -944,6 +944,7 @@ export default function Invoices() {
         codFeePercentage={codFeeMap[detailSellerId] ?? 5}
         confirmedRate={callCenterRatesMap[detailSellerId]?.confirmedRate ?? 0}
         droppedRate={callCenterRatesMap[detailSellerId]?.droppedRate ?? 0}
+        previousBalance={invoiceSummaries.find(i => i.id === detailInvoiceId)?.previousBalance ?? 0}
         isDraft={detailIsDraft}
         draftOrders={detailDraftOrders}
       />
