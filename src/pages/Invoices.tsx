@@ -524,7 +524,7 @@ export default function Invoices() {
     setDetailSellerRates(sellerRatesMap[inv.seller_id] || null);
     setDetailSellerId(inv.seller_id);
     setDetailInvoiceId(inv.id);
-    setDetailInvoiceNumber(inv.status === "draft" ? "Draft Invoice" : inv.invoice_number);
+    setDetailInvoiceNumber(inv.status === "open" ? "Open Invoice" : inv.invoice_number);
     setDetailIsDraft(false);
     setDetailDraftOrders([]);
   };
