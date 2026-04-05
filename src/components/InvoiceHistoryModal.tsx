@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface TimelineEntry {
   id: string;
-  type: "order_change" | "addon" | "status_change" | "order_added" | "order_removed";
+  type: "order_change" | "addon" | "status_change" | "order_added" | "order_removed" | "addon_added" | "addon_removed";
   created_at: string;
   // Order change fields
   order_id?: string;
@@ -24,6 +24,9 @@ interface TimelineEntry {
   addon_type?: string;
   amount?: number;
   reason?: string;
+  // History fields
+  description?: string;
+  metadata?: Record<string, any>;
 }
 
 const fieldLabels: Record<string, string> = {
@@ -168,6 +171,8 @@ export default function InvoiceHistoryModal({ open, onOpenChange, invoiceId, inv
             old_value: h.old_value,
             new_value: h.new_value,
             agent_name: h.changed_by ? invNameMap.get(h.changed_by) || "Unknown" : undefined,
+            description: h.description,
+            metadata: h.metadata,
           });
         });
       }
