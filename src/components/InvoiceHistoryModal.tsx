@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface TimelineEntry {
   id: string;
-  type: "order_change" | "addon" | "status_change" | "order_added" | "order_removed";
+  type: "order_change" | "addon" | "status_change" | "order_added" | "order_removed" | "addon_added" | "addon_removed";
   created_at: string;
   // Order change fields
   order_id?: string;
@@ -24,6 +24,9 @@ interface TimelineEntry {
   addon_type?: string;
   amount?: number;
   reason?: string;
+  // History fields
+  description?: string;
+  metadata?: Record<string, any>;
 }
 
 const fieldLabels: Record<string, string> = {
@@ -168,6 +171,8 @@ export default function InvoiceHistoryModal({ open, onOpenChange, invoiceId, inv
             old_value: h.old_value,
             new_value: h.new_value,
             agent_name: h.changed_by ? invNameMap.get(h.changed_by) || "Unknown" : undefined,
+            description: h.description,
+            metadata: h.metadata,
           });
         });
       }
@@ -183,7 +188,7 @@ export default function InvoiceHistoryModal({ open, onOpenChange, invoiceId, inv
 
   const orderMovements = timeline.filter(e => e.type === "order_added" || e.type === "order_removed");
   const statusChanges = timeline.filter(e => e.type === "status_change");
-  const otherEvents = timeline.filter(e => e.type === "order_change" || e.type === "addon");
+  const otherEvents = timeline.filter(e => e.type === "order_change" || e.type === "addon" || e.type === "addon_added" || e.type === "addon_removed");
 
   const renderEvent = (event: TimelineEntry) => {
     // Status change
@@ -224,6 +229,63 @@ export default function InvoiceHistoryModal({ open, onOpenChange, invoiceId, inv
                 </span>
               )}
             </div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[11px] text-muted-foreground tabular-nums">
+                {format(new Date(event.created_at), "dd MMM yyyy · HH:mm")}
+              </span>
+              {event.agent_name && (
+                <span className="text-[11px] text-muted-foreground">
+                  by <span className="font-medium text-foreground/70">{event.agent_name}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Addon added / removed (from invoice_history)
+    if (event.type === "addon_added" || event.type === "addon_removed") {
+      const isAdded = event.type === "addon_added";
+      const meta = event.metadata || {};
+      const addonAmount = meta.amount as number | undefined;
+      const addonReason = meta.reason as string | undefined;
+      const addonSubType = meta.type as string | undefined;
+      const isIn = addonSubType === "in";
+      const AddonEvIcon = isAdded ? (isIn ? ArrowDownCircle : ArrowUpCircle) : XCircle;
+      const addonEvColor = isAdded
+        ? (isIn ? "text-success bg-success/10" : "text-warning bg-warning/10")
+        : "text-destructive bg-destructive/10";
+
+      return (
+        <div key={event.id} className="relative flex gap-3 pb-5 last:pb-0">
+          <div className={`relative z-10 flex items-center justify-center w-[31px] h-[31px] rounded-full shrink-0 ${addonEvColor}`}>
+            <AddonEvIcon className="w-3.5 h-3.5" />
+          </div>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <p className="text-sm font-medium leading-snug">
+              {isAdded ? "Addon Added" : "Addon Removed"}
+              {isAdded && addonSubType && (
+                <span className={`ml-1.5 inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${isIn ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
+                  {isIn ? "Bonus" : "Deduction"}
+                </span>
+              )}
+            </p>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {addonAmount != null && (
+                <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isIn ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
+                  {isIn ? "+" : "-"}{addonAmount.toFixed(2)} $
+                </span>
+              )}
+              {addonReason && (
+                <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  {addonReason}
+                </span>
+              )}
+            </div>
+            {event.description && (
+              <p className="text-[11px] text-muted-foreground mt-1">{event.description}</p>
+            )}
             <div className="flex items-center gap-2 mt-1">
               <span className="text-[11px] text-muted-foreground tabular-nums">
                 {format(new Date(event.created_at), "dd MMM yyyy · HH:mm")}
