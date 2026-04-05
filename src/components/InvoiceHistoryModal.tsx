@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface TimelineEntry {
   id: string;
-  type: "order_change" | "addon" | "status_change" | "order_added" | "order_removed" | "addon_added" | "addon_removed";
+  type: "order_change" | "addon" | "status_change" | "order_added" | "order_removed" | "addon_added" | "addon_removed" | "adjustment_created" | "adjustment_approved" | "adjustment_rejected" | string;
   created_at: string;
   // Order change fields
   order_id?: string;
