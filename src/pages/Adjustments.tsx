@@ -170,7 +170,7 @@ export default function Adjustments() {
                   <TableCell><Badge variant="outline" className="text-[10px]">{adj.old_status}</Badge></TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px]">{adj.new_status}</Badge></TableCell>
                   <TableCell className={`text-right tabular-nums font-semibold ${adj.difference >= 0 ? "text-success" : "text-destructive"}`}>
-                    {adj.difference >= 0 ? "+" : ""}{formatUSD(adj.difference)}
+                    {adj.difference >= 0 ? "+" : ""}{formatPKR(adj.difference)}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{format(new Date(adj.created_at), "dd/MM/yy HH:mm")}</TableCell>
                   <TableCell>{statusBadge(adj.status)}</TableCell>
@@ -254,9 +254,9 @@ export default function Adjustments() {
                     <span className="tabular-nums">{formatPKR(selectedAdj.new_amount)}</span>
                   </div>
                   <div className="border-t pt-2 flex justify-between text-xs font-bold">
-                    <span>Difference (USD)</span>
+                    <span>Difference (PKR)</span>
                     <span className={`tabular-nums ${selectedAdj.difference >= 0 ? "text-success" : "text-destructive"}`}>
-                      {selectedAdj.difference >= 0 ? "+" : ""}{formatUSD(pkrToUsd(selectedAdj.difference))}
+                      {selectedAdj.difference >= 0 ? "+" : ""}{formatPKR(selectedAdj.difference)}
                     </span>
                   </div>
                 </CardContent>
