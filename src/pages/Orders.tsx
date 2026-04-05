@@ -716,10 +716,16 @@ export default function Orders() {
                     />
                   </th>
                 )}
-                {isAdmin && isCol('systemId') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">System ID</th>}
+                {isAdmin && isCol('systemId') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('systemId')}>
+                  <span className="inline-flex items-center gap-1">System ID {sortKey === 'systemId' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}</span>
+                </th>}
                 {isCol('id') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Seller ID</th>}
-                {isCol('createdAt') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Created</th>}
-                {isCol('updatedAt') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Updated</th>}
+                {isCol('createdAt') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('createdAt')}>
+                  <span className="inline-flex items-center gap-1">Created {sortKey === 'createdAt' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}</span>
+                </th>}
+                {isCol('updatedAt') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('updatedAt')}>
+                  <span className="inline-flex items-center gap-1">Updated {sortKey === 'updatedAt' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}</span>
+                </th>}
                 {isCol('seller') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Seller</th>}
                 {isCol('customer') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Client</th>}
                 {isCol('city') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">City</th>}
