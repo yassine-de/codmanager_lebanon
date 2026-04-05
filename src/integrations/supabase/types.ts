@@ -249,14 +249,17 @@ export type Database = {
           id: string
           invoice_id: string | null
           new_amount: number
+          new_shipping_fee: number
           new_status: string
           old_status: string
           order_id: string
           previous_amount: number
+          previous_shipping_fee: number
           reason: string
           reviewed_at: string | null
           reviewed_by: string | null
           seller_id: string
+          shipping_difference: number
           status: string
         }
         Insert: {
@@ -266,14 +269,17 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           new_amount?: number
+          new_shipping_fee?: number
           new_status: string
           old_status: string
           order_id: string
           previous_amount?: number
+          previous_shipping_fee?: number
           reason?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           seller_id: string
+          shipping_difference?: number
           status?: string
         }
         Update: {
@@ -283,14 +289,17 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           new_amount?: number
+          new_shipping_fee?: number
           new_status?: string
           old_status?: string
           order_id?: string
           previous_amount?: number
+          previous_shipping_fee?: number
           reason?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           seller_id?: string
+          shipping_difference?: number
           status?: string
         }
         Relationships: [
