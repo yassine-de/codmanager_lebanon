@@ -445,7 +445,7 @@ export default function Orders() {
         }
         return sortDir === 'asc' ? valA - valB : valB - valA;
       });
-  }, [search, appliedFilters, orders]);
+  }, [search, appliedFilters, orders, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginatedOrders = useMemo(() => {
