@@ -118,9 +118,10 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
       {/* Footer totals */}
       <div className="flex justify-between items-center px-4 py-2 border-t bg-muted/30">
         <span className="text-xs text-muted-foreground">{filtered.length} order{filtered.length !== 1 ? "s" : ""}</span>
-        <span className="text-xs font-bold text-success tabular-nums">
-          Total: {formatUSD(totalRevenueUsd)}
-        </span>
+        <div className="text-right">
+          <span className="text-xs font-bold tabular-nums">{formatPKR(totalRevenuePkr)}</span>
+          <span className="text-[10px] text-muted-foreground ml-1.5">({formatUSD(totalRevenueUsd)})</span>
+        </div>
       </div>
     </div>
   );
