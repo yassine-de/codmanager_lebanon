@@ -725,8 +725,8 @@ export default function Orders() {
                   )}
                   {isAdmin && isCol('systemId') && <td className="py-2.5 px-4 font-mono text-xs text-muted-foreground">{order.systemId ?? '—'}</td>}
                   {isCol('id') && <td className="py-2.5 px-4 font-medium text-xs">{order.id}</td>}
-                  {isCol('createdAt') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{format(new Date(order.createdAt), 'dd MMM yyyy')}</td>}
-                  {isCol('updatedAt') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{format(new Date(order.updatedAt), 'dd MMM yyyy')}</td>}
+                  {isCol('createdAt') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{format(new Date(order.createdAt), 'dd MMM yyyy HH:mm')}</td>}
+                  {isCol('updatedAt') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{format(new Date(order.updatedAt), 'dd MMM yyyy HH:mm')}</td>}
                   {isCol('seller') && <td className="py-2.5 px-4 text-xs">{order.seller}</td>}
                   {isCol('customer') && <td className="py-2.5 px-4 text-xs">{order.customer}</td>}
                   {isCol('city') && <td className="py-2.5 px-4 text-xs text-muted-foreground">{order.city}</td>}
@@ -817,7 +817,7 @@ export default function Orders() {
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="font-medium text-sm">{order.id}</span>
-                <span className="text-xs text-muted-foreground tabular-nums">{format(new Date(order.createdAt), 'dd MMM yyyy')}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">{format(new Date(order.createdAt), 'dd MMM yyyy HH:mm')}</span>
               </div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm">{order.customer}</span>
