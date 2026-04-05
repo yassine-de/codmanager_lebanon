@@ -44,7 +44,8 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
     });
   }, [orders, search, productFilter]);
 
-  const totalRevenueUsd = filtered.reduce((sum, o) => sum + (o.amount_usd ?? pkrToUsd(o.price * o.quantity)), 0);
+  const totalRevenuePkr = filtered.reduce((sum, o) => sum + (o.price * o.quantity), 0);
+  const totalRevenueUsd = pkrToUsd(totalRevenuePkr);
 
   return (
     <div>
@@ -82,7 +83,7 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
               <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Product</th>
               <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Qty</th>
               <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Weight</th>
-              <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Amount</th>
+              <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Amount (Rs)</th>
             </tr>
           </thead>
           <tbody>
@@ -94,7 +95,7 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
               filtered.map((o, i) => {
                 const wKg = o.weight_kg ?? productWeightMap[o.product_name] ?? 0;
                 const totalWeight = o.total_weight_kg ?? (wKg * o.quantity);
-                const amountUsd = o.amount_usd ?? pkrToUsd(o.price * o.quantity);
+                const amountPkr = o.price * o.quantity;
                 return (
                   <tr key={o.id} className={`border-b ${i % 2 === 0 ? "bg-background" : "bg-muted/20"}`}>
                     <td className="px-3 py-1.5 font-mono text-[11px]">{o.order_id}</td>
@@ -105,7 +106,7 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
                     <td className="px-3 py-1.5">{o.product_name}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{o.quantity}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{totalWeight > 0 ? `${totalWeight.toFixed(1)} KG` : "—"}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{formatUSD(amountUsd)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{formatPKR(amountPkr)}</td>
                   </tr>
                 );
               })
@@ -117,9 +118,10 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
       {/* Footer totals */}
       <div className="flex justify-between items-center px-4 py-2 border-t bg-muted/30">
         <span className="text-xs text-muted-foreground">{filtered.length} order{filtered.length !== 1 ? "s" : ""}</span>
-        <span className="text-xs font-bold text-success tabular-nums">
-          Total: {formatUSD(totalRevenueUsd)}
-        </span>
+        <div className="text-right">
+          <span className="text-xs font-bold tabular-nums">{formatPKR(totalRevenuePkr)}</span>
+          <span className="text-[10px] text-muted-foreground ml-1.5">({formatUSD(totalRevenueUsd)})</span>
+        </div>
       </div>
     </div>
   );
