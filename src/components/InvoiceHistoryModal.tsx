@@ -244,6 +244,63 @@ export default function InvoiceHistoryModal({ open, onOpenChange, invoiceId, inv
       );
     }
 
+    // Addon added / removed (from invoice_history)
+    if (event.type === "addon_added" || event.type === "addon_removed") {
+      const isAdded = event.type === "addon_added";
+      const meta = event.metadata || {};
+      const addonAmount = meta.amount as number | undefined;
+      const addonReason = meta.reason as string | undefined;
+      const addonSubType = meta.type as string | undefined;
+      const isIn = addonSubType === "in";
+      const AddonEvIcon = isAdded ? (isIn ? ArrowDownCircle : ArrowUpCircle) : XCircle;
+      const addonEvColor = isAdded
+        ? (isIn ? "text-success bg-success/10" : "text-warning bg-warning/10")
+        : "text-destructive bg-destructive/10";
+
+      return (
+        <div key={event.id} className="relative flex gap-3 pb-5 last:pb-0">
+          <div className={`relative z-10 flex items-center justify-center w-[31px] h-[31px] rounded-full shrink-0 ${addonEvColor}`}>
+            <AddonEvIcon className="w-3.5 h-3.5" />
+          </div>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <p className="text-sm font-medium leading-snug">
+              {isAdded ? "Addon Added" : "Addon Removed"}
+              {isAdded && addonSubType && (
+                <span className={`ml-1.5 inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${isIn ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
+                  {isIn ? "Bonus" : "Deduction"}
+                </span>
+              )}
+            </p>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {addonAmount != null && (
+                <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isIn ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
+                  {isIn ? "+" : "-"}{addonAmount.toFixed(2)} $
+                </span>
+              )}
+              {addonReason && (
+                <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  {addonReason}
+                </span>
+              )}
+            </div>
+            {event.description && (
+              <p className="text-[11px] text-muted-foreground mt-1">{event.description}</p>
+            )}
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[11px] text-muted-foreground tabular-nums">
+                {format(new Date(event.created_at), "dd MMM yyyy · HH:mm")}
+              </span>
+              {event.agent_name && (
+                <span className="text-[11px] text-muted-foreground">
+                  by <span className="font-medium text-foreground/70">{event.agent_name}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // Order added / removed
     if (event.type === "order_added" || event.type === "order_removed") {
       const isAdded = event.type === "order_added";
