@@ -120,7 +120,7 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
         <span className="text-xs text-muted-foreground">{filtered.length} order{filtered.length !== 1 ? "s" : ""}</span>
         <div className="text-right">
           <span className="text-xs font-bold tabular-nums">{formatPKR(totalRevenuePkr)}</span>
-          <span className="text-[10px] text-muted-foreground ml-1.5">({formatUSD(totalRevenueUsd)})</span>
+          <span className="text-xs font-bold text-muted-foreground ml-1.5">= {formatUSD(totalRevenueUsd)}</span>
         </div>
       </div>
     </div>
