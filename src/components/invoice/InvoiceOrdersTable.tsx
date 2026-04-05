@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { formatUSD, formatPKR, pkrToUsd } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search } from "lucide-react";
+import { Search, ExternalLink } from "lucide-react";
 
 interface Order {
   id: string;
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [productFilter, setProductFilter] = useState("all");
 
@@ -97,8 +99,17 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
                 const totalWeight = o.total_weight_kg ?? (wKg * o.quantity);
                 const amountPkr = o.price * o.quantity;
                 return (
-                  <tr key={o.id} className={`border-b ${i % 2 === 0 ? "bg-background" : "bg-muted/20"}`}>
-                    <td className="px-3 py-1.5 font-mono text-[11px]">{o.order_id}</td>
+                  <tr
+                    key={o.id}
+                    className={`border-b cursor-pointer transition-colors hover:bg-primary/5 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"}`}
+                    onClick={() => navigate(`/orders/${o.id}`)}
+                  >
+                    <td className="px-3 py-1.5 font-mono text-[11px]">
+                      <div className="flex items-center gap-1 text-primary">
+                        {o.order_id}
+                        <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                      </div>
+                    </td>
                     <td className="px-3 py-1.5">
                       <div className="leading-tight">{o.customer_name}</div>
                       <div className="text-[10px] text-muted-foreground">{o.customer_phone}</div>
