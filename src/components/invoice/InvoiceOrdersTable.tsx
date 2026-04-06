@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { formatUSD, formatPKR, pkrToUsd } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink } from "lucide-react";
+import { Search, Copy, Check } from "lucide-react";
+import { toast } from "sonner";
 
 interface Order {
   id: string;
@@ -26,8 +26,8 @@ interface Props {
 }
 
 export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
-  const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [productFilter, setProductFilter] = useState("all");
 
   const productNames = useMemo(() => {
@@ -101,13 +101,23 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
                 return (
                   <tr
                     key={o.id}
-                    className={`border-b cursor-pointer transition-colors hover:bg-primary/5 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"}`}
-                    onClick={() => navigate(`/orders/${o.id}`)}
+                    className={`border-b ${i % 2 === 0 ? "bg-background" : "bg-muted/20"}`}
                   >
                     <td className="px-3 py-1.5 font-mono text-[11px]">
-                      <div className="flex items-center gap-1 text-primary">
+                      <div className="flex items-center gap-1 text-foreground">
                         {o.order_id}
-                        <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                        <button
+                          className="ml-1 p-0.5 rounded hover:bg-muted transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(o.order_id);
+                            setCopiedId(o.id);
+                            toast.success("Order ID copied");
+                            setTimeout(() => setCopiedId(null), 1500);
+                          }}
+                        >
+                          {copiedId === o.id ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
+                        </button>
                       </div>
                     </td>
                     <td className="px-3 py-1.5">
