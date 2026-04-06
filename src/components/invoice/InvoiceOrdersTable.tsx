@@ -26,8 +26,8 @@ interface Props {
 }
 
 export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
-  const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [productFilter, setProductFilter] = useState("all");
 
   const productNames = useMemo(() => {
