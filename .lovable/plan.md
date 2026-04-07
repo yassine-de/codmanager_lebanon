@@ -1,56 +1,69 @@
 
 
-# Invoice System Refactor — Confirmed Plan
+# Fix: Event-Based Shipping Fee Logic
 
-## Immutability Confirmation
+## Problem
+The `get_invoice_summary` function uses `delivery_status = ANY(ARRAY['shipped','in_transit','with_courier','delivered','returned'])` to determine which orders incur shipping fees. This means a "returned" order that was already charged for shipping in a previous invoice gets charged again.
 
-The current `auto_assign_invoice_on_delivery` trigger already enforces the rule: orders in closed invoices are **never moved**. The trigger returns early with `RETURN NEW` (preserving `invoice_id`) when the linked invoice is `ready` or `paid`. No changes needed here.
+## Root Cause
+Shipping is state-based (checks current `delivery_status`) instead of event-based (checks if the first "shipped" event occurred in this invoice's period).
 
-## Changes to Implement
+## Solution
 
-### 1. Database Migration: Fix `get_invoice_summary` — Add Period Bounds
+### Database Migration: Update `get_invoice_summary`
 
-The cross-invoice CTEs currently lack time bounds, causing events to appear in every subsequent invoice.
+Replace all shipping-related queries that filter on current `delivery_status` with event-based detection using `order_history`.
 
-**Fix**: Add `AND oh.created_at > v_period_start AND oh.created_at <= v_period_end` to all 3 cross-invoice queries:
-- `cross_shipped` CTE (orders + shipping)
-- Cross delivered count query (for COD)
-- Cross delivered revenue query
+**For direct invoice orders** (currently: `o.invoice_id = p_invoice_id AND o.delivery_status = ANY(v_shipped_statuses)`):
 
-Also update the adjustment net calculation to include `shipping_difference`:
+Change to: orders in this invoice that had their **first** `shipped` event during or before the invoice period:
+
 ```sql
-SUM(CASE WHEN status='approved' THEN difference + shipping_difference ELSE 0 END)
+-- Instead of checking current status, check for first shipped event
+WHERE o.invoice_id = p_invoice_id
+  AND EXISTS (
+    SELECT 1 FROM public.order_history oh
+    WHERE oh.order_id = o.order_id
+      AND oh.field_changed = 'delivery_status'
+      AND oh.new_value = 'shipped'
+  )
+  AND NOT EXISTS (
+    -- Exclude if first shipped event was BEFORE this invoice's period
+    SELECT 1 FROM public.order_history oh2
+    WHERE oh2.order_id = o.order_id
+      AND oh2.field_changed = 'delivery_status'
+      AND oh2.new_value = 'shipped'
+      AND oh2.created_at <= v_period_start
+  )
 ```
 
-### 2. Database Migration: Enhance `create_invoice_adjustment_on_status_change`
+**For cross-invoice shipped orders**: Already event-based but currently also filters on `o.delivery_status = ANY(v_shipped_statuses)` — remove that state filter since a returned order should still count if its shipped event falls in this period.
 
-Add shipping reversal handling — when an order in a closed invoice moves from a shipped status back to pending/cancelled:
-- Calculate the old shipping fee from weight bracket
-- Create adjustment with `shipping_difference = -old_shipping_fee`
+**Shipped count**: Update `v_shipped_count` query to use the same event-based logic.
 
-Add price change handling — when `price` changes on a delivered order in a closed invoice:
-- `difference = (new_price × new_qty) - (old_price × old_qty)`
+**Unified shipping breakdown** (`all_shipped` CTE): Both halves (direct + cross) must use event-based detection instead of `delivery_status = ANY(v_shipped_statuses)`.
 
-### 3. Frontend: Update `src/lib/invoice-summary.ts`
+### Affected Queries (5 locations in `get_invoice_summary`)
 
-Add `shipping_difference` and `shipping_difference_usd` fields to the `adjustments` array type.
+| Query | Current (state-based) | New (event-based) |
+|-------|----------------------|-------------------|
+| `v_shipped_count` | `delivery_status = ANY(v_shipped_statuses)` | First shipped event in period |
+| `all_shipped` CTE (direct half) | `delivery_status = ANY(v_shipped_statuses)` | First shipped event in period |
+| `all_shipped` CTE (cross half) | `delivery_status = ANY(v_shipped_statuses)` | Already event-based, remove state filter |
+| `cross_shipped` CTE | `delivery_status = ANY(v_shipped_statuses)` | Remove state filter, keep event check |
+| Adjustment trigger | Uses `v_shipped_statuses` for reversal | No change needed (reversal is correct) |
 
-### 4. Frontend: Update `src/components/InvoiceDetailModal.tsx`
+### No Frontend Changes
+The frontend already displays whatever `get_invoice_summary` returns. Only the database function changes.
 
-Show revenue and shipping deltas separately in the adjustments display when both are non-zero.
-
-## Files Changed
+### Files Changed
 
 | Location | Change |
 |----------|--------|
-| DB Migration (new) | `get_invoice_summary`: period bounds + shipping_difference in net |
-| DB Migration (new) | `create_invoice_adjustment_on_status_change`: shipping reversal + price change |
-| `src/lib/invoice-summary.ts` | Add shipping_difference to adjustment type |
-| `src/components/InvoiceDetailModal.tsx` | Display revenue + shipping deltas separately |
+| DB Migration (new) | Rewrite shipping queries in `get_invoice_summary` to be event-based |
 
-## What Is NOT Changed
-
-- `auto_assign_invoice_on_delivery` — already correct, no reassignment from closed invoices
-- `auto_assign_invoice_on_insert` — only assigns when `invoice_id IS NULL`
-- Closed invoice data — never recomputed, only delta adjustments
+### What Is NOT Changed
+- `create_invoice_adjustment_on_status_change` — shipping reversal logic remains correct (it creates adjustments for closed invoices)
+- `auto_assign_invoice_on_delivery` — unchanged
+- Frontend components — unchanged
 
