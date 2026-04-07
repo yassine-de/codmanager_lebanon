@@ -105,44 +105,44 @@ export default function DeliveryAnalytics() {
     };
   }, [filteredOrders]);
 
-  // Delivery by confirmation agent
+  // Delivery by confirmation agent — use original_agent_id as fallback
   const byConfAgent = useMemo(() => {
-    const map: Record<string, { shipped: number; delivered: number }> = {};
+    const map: Record<string, { confirmed: number; delivered: number }> = {};
     filteredOrders.forEach(o => {
-      const agentId = o.agent_id;
+      const agentId = o.agent_id || o.original_agent_id;
       if (!agentId) return;
-      if (!map[agentId]) map[agentId] = { shipped: 0, delivered: 0 };
-      if (o.delivery_status && shippedStatuses.includes(o.delivery_status)) map[agentId].shipped++;
-      if (o.delivery_status === "delivered") map[agentId].delivered++;
+      if (!map[agentId]) map[agentId] = { confirmed: 0, delivered: 0 };
+      if (o.confirmation_status === "confirmed") map[agentId].confirmed++;
+      if (o.delivery_status && deliveredStatuses.includes(o.delivery_status)) map[agentId].delivered++;
     });
     return Object.entries(map)
-      .map(([id, d]) => ({ name: profileNameMap[id] || id.slice(0, 8), ...d, rate: d.shipped > 0 ? Math.round((d.delivered / d.shipped) * 100) : 0 }))
+      .map(([id, d]) => ({ name: profileNameMap[id] || id.slice(0, 8), confirmed: d.confirmed, delivered: d.delivered, rate: d.confirmed > 0 ? Math.round((d.delivered / d.confirmed) * 100) : 0 }))
       .sort((a, b) => b.rate - a.rate);
   }, [filteredOrders, profileNameMap]);
 
-  // Delivery by product
+  // Delivery by product — rate = delivered / confirmed
   const byProduct = useMemo(() => {
-    const map: Record<string, { shipped: number; delivered: number }> = {};
+    const map: Record<string, { confirmed: number; delivered: number }> = {};
     filteredOrders.forEach(o => {
       const name = o.product_name || "Unknown";
-      if (!map[name]) map[name] = { shipped: 0, delivered: 0 };
-      if (o.delivery_status && shippedStatuses.includes(o.delivery_status)) map[name].shipped++;
-      if (o.delivery_status === "delivered") map[name].delivered++;
+      if (!map[name]) map[name] = { confirmed: 0, delivered: 0 };
+      if (o.confirmation_status === "confirmed") map[name].confirmed++;
+      if (o.delivery_status && deliveredStatuses.includes(o.delivery_status)) map[name].delivered++;
     });
     return Object.entries(map)
-      .map(([name, d]) => ({ name, ...d, rate: d.shipped > 0 ? Math.round((d.delivered / d.shipped) * 100) : 0 }))
+      .map(([name, d]) => ({ name, confirmed: d.confirmed, delivered: d.delivered, rate: d.confirmed > 0 ? Math.round((d.delivered / d.confirmed) * 100) : 0 }))
       .sort((a, b) => b.rate - a.rate);
   }, [filteredOrders]);
 
   // Delivery by city
   const byCity = useMemo(() => {
-    const map: Record<string, { shipped: number; delivered: number; pending: number }> = {};
+    const map: Record<string, { shipped: number; delivered: number; inTransit: number }> = {};
     filteredOrders.forEach(o => {
       const city = o.customer_city || "Unknown";
-      if (!map[city]) map[city] = { shipped: 0, delivered: 0, pending: 0 };
-      if (o.delivery_status && shippedStatuses.includes(o.delivery_status)) map[city].shipped++;
-      if (o.delivery_status === "delivered") map[city].delivered++;
-      if (o.delivery_status === "pending" || o.delivery_status === "shipped") map[city].pending++;
+      if (!map[city]) map[city] = { shipped: 0, delivered: 0, inTransit: 0 };
+      if (o.delivery_status && allShippedStatuses.includes(o.delivery_status)) map[city].shipped++;
+      if (o.delivery_status && deliveredStatuses.includes(o.delivery_status)) map[city].delivered++;
+      if (o.delivery_status && inTransitStatuses.includes(o.delivery_status)) map[city].inTransit++;
     });
     return Object.entries(map)
       .map(([city, d]) => {
