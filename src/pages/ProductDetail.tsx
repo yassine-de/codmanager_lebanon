@@ -179,12 +179,12 @@ export default function ProductDetail() {
     );
   }
 
-  // Compute real shipped/delivered/returned counts from orders
-  const realDelivered = productOrders.filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid').length;
+  // Compute real shipped/delivered/returned counts from orders (by units/quantity)
+  const realDelivered = productOrders.filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid').reduce((sum, o) => sum + (o.quantity || 1), 0);
   const realShipped = productOrders.filter(o =>
     ['shipped', 'in_transit', 'with_courier'].includes(o.delivery_status || '')
-  ).length;
-  const realReturned = productOrders.filter(o => o.delivery_status === 'returned').length;
+  ).reduce((sum, o) => sum + (o.quantity || 1), 0);
+  const realReturned = productOrders.filter(o => o.delivery_status === 'returned').reduce((sum, o) => sum + (o.quantity || 1), 0);
   const realAvailable = Math.max(0, product.totalQty - realShipped - realDelivered + realReturned);
 
   const inventoryData = [
