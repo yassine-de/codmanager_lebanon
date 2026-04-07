@@ -318,6 +318,7 @@ export default function Orders() {
       setOrders(mapped);
       setSellerNames([...new Set(mapped.map(o => o.seller))]);
       setProductNames([...new Set(mapped.flatMap(o => o.products.map(p => p.name)))]);
+      setAgentNames([...new Set(mapped.map(o => o.agentName).filter(Boolean) as string[])]);
     };
 
     fetchOrders();
@@ -328,6 +329,7 @@ export default function Orders() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [filterProduct, setFilterProduct] = useState('all');
   const [filterSeller, setFilterSeller] = useState('all');
+  const [filterAgent, setFilterAgent] = useState('all');
   const [filterConfirmation, setFilterConfirmation] = useState('all');
   const [filterDelivery, setFilterDelivery] = useState('all');
   const [filterUpsell, setFilterUpsell] = useState('all');
