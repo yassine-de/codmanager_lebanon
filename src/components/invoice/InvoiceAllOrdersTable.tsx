@@ -21,6 +21,8 @@ interface Order {
   confirmation_status: string;
   delivery_status: string;
   has_adjustment: boolean;
+  adjustment_invoice_id?: string | null;
+  adjustment_invoice_number?: string | null;
 }
 
 interface Props {
@@ -135,8 +137,12 @@ export function InvoiceAllOrdersTable({ orders }: Props) {
                           {copiedId === o.id ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
                         </button>
                         {o.has_adjustment && (
-                          <span title="Has adjustment in another invoice">
-                            <AlertTriangle className="w-3 h-3 text-warning" />
+                          <span
+                            title={o.adjustment_invoice_number ? `Adjusted in ${o.adjustment_invoice_number}` : "Has adjustment"}
+                            className="inline-flex items-center gap-0.5 text-[9px] font-medium text-warning bg-warning/10 px-1 py-0.5 rounded"
+                          >
+                            <AlertTriangle className="w-3 h-3" />
+                            {o.adjustment_invoice_number ? o.adjustment_invoice_number : "Adj"}
                           </span>
                         )}
                       </div>
