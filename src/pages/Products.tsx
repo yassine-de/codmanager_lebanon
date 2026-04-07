@@ -40,14 +40,13 @@ export default function Products() {
     queryKey: ["product-order-stats", authUser?.role],
     queryFn: async () => {
       const pageSize = 1000;
-      const allRows: Array<{ seller_id: string; product_name: string; delivery_status: string | null; quantity: number }> = [];
+      const allRows: Array<{ seller_id: string; product_name: string; delivery_status: string | null; confirmation_status: string; quantity: number }> = [];
       let from = 0;
 
       while (true) {
         const { data, error } = await supabase
           .from("orders")
-          .select("seller_id, product_name, delivery_status, quantity")
-          .in("delivery_status", ["shipped", "in_transit", "with_courier", "delivered", "paid", "returned"])
+          .select("seller_id, product_name, delivery_status, confirmation_status, quantity")
           .range(from, from + pageSize - 1);
 
         if (error) throw error;
@@ -65,11 +64,11 @@ export default function Products() {
   });
 
   const productOrderStatsMap = useMemo(() => {
-    const map: Record<string, { delivered: number; shipped: number; returned: number }> = {};
+    const map: Record<string, { delivered: number; shipped: number; returned: number; cancelled: number }> = {};
 
     productOrderRows.forEach((row) => {
       const key = `${row.seller_id}::${row.product_name}`;
-      const current = map[key] || { delivered: 0, shipped: 0, returned: 0 };
+      const current = map[key] || { delivered: 0, shipped: 0, returned: 0, cancelled: 0 };
       const qty = row.quantity || 1;
 
       if (row.delivery_status === "delivered" || row.delivery_status === "paid") {
@@ -78,6 +77,9 @@ export default function Products() {
         current.shipped += qty;
       } else if (row.delivery_status === "returned") {
         current.returned += qty;
+      }
+      if (row.confirmation_status === "cancelled") {
+        current.cancelled += qty;
       }
 
       map[key] = current;
@@ -111,7 +113,7 @@ export default function Products() {
   // Merge: admin sees mock + DB, seller sees only their DB products
   const products = useMemo(() => {
     const dbMapped: Product[] = dbProducts.map(p => {
-      const orderStats = productOrderStatsMap[`${p.seller_id}::${p.name}`] || { delivered: 0, shipped: 0, returned: 0 };
+      const orderStats = productOrderStatsMap[`${p.seller_id}::${p.name}`] || { delivered: 0, shipped: 0, returned: 0, cancelled: 0 };
       const availableQty = Math.max(0, (p.quantity || 0) - orderStats.delivered - orderStats.shipped + orderStats.returned);
 
       // Map sourcing-style variants to product variants
@@ -136,6 +138,7 @@ export default function Products() {
         totalQty: p.quantity || 0,
         delivered: orderStats.delivered,
         shipped: orderStats.shipped,
+        cancelled: orderStats.cancelled,
         available: availableQty,
         createdAt: p.created_at,
         variants: mappedVariants,
@@ -404,6 +407,7 @@ export default function Products() {
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Total Qty</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Delivered</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Shipped</th>
+                      <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Cancelled</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Available</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Weight</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Variants</th>
@@ -460,6 +464,11 @@ export default function Products() {
                         <td className="py-2 px-3 text-center">
                           <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium bg-[hsl(210,60%,52%)]/12 text-[hsl(210,60%,52%)] border-[hsl(210,60%,52%)]/20">
                             {product.shipped}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium bg-[hsl(0,65%,52%)]/12 text-[hsl(0,65%,52%)] border-[hsl(0,65%,52%)]/20">
+                            {product.cancelled}
                           </span>
                         </td>
                         <td className="py-2 px-3 text-center">
@@ -576,6 +585,7 @@ export default function Products() {
                         <span className="font-medium">{product.price}</span>
                         <span className="text-muted-foreground">Selling: {product.lastSellingPrice}</span>
                         <span className="text-muted-foreground">Qty: {product.totalQty}</span>
+                        <span className="text-destructive">Cancel: {product.cancelled}</span>
                         <span className="text-muted-foreground">Avail: {product.available}</span>
                       </div>
                     </div>

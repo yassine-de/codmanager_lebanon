@@ -23,6 +23,7 @@ export interface Product {
   totalQty: number;
   delivered: number;
   shipped: number;
+  cancelled: number;
   available: number;
   createdAt: string;
   variants: ProductVariant[];
@@ -114,6 +115,7 @@ function generateProduct(i: number): Product {
     totalQty,
     delivered,
     shipped,
+    cancelled: 0,
     available,
     createdAt: new Date(Date.now() - daysAgo * 86400000).toISOString(),
     variants: generateVariants(sku, price),

@@ -50,6 +50,7 @@ export function CreateProductModal({ open, onOpenChange, onCreate }: CreateProdu
       totalQty: Number(totalQty),
       delivered: 0,
       shipped: 0,
+      cancelled: 0,
       available: Number(totalQty),
       createdAt: now,
       variants: [],
