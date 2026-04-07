@@ -21,6 +21,8 @@ interface Order {
   confirmation_status: string;
   delivery_status: string;
   has_adjustment: boolean;
+  adjustment_invoice_id?: string | null;
+  adjustment_invoice_number?: string | null;
 }
 
 interface Props {

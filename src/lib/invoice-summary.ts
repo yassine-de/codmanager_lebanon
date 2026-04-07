@@ -71,6 +71,8 @@ export interface InvoiceSummaryResponse {
     confirmation_status: string;
     delivery_status: string;
     has_adjustment: boolean;
+    adjustment_invoice_id: string | null;
+    adjustment_invoice_number: string | null;
   }>;
   shipping_breakdown: Array<{
     bracket: string;
