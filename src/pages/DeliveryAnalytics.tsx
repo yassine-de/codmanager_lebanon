@@ -185,9 +185,9 @@ export default function DeliveryAnalytics() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard title="Shipped Orders" value={stats.shipped} icon={Package} iconBg="bg-info/10" iconColor="text-info" delay={0} />
-        <KPICard title="Delivered" value={stats.delivered} subtitle={`${stats.deliveryRate}% rate`} icon={CheckCircle2} iconBg="bg-success/10" iconColor="text-success" delay={50} />
-        <KPICard title="Pending" value={stats.pending} subtitle={`${stats.pendingRate}% of shipped`} icon={Clock} iconBg="bg-warning/10" iconColor="text-warning" delay={100} />
+        <KPICard title="Total Shipped" value={stats.totalShipped} icon={Package} iconBg="bg-info/10" iconColor="text-info" delay={0} />
+        <KPICard title="Delivered" value={stats.delivered} subtitle={`${stats.deliveryRate}% of confirmed`} icon={CheckCircle2} iconBg="bg-success/10" iconColor="text-success" delay={50} />
+        <KPICard title="In Transit" value={stats.inTransit} subtitle={`${stats.inTransitRate}% of shipped`} icon={Truck} iconBg="bg-warning/10" iconColor="text-warning" delay={100} />
         <KPICard title="Avg Delivery Time" value={`${stats.avgDeliveryTime} days`} icon={Clock} iconBg="bg-muted" iconColor="text-muted-foreground" delay={150} />
       </div>
 
@@ -244,7 +244,7 @@ export default function DeliveryAnalytics() {
                 <text x={cx} y={cy + 22} textAnchor="middle" dominantBaseline="middle"
                   className="text-[10px] font-bold" fill={statusColor}>{status}</text>
                 <text x={cx - 70} y={cy + 48} textAnchor="middle" className="text-[10px] font-medium" fill="hsl(30,6%,55%)">
-                  {stats.shipped} Shipped
+                  {stats.confirmed} Confirmed
                 </text>
                 <text x={cx} y={cy + 48} textAnchor="middle" className="text-[10px] font-medium" fill="hsl(155,50%,42%)">
                   {stats.delivered} Delivered
@@ -265,14 +265,14 @@ export default function DeliveryAnalytics() {
                 <Pie
                   data={[
                     { name: 'Delivered', value: stats.delivered },
-                    { name: 'Pending', value: stats.pending },
-                    { name: 'Shipped', value: stats.shippedOnly },
+                    { name: 'In Transit', value: stats.inTransit },
+                    { name: 'Returned', value: stats.returned },
                   ].filter(d => d.value > 0)}
                   cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={3} dataKey="value"
                 >
                   <Cell fill="hsl(155, 50%, 42%)" />
-                  <Cell fill="hsl(38, 90%, 55%)" />
                   <Cell fill="hsl(210, 60%, 52%)" />
+                  <Cell fill="hsl(0, 65%, 52%)" />
                 </Pie>
                 <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', fontSize: '12px', background: 'hsl(var(--card))' }} />
               </PieChart>
@@ -281,8 +281,8 @@ export default function DeliveryAnalytics() {
           <div className="w-full md:w-1/2 space-y-2.5">
             {[
               { name: 'Delivered', value: stats.delivered, color: 'hsl(155, 50%, 42%)', pct: stats.deliveryRate },
-              { name: 'Pending', value: stats.pending, color: 'hsl(38, 90%, 55%)', pct: stats.pendingRate },
-              { name: 'Shipped', value: stats.shippedOnly, color: 'hsl(210, 60%, 52%)', pct: stats.shippedOnlyRate },
+              { name: 'In Transit', value: stats.inTransit, color: 'hsl(210, 60%, 52%)', pct: stats.inTransitRate },
+              { name: 'Returned', value: stats.returned, color: 'hsl(0, 65%, 52%)', pct: stats.returnedRate },
             ].filter(d => d.value > 0).map((item) => (
               <div key={item.name} className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
