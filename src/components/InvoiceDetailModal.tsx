@@ -4,10 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Loader2, Package, Truck, Phone, CreditCard, ArrowDownCircle, ArrowUpCircle, BarChart3, ArrowUpDown, Wallet, Trash2, List } from "lucide-react";
+import { Loader2, Package, Truck, Phone, CreditCard, ArrowDownCircle, ArrowUpCircle, BarChart3, ArrowUpDown, Wallet, Trash2 } from "lucide-react";
 import { formatUSD } from "@/lib/currency";
 import { InvoiceOrdersTable } from "@/components/invoice/InvoiceOrdersTable";
-import { InvoiceAllOrdersTable } from "@/components/invoice/InvoiceAllOrdersTable";
+
 import { fetchInvoiceSummary } from "@/lib/invoice-summary";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -49,7 +49,7 @@ export function InvoiceDetailModal({
   });
 
   const deliveredOrders = summary?.delivered_orders ?? [];
-  const allOrders = summary?.all_orders ?? [];
+  
   const shippingBreakdown = summary?.shipping_breakdown ?? [];
   const addons = summary?.addons ?? [];
   const invoiceAdjustments = summary?.adjustments ?? [];
@@ -89,13 +89,6 @@ export function InvoiceDetailModal({
             </div>
           ) : (
             <div>
-              {/* SECTION 0: ALL ORDERS (full audit visibility) */}
-              <SectionHeader icon={List} title="All Orders" color="text-foreground" count={allOrders.length} />
-              {allOrders.length > 0 ? (
-                <InvoiceAllOrdersTable orders={allOrders} invoiceStatus={summary?.invoice.status ?? "open"} />
-              ) : (
-                <div className="text-center py-4 text-muted-foreground text-xs">No orders linked to this invoice.</div>
-              )}
 
               {/* SECTION 1: DELIVERED ORDERS (revenue detail) */}
               <SectionHeader icon={Package} title={`Delivered Orders (Revenue)${(counts?.cross_delivered_count ?? 0) > 0 ? ` (incl. ${counts.cross_delivered_count} cross-invoice)` : ''}`} color="text-success" count={counts?.delivered_count ?? 0} />
