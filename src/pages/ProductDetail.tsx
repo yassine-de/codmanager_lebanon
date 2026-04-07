@@ -185,7 +185,7 @@ export default function ProductDetail() {
     ['shipped', 'in_transit', 'with_courier'].includes(o.delivery_status || '')
   ).length;
   const realReturned = productOrders.filter(o => o.delivery_status === 'returned').length;
-  const realAvailable = Math.max(0, product.totalQty - realShipped - realDelivered);
+  const realAvailable = Math.max(0, product.totalQty - realShipped - realDelivered + realReturned);
 
   const inventoryData = [
     { label: "Total", value: product.totalQty, color: "hsl(30, 10%, 12%)" },
