@@ -366,7 +366,7 @@ export default function DeliveryAnalytics() {
                 <tr className="border-b text-muted-foreground text-xs">
                   <th className="text-left py-2 pr-4">City</th>
                   <th className="text-right py-2 pr-4">Shipped</th>
-                  <th className="text-right py-2 pr-4">Pending</th>
+                  <th className="text-right py-2 pr-4">In Transit</th>
                   <th className="text-right py-2 pr-4">Delivered</th>
                   <th className="text-right py-2 pr-4">Rate</th>
                   <th className="text-right py-2 pr-4">Avg Time</th>
