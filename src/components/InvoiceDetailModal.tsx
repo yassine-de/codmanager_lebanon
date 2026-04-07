@@ -191,18 +191,36 @@ export function InvoiceDetailModal({
                 <>
                   <SectionHeader icon={ArrowUpDown} title="Adjustments" color="text-orange-500" count={invoiceAdjustments.length} />
                   <div className="py-2">
-                    {invoiceAdjustments.map(adj => (
-                      <div key={adj.id} className="flex justify-between px-4 py-1 text-xs items-center">
-                        <span className="flex items-center gap-1.5 text-muted-foreground">
-                          <ArrowUpDown className="h-3 w-3" />
-                          <span className="font-mono">{adj.order_id}</span>
-                          <span className="text-muted-foreground/60">({adj.old_status} → {adj.new_status})</span>
-                        </span>
-                        <span className={`font-semibold tabular-nums ${adj.difference_usd >= 0 ? "text-success" : "text-destructive"}`}>
-                          {adj.difference_usd >= 0 ? "+" : ""}{formatUSD(adj.difference_usd)}
-                        </span>
-                      </div>
-                    ))}
+                    {invoiceAdjustments.map(adj => {
+                      const totalUsd = adj.difference_usd + (adj.shipping_difference_usd ?? 0);
+                      const hasRevenue = adj.difference_usd !== 0;
+                      const hasShipping = (adj.shipping_difference_usd ?? 0) !== 0;
+                      return (
+                        <div key={adj.id} className="flex justify-between px-4 py-1.5 text-xs items-start gap-2">
+                          <span className="flex items-center gap-1.5 text-muted-foreground min-w-0">
+                            <ArrowUpDown className="h-3 w-3 shrink-0" />
+                            <span className="font-mono">{adj.order_id}</span>
+                            <span className="text-muted-foreground/60">({adj.old_status} → {adj.new_status})</span>
+                          </span>
+                          <span className="flex flex-col items-end shrink-0">
+                            {hasRevenue && hasShipping ? (
+                              <>
+                                <span className={`tabular-nums ${adj.difference_usd >= 0 ? "text-success" : "text-destructive"}`}>
+                                  Rev: {adj.difference_usd >= 0 ? "+" : ""}{formatUSD(adj.difference_usd)}
+                                </span>
+                                <span className={`tabular-nums ${adj.shipping_difference_usd >= 0 ? "text-success" : "text-destructive"}`}>
+                                  Ship: {adj.shipping_difference_usd >= 0 ? "+" : ""}{formatUSD(adj.shipping_difference_usd)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className={`font-semibold tabular-nums ${totalUsd >= 0 ? "text-success" : "text-destructive"}`}>
+                                {totalUsd >= 0 ? "+" : ""}{formatUSD(totalUsd)}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </>
               )}

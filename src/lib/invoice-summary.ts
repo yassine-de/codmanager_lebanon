@@ -104,6 +104,8 @@ export interface InvoiceSummaryResponse {
     new_status: string;
     difference: number;
     difference_usd: number;
+    shipping_difference: number;
+    shipping_difference_usd: number;
     reason: string;
     status: string;
     created_at: string;
