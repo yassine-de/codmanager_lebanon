@@ -163,6 +163,7 @@ export default function Orders() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sellerNames, setSellerNames] = useState<string[]>([]);
+  const [agentNames, setAgentNames] = useState<string[]>([]);
   const [productNames, setProductNames] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
