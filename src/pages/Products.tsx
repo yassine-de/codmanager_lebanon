@@ -113,7 +113,7 @@ export default function Products() {
   // Merge: admin sees mock + DB, seller sees only their DB products
   const products = useMemo(() => {
     const dbMapped: Product[] = dbProducts.map(p => {
-      const orderStats = productOrderStatsMap[`${p.seller_id}::${p.name}`] || { delivered: 0, shipped: 0, returned: 0 };
+      const orderStats = productOrderStatsMap[`${p.seller_id}::${p.name}`] || { delivered: 0, shipped: 0, returned: 0, cancelled: 0 };
       const availableQty = Math.max(0, (p.quantity || 0) - orderStats.delivered - orderStats.shipped + orderStats.returned);
 
       // Map sourcing-style variants to product variants
@@ -138,6 +138,7 @@ export default function Products() {
         totalQty: p.quantity || 0,
         delivered: orderStats.delivered,
         shipped: orderStats.shipped,
+        cancelled: orderStats.cancelled,
         available: availableQty,
         createdAt: p.created_at,
         variants: mappedVariants,
