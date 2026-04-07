@@ -70,13 +70,14 @@ export default function Products() {
     productOrderRows.forEach((row) => {
       const key = `${row.seller_id}::${row.product_name}`;
       const current = map[key] || { delivered: 0, shipped: 0, returned: 0 };
+      const qty = row.quantity || 1;
 
       if (row.delivery_status === "delivered" || row.delivery_status === "paid") {
-        current.delivered += 1;
+        current.delivered += qty;
       } else if (["shipped", "in_transit", "with_courier"].includes(row.delivery_status || "")) {
-        current.shipped += 1;
+        current.shipped += qty;
       } else if (row.delivery_status === "returned") {
-        current.returned += 1;
+        current.returned += qty;
       }
 
       map[key] = current;
