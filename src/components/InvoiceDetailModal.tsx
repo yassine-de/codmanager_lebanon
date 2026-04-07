@@ -49,6 +49,7 @@ export function InvoiceDetailModal({
   });
 
   const deliveredOrders = summary?.delivered_orders ?? [];
+  const allOrders = summary?.all_orders ?? [];
   const shippingBreakdown = summary?.shipping_breakdown ?? [];
   const addons = summary?.addons ?? [];
   const invoiceAdjustments = summary?.adjustments ?? [];
