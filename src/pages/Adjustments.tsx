@@ -281,17 +281,17 @@ function AdjustmentDetail({ adj, sellerMap, onApprove, onReject }: {
         <CardContent className="py-3 px-4 space-y-2">
           <p className="text-xs font-semibold mb-2">Revenue Impact</p>
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Previous Amount (USD)</span>
-            <span className="tabular-nums">{formatUSD(adj.previous_amount)}</span>
+            <span className="text-muted-foreground">Previous Amount (PKR)</span>
+            <span className="tabular-nums">{formatPKR(adj.previous_amount)}</span>
           </div>
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">New Amount (USD)</span>
-            <span className="tabular-nums">{formatUSD(adj.new_amount)}</span>
+            <span className="text-muted-foreground">New Amount (PKR)</span>
+            <span className="tabular-nums">{formatPKR(adj.new_amount)}</span>
           </div>
           <div className="border-t pt-2 flex justify-between text-xs font-bold">
-            <span>Revenue Δ (USD)</span>
+            <span>Revenue Δ (PKR)</span>
             <span className={`tabular-nums ${adj.difference >= 0 ? "text-success" : "text-destructive"}`}>
-              {adj.difference >= 0 ? "+" : ""}{formatUSD(adj.difference)}
+              {adj.difference >= 0 ? "+" : ""}{formatPKR(adj.difference)}
             </span>
           </div>
         </CardContent>
@@ -328,9 +328,9 @@ function AdjustmentDetail({ adj, sellerMap, onApprove, onReject }: {
         <Card className="bg-muted/50">
           <CardContent className="py-3 px-4">
             <div className="flex justify-between text-xs font-bold">
-              <span>Total Adjustment (USD)</span>
+              <span>Total Adjustment (PKR)</span>
               <span className={`tabular-nums text-sm ${totalDiff >= 0 ? "text-success" : "text-destructive"}`}>
-                {totalDiff >= 0 ? "+" : ""}{formatUSD(totalDiff)}
+                {totalDiff >= 0 ? "+" : ""}{formatPKR(totalDiff)}
               </span>
             </div>
           </CardContent>
