@@ -55,6 +55,23 @@ export interface InvoiceSummaryResponse {
     total_weight_kg: number | null;
     amount_usd: number;
   }>;
+  all_orders: Array<{
+    id: string;
+    order_id: string;
+    customer_name: string;
+    customer_phone: string;
+    product_name: string;
+    quantity: number;
+    price: number;
+    total_amount: number;
+    created_at: string;
+    weight_kg: number | null;
+    total_weight_kg: number | null;
+    amount_usd: number;
+    confirmation_status: string;
+    delivery_status: string;
+    has_adjustment: boolean;
+  }>;
   shipping_breakdown: Array<{
     bracket: string;
     count: number;
