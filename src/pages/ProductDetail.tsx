@@ -170,8 +170,12 @@ export default function ProductDetail() {
   }
 
   // Compute real shipped/delivered counts from orders
-  const realShipped = productOrders.filter(o => o.shipping_status && ['shipped', 'in_transit', 'with_courier'].includes(o.shipping_status)).length;
+  // "Shipped" = orders that have been shipped but NOT yet delivered
   const realDelivered = productOrders.filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid').length;
+  const realShipped = productOrders.filter(o =>
+    o.shipping_status && ['shipped', 'in_transit', 'with_courier'].includes(o.shipping_status)
+    && o.delivery_status !== 'delivered' && o.delivery_status !== 'paid'
+  ).length;
   const realAvailable = Math.max(0, product.totalQty - realShipped - realDelivered);
 
   const inventoryData = [
