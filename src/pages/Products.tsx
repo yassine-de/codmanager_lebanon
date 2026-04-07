@@ -64,11 +64,11 @@ export default function Products() {
   });
 
   const productOrderStatsMap = useMemo(() => {
-    const map: Record<string, { delivered: number; shipped: number; returned: number }> = {};
+    const map: Record<string, { delivered: number; shipped: number; returned: number; cancelled: number }> = {};
 
     productOrderRows.forEach((row) => {
       const key = `${row.seller_id}::${row.product_name}`;
-      const current = map[key] || { delivered: 0, shipped: 0, returned: 0 };
+      const current = map[key] || { delivered: 0, shipped: 0, returned: 0, cancelled: 0 };
       const qty = row.quantity || 1;
 
       if (row.delivery_status === "delivered" || row.delivery_status === "paid") {
@@ -77,6 +77,9 @@ export default function Products() {
         current.shipped += qty;
       } else if (row.delivery_status === "returned") {
         current.returned += qty;
+      }
+      if (row.confirmation_status === "cancelled") {
+        current.cancelled += qty;
       }
 
       map[key] = current;
