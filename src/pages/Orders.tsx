@@ -163,6 +163,7 @@ export default function Orders() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sellerNames, setSellerNames] = useState<string[]>([]);
+  const [agentNames, setAgentNames] = useState<string[]>([]);
   const [productNames, setProductNames] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -273,14 +274,21 @@ export default function Orders() {
         return;
       }
 
-      // Fetch seller names for display
+      // Fetch seller & agent names for display
       const sellerIds = [...new Set((data || []).map(o => o.seller_id))];
+      const agentIdsSet = new Set<string>();
+      (data || []).forEach(o => {
+        if (o.agent_id) agentIdsSet.add(o.agent_id);
+        if (o.original_agent_id) agentIdsSet.add(o.original_agent_id);
+      });
+      const allUserIds = [...new Set([...sellerIds, ...agentIdsSet])];
+
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, name")
-        .in("user_id", sellerIds);
+        .in("user_id", allUserIds);
 
-      const sellerMap = new Map((profiles || []).map(p => [p.user_id, p.name]));
+      const profileMap = new Map((profiles || []).map(p => [p.user_id, p.name]));
 
       const mapped: Order[] = (data || []).map(o => ({
         id: o.order_id,
@@ -300,7 +308,8 @@ export default function Orders() {
         confirmedAt: o.confirmed_at || undefined,
         deliveredAt: o.delivered_at || undefined,
         notes: o.note || undefined,
-        seller: sellerMap.get(o.seller_id) || "Unknown",
+        seller: profileMap.get(o.seller_id) || "Unknown",
+        agentName: o.agent_id ? (profileMap.get(o.agent_id) || undefined) : (o.original_agent_id ? (profileMap.get(o.original_agent_id) || undefined) : undefined),
         upsell: false,
         warehouseState: "in_stock" as const,
         history: [],
@@ -310,6 +319,7 @@ export default function Orders() {
       setOrders(mapped);
       setSellerNames([...new Set(mapped.map(o => o.seller))]);
       setProductNames([...new Set(mapped.flatMap(o => o.products.map(p => p.name)))]);
+      setAgentNames([...new Set(mapped.map(o => o.agentName).filter(Boolean) as string[])]);
     };
 
     fetchOrders();
@@ -320,6 +330,7 @@ export default function Orders() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [filterProduct, setFilterProduct] = useState('all');
   const [filterSeller, setFilterSeller] = useState('all');
+  const [filterAgent, setFilterAgent] = useState('all');
   const [filterConfirmation, setFilterConfirmation] = useState('all');
   const [filterDelivery, setFilterDelivery] = useState('all');
   const [filterUpsell, setFilterUpsell] = useState('all');
@@ -351,7 +362,7 @@ export default function Orders() {
     const del = new URLSearchParams(window.location.search).get('delivery');
     return {
       dateRange: undefined as DateRange | undefined,
-      product: 'all', seller: 'all', 
+      product: 'all', seller: 'all', agent: 'all',
       confirmation: conf || 'all',
       delivery: del || 'all', 
       upsell: 'all', warehouse: 'all',
@@ -379,19 +390,19 @@ export default function Orders() {
 
   const applyFilters = useCallback(() => {
     setAppliedFilters({
-      dateRange, product: filterProduct, seller: filterSeller,
+      dateRange, product: filterProduct, seller: filterSeller, agent: filterAgent,
       confirmation: filterConfirmation, delivery: filterDelivery,
       upsell: filterUpsell, warehouse: filterWarehouse,
     });
-  }, [dateRange, filterProduct, filterSeller, filterConfirmation, filterDelivery, filterUpsell, filterWarehouse]);
+  }, [dateRange, filterProduct, filterSeller, filterAgent, filterConfirmation, filterDelivery, filterUpsell, filterWarehouse]);
 
   const clearFilters = useCallback(() => {
     setDateRange(undefined);
-    setFilterProduct('all'); setFilterSeller('all');
+    setFilterProduct('all'); setFilterSeller('all'); setFilterAgent('all');
     setFilterConfirmation('all'); setFilterDelivery('all');
     setFilterUpsell('all'); setFilterWarehouse('all');
     setAppliedFilters({
-      dateRange: undefined, product: 'all', seller: 'all',
+      dateRange: undefined, product: 'all', seller: 'all', agent: 'all',
       confirmation: 'all', delivery: 'all', upsell: 'all', warehouse: 'all',
     });
   }, []);
@@ -401,6 +412,7 @@ export default function Orders() {
     if (appliedFilters.dateRange?.from) count++;
     if (appliedFilters.product !== 'all') count++;
     if (appliedFilters.seller !== 'all') count++;
+    if (appliedFilters.agent !== 'all') count++;
     if (appliedFilters.confirmation !== 'all') count++;
     if (appliedFilters.delivery !== 'all') count++;
     if (appliedFilters.upsell !== 'all') count++;
@@ -419,6 +431,7 @@ export default function Orders() {
         }
         if (f.product !== 'all' && !o.products.some(p => p.name === f.product)) return false;
         if (f.seller !== 'all' && o.seller !== f.seller) return false;
+        if (f.agent !== 'all' && o.agentName !== f.agent) return false;
         if (f.confirmation !== 'all' && o.confirmationStatus !== f.confirmation) return false;
         if (f.delivery !== 'all' && o.deliveryStatus !== f.delivery) return false;
         if (f.upsell !== 'all') {
@@ -552,6 +565,20 @@ export default function Orders() {
                 options={sellerNames.map(s => ({ value: s, label: s }))}
                 placeholder="Seller"
                 allLabel="All Sellers"
+                className="w-full"
+              />
+            </div>
+            )}
+            {/* Agent - admin only */}
+            {isAdmin && (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Agent</label>
+              <SearchableSelect
+                value={filterAgent}
+                onValueChange={setFilterAgent}
+                options={agentNames.map(a => ({ value: a, label: a }))}
+                placeholder="Agent"
+                allLabel="All Agents"
                 className="w-full"
               />
             </div>
