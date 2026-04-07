@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { pkrToUsd } from "@/lib/currency";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, ShoppingCart, CheckCircle2, Truck, Package, TrendingUp, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -115,9 +116,7 @@ export default function ProductDetail() {
     const delivered = productOrders.filter(o =>
       o.delivery_status === 'delivered' || o.delivery_status === 'paid'
     ).length;
-    const cancelled = productOrders.filter(o =>
-      ['cancelled', 'no_answer', 'wrong_number', 'double'].includes(o.confirmation_status)
-    ).length;
+    const cancelled = productOrders.filter(o => o.confirmation_status === 'cancelled').length;
     // Total sales = sum of total_amount for confirmed/shipped/delivered orders
     const activeSales = productOrders.filter(o =>
       !['cancelled', 'no_answer', 'wrong_number', 'double'].includes(o.confirmation_status)
@@ -226,13 +225,13 @@ export default function ProductDetail() {
         />
         <KPICard
           label="Total Sales"
-          value={`${(stats?.totalSales ?? 0).toLocaleString()}`}
-          suffix="$"
+          value={`${(stats?.totalSales ?? 0).toLocaleString()} Rs`}
+          suffix={`= ${pkrToUsd(stats?.totalSales ?? 0).toFixed(1)} $`}
         />
         <KPICard
           label="Avg. Order Value"
-          value={stats?.avgOrderValue ?? 0}
-          suffix="$"
+          value={`${(stats?.avgOrderValue ?? 0).toLocaleString()} Rs`}
+          suffix={`= ${pkrToUsd(stats?.avgOrderValue ?? 0).toFixed(1)} $`}
         />
         <KPICard
           label="Confirmed"
