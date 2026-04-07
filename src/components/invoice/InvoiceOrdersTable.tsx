@@ -18,6 +18,8 @@ interface Order {
   amount_usd?: number;
   weight_kg?: number | null;
   total_weight_kg?: number | null;
+  is_cross_invoice?: boolean;
+  original_invoice_number?: string | null;
 }
 
 interface Props {
@@ -106,6 +108,11 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
                     <td className="px-3 py-1.5 font-mono text-[11px]">
                       <div className="flex items-center gap-1 text-foreground">
                         {o.order_id}
+                        {o.is_cross_invoice && (
+                          <span title={`From ${o.original_invoice_number}`} className="inline-flex items-center gap-0.5 text-[9px] font-medium text-info bg-info/10 px-1 py-0.5 rounded ml-1">
+                            📦 {o.original_invoice_number}
+                          </span>
+                        )}
                         <button
                           className="ml-1 p-0.5 rounded hover:bg-muted transition-colors"
                           onClick={(e) => {

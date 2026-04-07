@@ -98,7 +98,7 @@ export function InvoiceDetailModal({
               )}
 
               {/* SECTION 1: DELIVERED ORDERS (revenue detail) */}
-              <SectionHeader icon={Package} title="Delivered Orders (Revenue)" color="text-success" count={counts?.delivered_count ?? 0} />
+              <SectionHeader icon={Package} title={`Delivered Orders (Revenue)${(counts?.cross_delivered_count ?? 0) > 0 ? ` (incl. ${counts.cross_delivered_count} cross-invoice)` : ''}`} color="text-success" count={counts?.delivered_count ?? 0} />
               {deliveredOrders.length > 0 ? (
                 <InvoiceOrdersTable orders={deliveredOrders} productWeightMap={productWeightMap} />
               ) : (
@@ -106,7 +106,7 @@ export function InvoiceDetailModal({
               )}
 
               {/* SECTION 2: SHIPPING FEES (summary only — count × rate by weight bracket) */}
-              <SectionHeader icon={Truck} title="Shipping Fees" color="text-info" count={counts?.shipped_count ?? 0} />
+              <SectionHeader icon={Truck} title={`Shipping Fees${(counts?.cross_shipped_count ?? 0) > 0 ? ` (incl. ${counts.cross_shipped_count} cross-invoice)` : ''}`} color="text-info" count={counts?.shipped_count ?? 0} />
               <div className="px-4 py-2 space-y-1">
                 {shippingBreakdown.map((item) => (
                   <div key={item.bracket} className="flex justify-between text-xs">
