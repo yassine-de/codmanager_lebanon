@@ -89,8 +89,16 @@ export function InvoiceDetailModal({
             </div>
           ) : (
             <div>
-              {/* SECTION 1: DELIVERED ORDERS (listed individually) */}
-              <SectionHeader icon={Package} title="Delivered Orders" color="text-success" count={counts?.delivered_count ?? 0} />
+              {/* SECTION 0: ALL ORDERS (full audit visibility) */}
+              <SectionHeader icon={List} title="All Orders" color="text-foreground" count={allOrders.length} />
+              {allOrders.length > 0 ? (
+                <InvoiceAllOrdersTable orders={allOrders} />
+              ) : (
+                <div className="text-center py-4 text-muted-foreground text-xs">No orders linked to this invoice.</div>
+              )}
+
+              {/* SECTION 1: DELIVERED ORDERS (revenue detail) */}
+              <SectionHeader icon={Package} title="Delivered Orders (Revenue)" color="text-success" count={counts?.delivered_count ?? 0} />
               {deliveredOrders.length > 0 ? (
                 <InvoiceOrdersTable orders={deliveredOrders} productWeightMap={productWeightMap} />
               ) : (
