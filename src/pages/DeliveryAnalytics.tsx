@@ -308,7 +308,7 @@ export default function DeliveryAnalytics() {
                 <tr className="border-b text-muted-foreground text-xs">
                   <th className="text-left py-2 pr-4">Rank</th>
                   <th className="text-left py-2 pr-4">Agent</th>
-                  <th className="text-right py-2 pr-4">Shipped</th>
+                  <th className="text-right py-2 pr-4">Confirmed</th>
                   <th className="text-right py-2 pr-4">Delivered</th>
                   <th className="text-right py-2">Del. Rate</th>
                 </tr>
@@ -322,7 +322,7 @@ export default function DeliveryAnalytics() {
                       )}>{i + 1}</span>
                     </td>
                     <td className="py-2.5 pr-4 font-medium">{a.name}</td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">{a.shipped}</td>
+                    <td className="py-2.5 pr-4 text-right tabular-nums">{a.confirmed}</td>
                     <td className="py-2.5 pr-4 text-right tabular-nums text-success">{a.delivered}</td>
                     <td className="py-2.5 text-right">
                       <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold", rateBadge(a.rate))}>{a.rate}%</span>
@@ -380,7 +380,7 @@ export default function DeliveryAnalytics() {
                       onClick={() => setExpandedCity(expandedCity === c.city ? null : c.city)}>
                       <td className="py-2.5 pr-4 font-medium">{c.city}</td>
                       <td className="py-2.5 pr-4 text-right tabular-nums">{c.shipped}</td>
-                      <td className="py-2.5 pr-4 text-right tabular-nums text-info">{c.pending}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-info">{c.inTransit}</td>
                       <td className="py-2.5 pr-4 text-right tabular-nums text-success">{c.delivered}</td>
                       <td className="py-2.5 pr-4 text-right">
                         <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold", rateBadge(c.rate))}>{c.rate}%</span>
@@ -406,7 +406,7 @@ export default function DeliveryAnalytics() {
                             <div className="bg-card rounded-lg border p-3">
                               <p className="text-muted-foreground font-medium mb-1">Avg Delivery</p>
                               <p className="text-lg font-bold">{c.avgTime} days</p>
-                              <p className="text-muted-foreground mt-0.5">{c.pending} still pending</p>
+                              <p className="text-muted-foreground mt-0.5">{c.inTransit} in transit</p>
                             </div>
                           </div>
                         </td>
