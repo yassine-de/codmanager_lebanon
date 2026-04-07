@@ -103,7 +103,7 @@ function OrderSparklineCards({ orders }: { orders: Order[] }) {
 
   const totals = useMemo(() => ({
     total: orders.length,
-    confirmed: orders.filter(o => ["confirmed","shipped","delivered","in_transit","with_courier"].includes(o.status)).length,
+    confirmed: orders.filter(o => ["shipped","in_transit","with_courier"].includes(o.deliveryStatus || "")).length,
     delivered: orders.filter(o => o.status === "delivered").length,
     returned: orders.filter(o => o.status === "returned").length,
   }), [orders]);
