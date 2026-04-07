@@ -115,6 +115,7 @@ function generateProduct(i: number): Product {
     totalQty,
     delivered,
     shipped,
+    cancelled: 0,
     available,
     createdAt: new Date(Date.now() - daysAgo * 86400000).toISOString(),
     variants: generateVariants(sku, price),
