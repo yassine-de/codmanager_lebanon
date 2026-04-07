@@ -103,14 +103,14 @@ function OrderSparklineCards({ orders }: { orders: Order[] }) {
 
   const totals = useMemo(() => ({
     total: orders.length,
-    confirmed: orders.filter(o => ["confirmed","shipped","delivered","in_transit","with_courier"].includes(o.status)).length,
-    delivered: orders.filter(o => o.status === "delivered").length,
-    returned: orders.filter(o => o.status === "returned").length,
+    confirmed: orders.filter(o => ["shipped","in_transit","with_courier"].includes(o.deliveryStatus || "")).length,
+    delivered: orders.filter(o => o.deliveryStatus === "delivered").length,
+    returned: orders.filter(o => o.deliveryStatus === "returned").length,
   }), [orders]);
 
   const cards = [
     { title: "Total Orders", value: totals.total, dataKey: "total", color: "hsl(210,60%,52%)" },
-    { title: "Fulfilled orders over time", value: totals.confirmed, dataKey: "confirmed", color: "hsl(210,60%,52%)" },
+    { title: "Shipped", value: totals.confirmed, dataKey: "confirmed", color: "hsl(210,60%,52%)" },
     { title: "Delivered orders over time", value: totals.delivered, dataKey: "delivered", color: "hsl(155,50%,42%)" },
     { title: "Returns", value: totals.returned, dataKey: "returned", color: "hsl(210,60%,52%)" },
   ];
