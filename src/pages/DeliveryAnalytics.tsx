@@ -123,11 +123,11 @@ export default function DeliveryAnalytics() {
     // Total shipped (all that have been sent out)
     const totalShipped = inTransit + delivered + returned;
 
-    // Compute avg delivery time
+    // Compute avg delivery time: from shipped_at to delivered_at
     const deliveryTimes = filteredOrders
-      .filter(o => o.confirmed_at && o.delivered_at)
+      .filter(o => (o as any).shipped_at && o.delivered_at)
       .map(o => {
-        const days = Math.max(1, Math.round((new Date(o.delivered_at!).getTime() - new Date(o.confirmed_at!).getTime()) / 86400000));
+        const days = Math.max(1, Math.round((new Date(o.delivered_at!).getTime() - new Date((o as any).shipped_at).getTime()) / 86400000));
         return days;
       });
     const avgDeliveryTime = deliveryTimes.length > 0 ? (deliveryTimes.reduce((a, b) => a + b, 0) / deliveryTimes.length).toFixed(1) : '—';
