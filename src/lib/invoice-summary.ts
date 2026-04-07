@@ -32,6 +32,8 @@ export interface InvoiceSummaryResponse {
     shipped_count: number;
     confirmed_count: number;
     dropped_count: number;
+    cross_shipped_count: number;
+    cross_delivered_count: number;
   };
   call_center_breakdown: {
     confirmed_count: number;
@@ -54,6 +56,8 @@ export interface InvoiceSummaryResponse {
     weight_kg: number | null;
     total_weight_kg: number | null;
     amount_usd: number;
+    is_cross_invoice?: boolean;
+    original_invoice_number?: string | null;
   }>;
   all_orders: Array<{
     id: string;
@@ -74,6 +78,8 @@ export interface InvoiceSummaryResponse {
     adjustment_invoice_id: string | null;
     adjustment_invoice_number: string | null;
     was_delivered: boolean;
+    is_cross_invoice?: boolean;
+    original_invoice_number?: string | null;
   }>;
   shipping_breakdown: Array<{
     bracket: string;
