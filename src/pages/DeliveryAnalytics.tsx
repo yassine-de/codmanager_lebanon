@@ -28,7 +28,33 @@ export default function DeliveryAnalytics() {
         .select("id, order_id, confirmation_status, delivery_status, product_name, seller_id, agent_id, original_agent_id, customer_city, created_at, confirmed_at, delivered_at, shipping_status")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+
+      // Fetch delivery dates from order_history for orders missing delivered_at
+      const deliveredOrderIds = (data || [])
+        .filter(o => (o.delivery_status === 'delivered' || o.delivery_status === 'paid') && !o.delivered_at)
+        .map(o => o.order_id);
+
+      let deliveryDateMap: Record<string, string> = {};
+      if (deliveredOrderIds.length > 0) {
+        const { data: historyData } = await supabase
+          .from("order_history")
+          .select("order_id, created_at")
+          .in("order_id", deliveredOrderIds)
+          .eq("field_changed", "delivery_status")
+          .eq("new_value", "delivered")
+          .order("created_at", { ascending: false });
+        if (historyData) {
+          historyData.forEach(h => {
+            if (!deliveryDateMap[h.order_id]) deliveryDateMap[h.order_id] = h.created_at;
+          });
+        }
+      }
+
+      // Enrich orders with fallback delivered_at
+      return (data || []).map(o => ({
+        ...o,
+        delivered_at: o.delivered_at || deliveryDateMap[o.order_id] || null,
+      }));
     },
   });
 
