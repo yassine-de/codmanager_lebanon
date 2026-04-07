@@ -407,7 +407,7 @@ export default function Products() {
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Total Qty</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Delivered</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Shipped</th>
-                      <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Cancelled</th>
+                      <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Returned</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Available</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Weight</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Variants</th>
@@ -585,7 +585,7 @@ export default function Products() {
                         <span className="font-medium">{product.price}</span>
                         <span className="text-muted-foreground">Selling: {product.lastSellingPrice}</span>
                         <span className="text-muted-foreground">Qty: {product.totalQty}</span>
-                        <span className="text-destructive">Cancel: {product.cancelled}</span>
+                        <span className="text-destructive">Returned: {product.cancelled}</span>
                         <span className="text-muted-foreground">Avail: {product.available}</span>
                       </div>
                     </div>
