@@ -24,6 +24,8 @@ interface Order {
   adjustment_invoice_id?: string | null;
   adjustment_invoice_number?: string | null;
   was_delivered?: boolean;
+  is_cross_invoice?: boolean;
+  original_invoice_number?: string | null;
 }
 
 interface Props {
@@ -49,6 +51,8 @@ function getDisplayStatus(order: Order) {
 }
 
 function shouldShowOrder(order: Order, invoiceStatus: string): boolean {
+  // Cross-invoice orders always visible (they represent active fees)
+  if (order.is_cross_invoice) return true;
   // OPEN invoice: only show delivered orders
   if (invoiceStatus === "open") {
     return order.delivery_status === "delivered";
@@ -179,6 +183,14 @@ export function InvoiceAllOrdersTable({ orders, invoiceStatus }: Props) {
                           >
                             <AlertTriangle className="w-2.5 h-2.5" />
                             {o.adjustment_invoice_number || "Adj"}
+                          </span>
+                        )}
+                        {o.is_cross_invoice && (
+                          <span
+                            title={`Fee from ${o.original_invoice_number}`}
+                            className="inline-flex items-center gap-0.5 text-[9px] font-medium text-info bg-info/10 px-1 py-0.5 rounded"
+                          >
+                            📦 {o.original_invoice_number}
                           </span>
                         )}
                       </div>
