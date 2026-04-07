@@ -148,9 +148,9 @@ export default function Adjustments() {
                 <TableHead className="text-xs">Seller</TableHead>
                 <TableHead className="text-xs">Old Status</TableHead>
                 <TableHead className="text-xs">New Status</TableHead>
-                <TableHead className="text-xs text-right">Revenue Δ</TableHead>
+                <TableHead className="text-xs text-right">Revenue Δ (PKR)</TableHead>
                 <TableHead className="text-xs text-right">Shipping Δ</TableHead>
-                <TableHead className="text-xs text-right">Total Δ</TableHead>
+                <TableHead className="text-xs text-right">Total Δ (PKR)</TableHead>
                 <TableHead className="text-xs">Date</TableHead>
                 <TableHead className="text-xs">Status</TableHead>
                 <TableHead className="text-xs text-right">Actions</TableHead>
@@ -171,7 +171,7 @@ export default function Adjustments() {
                     <TableCell><Badge variant="outline" className="text-[10px]">{adj.old_status}</Badge></TableCell>
                     <TableCell><Badge variant="outline" className="text-[10px]">{adj.new_status}</Badge></TableCell>
                     <TableCell className={`text-right tabular-nums font-semibold ${adj.difference >= 0 ? "text-success" : "text-destructive"}`}>
-                      {adj.difference !== 0 ? (adj.difference >= 0 ? "+" : "") + formatUSD(adj.difference) : "—"}
+                      {adj.difference !== 0 ? (adj.difference >= 0 ? "+" : "") + formatPKR(adj.difference) : "—"}
                     </TableCell>
                     <TableCell className={`text-right tabular-nums font-semibold ${shippingDiff >= 0 ? "text-success" : "text-destructive"}`}>
                       {shippingDiff !== 0 ? (
@@ -182,7 +182,7 @@ export default function Adjustments() {
                       ) : "—"}
                     </TableCell>
                     <TableCell className={`text-right tabular-nums font-bold ${totalDiff >= 0 ? "text-success" : "text-destructive"}`}>
-                      {totalDiff !== 0 ? (totalDiff >= 0 ? "+" : "") + formatUSD(totalDiff) : "—"}
+                      {totalDiff !== 0 ? (totalDiff >= 0 ? "+" : "") + formatPKR(totalDiff) : "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{format(new Date(adj.created_at), "dd/MM/yy HH:mm")}</TableCell>
                     <TableCell>{statusBadge(adj.status)}</TableCell>
