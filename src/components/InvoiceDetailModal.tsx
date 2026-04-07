@@ -92,7 +92,7 @@ export function InvoiceDetailModal({
               {/* SECTION 0: ALL ORDERS (full audit visibility) */}
               <SectionHeader icon={List} title="All Orders" color="text-foreground" count={allOrders.length} />
               {allOrders.length > 0 ? (
-                <InvoiceAllOrdersTable orders={allOrders} />
+                <InvoiceAllOrdersTable orders={allOrders} invoiceStatus={summary?.invoice.status ?? "open"} />
               ) : (
                 <div className="text-center py-4 text-muted-foreground text-xs">No orders linked to this invoice.</div>
               )}
