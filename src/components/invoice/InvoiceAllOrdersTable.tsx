@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { formatPKR } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,13 +51,10 @@ function getDisplayStatus(order: Order) {
 }
 
 function shouldShowOrder(order: Order, invoiceStatus: string): boolean {
-  // Cross-invoice orders always visible (they represent active fees)
-  if (order.is_cross_invoice) return true;
-  // OPEN invoice: only show delivered orders
   if (invoiceStatus === "open") {
     return order.delivery_status === "delivered";
   }
-  // CLOSED/PAID invoice: show delivered OR was previously delivered
+
   return order.delivery_status === "delivered" || order.was_delivered === true;
 }
 
@@ -66,9 +63,21 @@ export function InvoiceAllOrdersTable({ orders, invoiceStatus }: Props) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // Filter orders based on invoice status visibility rules
+  useEffect(() => {
+    orders.forEach((order) => {
+      console.log("[InvoiceAllOrdersTable]", {
+        order_id: order.order_id,
+        delivery_status: order.delivery_status,
+        was_delivered: order.was_delivered ?? false,
+        invoice_status: invoiceStatus,
+        is_cross_invoice: order.is_cross_invoice ?? false,
+        visible: shouldShowOrder(order, invoiceStatus),
+      });
+    });
+  }, [orders, invoiceStatus]);
+
   const visibleOrders = useMemo(() => {
-    return orders.filter(o => shouldShowOrder(o, invoiceStatus));
+    return orders.filter((order) => shouldShowOrder(order, invoiceStatus));
   }, [orders, invoiceStatus]);
 
   const filtered = useMemo(() => {
