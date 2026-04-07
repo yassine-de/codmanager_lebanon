@@ -23,6 +23,7 @@ export interface Product {
   totalQty: number;
   delivered: number;
   shipped: number;
+  cancelled: number;
   available: number;
   createdAt: string;
   variants: ProductVariant[];
