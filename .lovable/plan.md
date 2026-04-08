@@ -1,62 +1,48 @@
 
 
-# Fix: Shipping Fee Not Removed on Revert to Pending
+# Fix: Double-Counting Shipping Fees After Delivered→Shipped Revert
 
 ## Problem
-When an order is shipped (counted in shipping fees), then reverted to `pending`, the shipping fee remains because the shipped count logic only checks if a `shipped` event EXISTS in `order_history` — it doesn't verify the order's last delivery_status event is still a shipped state.
+When an order in a closed invoice changes from `delivered` → `shipped`, the adjustment trigger correctly creates a revenue reversal. However, the `get_invoice_summary` cross-invoice shipped query sees the new `shipped` event (logged in `order_history` when status changed) as a **new** shipment happening after the closed invoice's finalization — and counts it again in the open invoice's shipping fees.
+
+The order was already shipped and billed in the closed invoice. The `delivered→shipped` revert is not a new shipment — it's just a status correction.
 
 ## Root Cause
-The current shipped count query in `get_invoice_summary`:
-```sql
-AND EXISTS (
-  SELECT 1 FROM public.order_history oh
-  WHERE oh.order_id = o.order_id AND oh.field_changed = 'delivery_status' AND oh.new_value = 'shipped'
-)
-AND NOT EXISTS (
-  -- only checks if shipped event was before period_start
-  SELECT 1 FROM public.order_history oh2
-  WHERE ... AND oh2.created_at <= v_period_start
-)
+The cross-invoice shipped query checks:
 ```
-It never checks if the order was **reverted** after being shipped.
+EXISTS (shipped event after inv_orig.finalized_at AND within current period)
+```
+When status changes from `delivered` to `shipped`, a new `order_history` entry is created with `new_value = 'shipped'`. This event falls after finalization, so the query picks it up as a "new cross-invoice shipment."
 
 ## Fix
-Apply the same "last event in period" pattern used for confirmations. For the shipped count (both direct and cross-invoice), add a `NOT EXISTS` clause that excludes orders whose **last** `delivery_status` event in the period is NOT a shipped state (`shipped`, `in_transit`, `with_courier`, `delivered`, `returned`).
+In the `get_invoice_summary` function, add an exclusion to the **cross-invoice shipped** query (and corresponding parts of the **shipping breakdown** UNION ALL): skip orders that already had a `shipped` event **before or during** the original invoice period (`<= inv_orig.finalized_at`). If the order was already shipped in the closed invoice, any subsequent shipped events are not new shipments.
 
 ### Database Migration
+Add this condition to the cross-invoice shipped CTE and the second half of the shipping breakdown UNION ALL:
 
-Update `get_invoice_summary` in three places:
-
-#### 1. Direct shipped count
-Add after the existing `NOT EXISTS`:
 ```sql
--- Exclude if last delivery_status event in period reverts to non-shipped
+-- Exclude orders that were already shipped within their original closed invoice period
 AND NOT EXISTS (
-  SELECT 1 FROM public.order_history oh_last
-  WHERE oh_last.order_id = o.order_id
-    AND oh_last.field_changed = 'delivery_status'
-    AND oh_last.created_at > v_period_start
-    AND oh_last.created_at <= v_period_end
-    AND oh_last.created_at = (
-      SELECT MAX(created_at) FROM public.order_history
-      WHERE order_id = o.order_id AND field_changed = 'delivery_status'
-        AND created_at > v_period_start AND created_at <= v_period_end
-    )
-    AND oh_last.new_value NOT IN ('shipped','in_transit','with_courier','delivered','returned')
+  SELECT 1 FROM public.order_history oh_prev
+  WHERE oh_prev.order_id = o.order_id
+    AND oh_prev.field_changed = 'delivery_status'
+    AND oh_prev.new_value = 'shipped'
+    AND oh_prev.created_at <= inv_orig.finalized_at
 )
 ```
 
-#### 2. Cross-invoice shipped query (same pattern)
-Add the same `NOT EXISTS` clause to the cross-shipped CTE.
+This ensures only **genuinely new** cross-invoice shipments are counted — orders that were never shipped before the invoice was closed.
 
-#### 3. Shipping breakdown query
-Add the same `NOT EXISTS` clause to both halves of the `all_shipped` UNION ALL in the shipping breakdown.
+### Affected Queries (3 spots)
+1. **Cross-invoice shipped CTE** — the `cross_shipped` WITH block
+2. **Cross-delivered count** — no change needed (delivery events are separate)
+3. **Shipping breakdown** — the second UNION ALL half (cross-invoice part)
 
 ### No Frontend Changes
-The frontend already reads `shipped_count` and `shipping_breakdown` from the summary — no type changes needed.
+The frontend reads `shipped_count` and `shipping_breakdown` from the summary — no code changes needed.
 
 ## Result
-- Order shipped then reverted to pending → removed from shipping fees
-- Order shipped, reverted, then re-shipped → included (last event is shipped)
-- Correct billing in all revert scenarios
+- Order shipped in closed invoice → delivered → reverted to shipped: **NOT** double-counted
+- Genuinely new shipment after invoice close (never shipped before): **correctly counted**
+- Adjustment for revenue reversal continues working as-is
 
