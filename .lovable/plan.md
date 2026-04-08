@@ -1,50 +1,65 @@
 
 
-# Fix: Cross-Invoice Shipped Exclusion Too Aggressive
+# Fix: Notification Sound Playing on Login
 
 ## Problem
-BS-043 was shipped, then reverted to pending BEFORE its invoice (BS-INV-002) was finalized. The first shipping was never billed (same-period revert excluded it). After finalization, the order was shipped again — this IS a genuinely new shipment that should appear in BS-INV-003.
-
-But the `NOT EXISTS (shipped before finalization)` filter blindly blocks any order that ever had a shipped event before finalization, regardless of whether that shipping was actually billed.
+When logging in as either admin or seller, a notification sound plays immediately. This is unexpected — sounds should only play for **new** messages arriving after login.
 
 ## Root Cause
-The exclusion checks:
-```sql
-AND NOT EXISTS (
-  oh_prev.new_value = 'shipped' AND oh_prev.created_at <= inv_orig.finalized_at
-)
-```
-This is too broad. It should only exclude orders whose shipping was **actually billed** in the closed invoice — i.e., orders that were still in a shipped-like state when the invoice was finalized.
+
+**Seller side**: `prevUnreadRef` starts at `0`. On first fetch of `unreadCount`, if there are any existing unread messages (e.g. count = 2), the condition `unreadCount > prevUnreadRef.current` is true → sound plays. This is a false positive — those messages existed before login.
+
+**Admin side**: The realtime channel subscribes immediately on login. Supabase may replay recent events or there could be messages arriving during the brief login window triggering the sound.
 
 ## Fix
-Replace the "any shipped event before finalization" check with a "last delivery event before finalization was shipped-like" check. This way:
-- Order shipped and still shipped at finalization → shipping was billed → **exclude** (no double-count)
-- Order shipped then reverted to pending before finalization → shipping was NOT billed → **allow** (new shipment)
 
-### New condition (replaces the current `NOT EXISTS` in 2 spots):
-```sql
-AND NOT EXISTS (
-  SELECT 1 FROM public.order_history oh_prev
-  WHERE oh_prev.order_id = o.order_id
-    AND oh_prev.field_changed = 'delivery_status'
-    AND oh_prev.created_at <= inv_orig.finalized_at
-    AND oh_prev.created_at = (
-      SELECT MAX(created_at) FROM public.order_history
-      WHERE order_id = o.order_id
-        AND field_changed = 'delivery_status'
-        AND created_at <= inv_orig.finalized_at
-    )
-    AND oh_prev.new_value IN ('shipped','in_transit','with_courier','delivered','returned')
-)
+### 1. Seller — `SellerSupportChat.tsx` (line 64, 174-180)
+Initialize `prevUnreadRef` to `-1` (sentinel) instead of `0`. On first render, set it to current count without playing sound:
+
+```tsx
+const prevUnreadRef = useRef<number>(-1);
+
+useEffect(() => {
+  if (prevUnreadRef.current === -1) {
+    // First load — just sync, don't play sound
+    prevUnreadRef.current = unreadCount;
+    return;
+  }
+  if (unreadCount > prevUnreadRef.current) {
+    playSellerNotificationSound();
+  }
+  prevUnreadRef.current = unreadCount;
+}, [unreadCount]);
 ```
 
-### Affected locations (2 spots in `get_invoice_summary`):
-1. **Cross-shipped CTE** — the final `NOT EXISTS` clause
-2. **Shipping breakdown UNION ALL** — the cross-invoice half's final `NOT EXISTS` clause
+### 2. Admin — `useGlobalSupportNotifications.ts` (line 18-48)
+Add a `readyRef` that starts `false` and is set to `true` after a short delay (e.g. 2 seconds) post-subscription. Ignore events during this grace period:
 
-### No frontend changes needed.
+```tsx
+const readyRef = useRef(false);
+
+useEffect(() => {
+  if (!isAdmin || !authUser) return;
+  readyRef.current = false;
+  const timer = setTimeout(() => { readyRef.current = true; }, 2000);
+
+  const channel = supabase.channel(...)
+    .on('postgres_changes', ..., (payload) => {
+      if (!readyRef.current) return; // skip during grace period
+      // ... existing logic
+    })
+    .subscribe();
+
+  return () => {
+    clearTimeout(timer);
+    supabase.removeChannel(channel);
+  };
+}, [isAdmin, authUser, queryClient]);
+```
+
+### No other changes needed.
 
 ## Result
-- BS-043: shipped → pending (before close) → shipped (after close) → **correctly counted** as new shipment in open invoice
-- Orders that were shipped and stayed shipped at close → still excluded (no double-counting)
+- No sound on login for either role
+- Sound still plays for genuinely new messages arriving after login
 
