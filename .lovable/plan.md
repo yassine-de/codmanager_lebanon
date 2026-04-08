@@ -1,114 +1,62 @@
 
 
-# Event-Based Confirmation Fee Logic
+# Fix: Shipping Fee Not Removed on Revert to Pending
 
-## Summary
-Replace state-based confirmation counting (`confirmation_status = 'confirmed'`) with event-based detection using `order_history`. Count one confirmation per order, only if a valid confirmation event exists in the invoice period.
+## Problem
+When an order is shipped (counted in shipping fees), then reverted to `pending`, the shipping fee remains because the shipped count logic only checks if a `shipped` event EXISTS in `order_history` — it doesn't verify the order's last delivery_status event is still a shipped state.
 
-## Database Migration: Update `get_invoice_summary`
-
-### 1. Direct invoice confirmed count
-
-**Current:**
+## Root Cause
+The current shipped count query in `get_invoice_summary`:
 ```sql
-SELECT COUNT(*) INTO v_invoice_confirmed_count
-FROM public.orders WHERE invoice_id = p_invoice_id AND confirmation_status = 'confirmed';
+AND EXISTS (
+  SELECT 1 FROM public.order_history oh
+  WHERE oh.order_id = o.order_id AND oh.field_changed = 'delivery_status' AND oh.new_value = 'shipped'
+)
+AND NOT EXISTS (
+  -- only checks if shipped event was before period_start
+  SELECT 1 FROM public.order_history oh2
+  WHERE ... AND oh2.created_at <= v_period_start
+)
+```
+It never checks if the order was **reverted** after being shipped.
+
+## Fix
+Apply the same "last event in period" pattern used for confirmations. For the shipped count (both direct and cross-invoice), add a `NOT EXISTS` clause that excludes orders whose **last** `delivery_status` event in the period is NOT a shipped state (`shipped`, `in_transit`, `with_courier`, `delivered`, `returned`).
+
+### Database Migration
+
+Update `get_invoice_summary` in three places:
+
+#### 1. Direct shipped count
+Add after the existing `NOT EXISTS`:
+```sql
+-- Exclude if last delivery_status event in period reverts to non-shipped
+AND NOT EXISTS (
+  SELECT 1 FROM public.order_history oh_last
+  WHERE oh_last.order_id = o.order_id
+    AND oh_last.field_changed = 'delivery_status'
+    AND oh_last.created_at > v_period_start
+    AND oh_last.created_at <= v_period_end
+    AND oh_last.created_at = (
+      SELECT MAX(created_at) FROM public.order_history
+      WHERE order_id = o.order_id AND field_changed = 'delivery_status'
+        AND created_at > v_period_start AND created_at <= v_period_end
+    )
+    AND oh_last.new_value NOT IN ('shipped','in_transit','with_courier','delivered','returned')
+)
 ```
 
-**New:**
-```sql
-SELECT COUNT(*) INTO v_invoice_confirmed_count
-FROM public.orders o
-WHERE o.invoice_id = p_invoice_id
-  AND EXISTS (
-    SELECT 1 FROM public.order_history oh
-    WHERE oh.order_id = o.order_id
-      AND oh.field_changed = 'confirmation_status'
-      AND oh.new_value = 'confirmed'
-      AND oh.created_at > v_period_start
-      AND oh.created_at <= v_period_end
-  )
-  AND NOT EXISTS (
-    -- Exclude if the last confirmation_status event in this period is a revert (not 'confirmed')
-    SELECT 1 FROM public.order_history oh_later
-    WHERE oh_later.order_id = o.order_id
-      AND oh_later.field_changed = 'confirmation_status'
-      AND oh_later.created_at > v_period_start
-      AND oh_later.created_at <= v_period_end
-      AND oh_later.created_at = (
-        SELECT MAX(oh_max.created_at) FROM public.order_history oh_max
-        WHERE oh_max.order_id = o.order_id
-          AND oh_max.field_changed = 'confirmation_status'
-          AND oh_max.created_at > v_period_start
-          AND oh_max.created_at <= v_period_end
-      )
-      AND oh_later.new_value != 'confirmed'
-  );
-```
+#### 2. Cross-invoice shipped query (same pattern)
+Add the same `NOT EXISTS` clause to the cross-shipped CTE.
 
-This ensures:
-- Counts only orders with a confirmation event in the period
-- If confirmed then reverted in the same period → excluded (last event is not 'confirmed')
-- If confirmed, reverted, then re-confirmed in the same period → included (last event is 'confirmed')
+#### 3. Shipping breakdown query
+Add the same `NOT EXISTS` clause to both halves of the `all_shipped` UNION ALL in the shipping breakdown.
 
-### 2. Cross-invoice confirmed count (new variable)
+### No Frontend Changes
+The frontend already reads `shipped_count` and `shipping_breakdown` from the summary — no type changes needed.
 
-Add `v_cross_confirmed_count`:
-```sql
-SELECT COUNT(*) INTO v_cross_confirmed_count
-FROM public.orders o
-JOIN public.invoices inv_orig ON inv_orig.id = o.invoice_id
-WHERE o.seller_id = v_invoice.seller_id
-  AND o.invoice_id != p_invoice_id
-  AND inv_orig.status IN ('ready','paid')
-  AND inv_orig.finalized_at IS NOT NULL
-  AND EXISTS (
-    SELECT 1 FROM public.order_history oh
-    WHERE oh.order_id = o.order_id
-      AND oh.field_changed = 'confirmation_status'
-      AND oh.new_value = 'confirmed'
-      AND oh.created_at > inv_orig.finalized_at
-      AND oh.created_at > v_period_start
-      AND oh.created_at <= v_period_end
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM public.order_history oh_later
-    WHERE oh_later.order_id = o.order_id
-      AND oh_later.field_changed = 'confirmation_status'
-      AND oh_later.created_at > v_period_start
-      AND oh_later.created_at <= v_period_end
-      AND oh_later.created_at = (
-        SELECT MAX(oh_max.created_at) FROM public.order_history oh_max
-        WHERE oh_max.order_id = o.order_id
-          AND oh_max.field_changed = 'confirmation_status'
-          AND oh_max.created_at > v_period_start
-          AND oh_max.created_at <= v_period_end
-      )
-      AND oh_later.new_value != 'confirmed'
-  );
-```
-
-### 3. Update totals
-```sql
-v_confirmed_count := v_invoice_confirmed_count + v_cross_confirmed_count;
-```
-
-### 4. Return value
-Add `'cross_confirmed_count', v_cross_confirmed_count` to the `counts` object.
-
-## Frontend Type Update
-
-**File:** `src/lib/invoice-summary.ts` — add `cross_confirmed_count: number` to `counts`.
-
-## Files Changed
-
-| Location | Change |
-|----------|--------|
-| DB Migration (new) | Event-based confirmation in `get_invoice_summary` |
-| `src/lib/invoice-summary.ts` | Add `cross_confirmed_count` to types |
-
-## What Is NOT Changed
-- Dropped count formula — unchanged
-- Adjustment trigger for confirmation — unchanged
-- Frontend display — already uses `confirmed_count` from summary
+## Result
+- Order shipped then reverted to pending → removed from shipping fees
+- Order shipped, reverted, then re-shipped → included (last event is shipped)
+- Correct billing in all revert scenarios
 
