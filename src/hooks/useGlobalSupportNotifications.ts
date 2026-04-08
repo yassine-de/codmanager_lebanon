@@ -14,9 +14,12 @@ export function useGlobalAdminSupportNotifications() {
   const { authUser } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = authUser?.role === "admin";
+  const readyRef = useRef(false);
 
   useEffect(() => {
     if (!isAdmin || !authUser) return;
+    readyRef.current = false;
+    const timer = setTimeout(() => { readyRef.current = true; }, 2000);
 
     const channel = supabase
       .channel("global-admin-support-notify")
@@ -24,6 +27,7 @@ export function useGlobalAdminSupportNotifications() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "support_messages" },
         (payload) => {
+          if (!readyRef.current) return; // skip during grace period
           const msg = payload.new as any;
           // Only notify for seller messages (not admin's own messages)
           if (msg.sender_type === "seller" && msg.sender_id !== authUser.id) {
@@ -43,6 +47,7 @@ export function useGlobalAdminSupportNotifications() {
       .subscribe();
 
     return () => {
+      clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, [isAdmin, authUser, queryClient]);

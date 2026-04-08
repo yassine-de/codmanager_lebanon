@@ -61,7 +61,7 @@ export function SellerSupportChat() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const prevUnreadRef = useRef<number>(0);
+  const prevUnreadRef = useRef<number>(-1);
 
   // New ticket form
   const [issueType, setIssueType] = useState("other");
@@ -173,7 +173,12 @@ export function SellerSupportChat() {
 
   // Play sound on new unread
   useEffect(() => {
-    if (unreadCount > prevUnreadRef.current && prevUnreadRef.current >= 0) {
+    if (prevUnreadRef.current === -1) {
+      // First load — just sync, don't play sound
+      prevUnreadRef.current = unreadCount;
+      return;
+    }
+    if (unreadCount > prevUnreadRef.current) {
       playSellerNotificationSound();
     }
     prevUnreadRef.current = unreadCount;
