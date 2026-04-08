@@ -518,7 +518,7 @@ export default function Invoices() {
                         </TableCell>
                       )}
                       <TableCell className="text-center">
-                        <span className="inline-flex items-center justify-center h-6 min-w-[28px] px-1.5 rounded-md bg-accent text-[11px] font-semibold">{inv.ordersCount}</span>
+                        <span className="inline-flex items-center justify-center h-6 min-w-[28px] px-1.5 rounded-md bg-accent text-[11px] font-semibold">{inv.deliveredCount}</span>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{formatUSD(inv.totalAmountPKR)}</TableCell>
                       <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.shippingFees)}</TableCell>
