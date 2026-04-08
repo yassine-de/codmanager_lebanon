@@ -65,13 +65,12 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
   const [address, setAddress] = useState('');
-  const [seller, setSeller] = useState('');
+  
   const [confirmationStatus, setConfirmationStatus] = useState<ConfirmationStatus>('new');
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus>('pending');
   const [notes, setNotes] = useState('');
   const [products, setProducts] = useState<{ name: string; qty: number; price: number }[]>([]);
   const [upsell, setUpsell] = useState(false);
-  const [warehouseState, setWarehouseState] = useState<'in_stock' | 'out_of_stock' | 'reserved'>('in_stock');
 
   useEffect(() => {
     if (open && order) {
@@ -79,13 +78,11 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
       setPhone(order.phone);
       setCity(order.city);
       setAddress(order.address);
-      setSeller(order.seller);
       setConfirmationStatus(order.confirmationStatus);
       setDeliveryStatus(order.deliveryStatus);
       setNotes(order.notes || '');
       setProducts(order.products.map(p => ({ ...p })));
       setUpsell(order.upsell);
-      setWarehouseState(order.warehouseState);
     }
   }, [open, order]);
 
@@ -142,14 +139,12 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
       phone: phone.trim(),
       city,
       address: address.trim(),
-      seller,
       confirmationStatus,
       deliveryStatus,
       notes: notes.trim() || undefined,
       products,
       total,
       upsell,
-      warehouseState,
       updatedAt: now,
       history: historyEvents,
     };
@@ -265,26 +260,6 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
             <div>
               <h3 className={sectionTitle}>Order Status</h3>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className={fieldLabel}>Seller</Label>
-                  <Select value={seller} onValueChange={setSeller}>
-                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {sellerNames.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className={fieldLabel}>Warehouse</Label>
-                  <Select value={warehouseState} onValueChange={v => setWarehouseState(v as any)}>
-                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="in_stock">In Stock</SelectItem>
-                      <SelectItem value="out_of_stock">Out of Stock</SelectItem>
-                      <SelectItem value="reserved">Reserved</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div>
                   <Label className={fieldLabel}>Confirmation</Label>
                   <Select value={confirmationStatus} onValueChange={v => setConfirmationStatus(v as ConfirmationStatus)}>

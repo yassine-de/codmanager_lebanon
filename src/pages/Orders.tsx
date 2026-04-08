@@ -311,7 +311,7 @@ export default function Orders() {
         seller: profileMap.get(o.seller_id) || "Unknown",
         agentName: o.agent_id ? (profileMap.get(o.agent_id) || undefined) : (o.original_agent_id ? (profileMap.get(o.original_agent_id) || undefined) : undefined),
         upsell: false,
-        warehouseState: "in_stock" as const,
+        
         history: [],
         attemptCount: o.attempt_count || 0,
       }));
@@ -334,7 +334,7 @@ export default function Orders() {
   const [filterConfirmation, setFilterConfirmation] = useState('all');
   const [filterDelivery, setFilterDelivery] = useState('all');
   const [filterUpsell, setFilterUpsell] = useState('all');
-  const [filterWarehouse, setFilterWarehouse] = useState('all');
+  
 
   // Read URL params on mount
   useEffect(() => {
@@ -365,7 +365,7 @@ export default function Orders() {
       product: 'all', seller: 'all', agent: 'all',
       confirmation: conf || 'all',
       delivery: del || 'all', 
-      upsell: 'all', warehouse: 'all',
+      upsell: 'all',
     };
   });
 
@@ -392,18 +392,18 @@ export default function Orders() {
     setAppliedFilters({
       dateRange, product: filterProduct, seller: filterSeller, agent: filterAgent,
       confirmation: filterConfirmation, delivery: filterDelivery,
-      upsell: filterUpsell, warehouse: filterWarehouse,
+      upsell: filterUpsell,
     });
-  }, [dateRange, filterProduct, filterSeller, filterAgent, filterConfirmation, filterDelivery, filterUpsell, filterWarehouse]);
+  }, [dateRange, filterProduct, filterSeller, filterAgent, filterConfirmation, filterDelivery, filterUpsell]);
 
   const clearFilters = useCallback(() => {
     setDateRange(undefined);
     setFilterProduct('all'); setFilterSeller('all'); setFilterAgent('all');
     setFilterConfirmation('all'); setFilterDelivery('all');
-    setFilterUpsell('all'); setFilterWarehouse('all');
+    setFilterUpsell('all');
     setAppliedFilters({
       dateRange: undefined, product: 'all', seller: 'all', agent: 'all',
-      confirmation: 'all', delivery: 'all', upsell: 'all', warehouse: 'all',
+      confirmation: 'all', delivery: 'all', upsell: 'all',
     });
   }, []);
 
@@ -416,7 +416,7 @@ export default function Orders() {
     if (appliedFilters.confirmation !== 'all') count++;
     if (appliedFilters.delivery !== 'all') count++;
     if (appliedFilters.upsell !== 'all') count++;
-    if (appliedFilters.warehouse !== 'all') count++;
+    
     return count;
   }, [appliedFilters]);
 
@@ -438,7 +438,7 @@ export default function Orders() {
           if (f.upsell === 'yes' && !o.upsell) return false;
           if (f.upsell === 'no' && o.upsell) return false;
         }
-        if (f.warehouse !== 'all' && o.warehouseState !== f.warehouse) return false;
+        
         if (search) {
           const s = search.toLowerCase();
           return o.id.toLowerCase().includes(s) || o.customer.toLowerCase().includes(s) ||
@@ -619,20 +619,6 @@ export default function Orders() {
                 className="w-full"
               />
             </div>
-            {/* Warehouse - admin only */}
-            {isAdmin && (
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Warehouse</label>
-              <SearchableSelect
-                value={filterWarehouse}
-                onValueChange={setFilterWarehouse}
-                options={[{ value: "in_stock", label: "In Stock" }, { value: "out_of_stock", label: "Out of Stock" }, { value: "reserved", label: "Reserved" }]}
-                placeholder="Warehouse"
-                allLabel="All"
-                className="w-full"
-              />
-            </div>
-            )}
             {/* Buttons */}
             <div className="flex items-end gap-2">
               <Button size="sm" className="h-9 px-4" onClick={applyFilters}>Apply</Button>
