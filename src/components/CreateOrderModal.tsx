@@ -172,7 +172,7 @@ export default function CreateOrderModal({ open, onOpenChange, onCreated }: Crea
                     <SelectValue placeholder="Select city" />
                   </SelectTrigger>
                   <SelectContent>
-                    {MOROCCAN_CITIES.map(c => (
+                    {PAKISTANI_CITIES.map(c => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
                   </SelectContent>
