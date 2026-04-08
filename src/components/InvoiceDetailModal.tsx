@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -24,6 +25,8 @@ export function InvoiceDetailModal({
   open, onOpenChange, invoiceId, invoiceNumber, sellerName,
 }: Props) {
   const queryClient = useQueryClient();
+  const { authUser } = useAuth();
+  const isAdmin = authUser?.role === "admin";
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const removeAddonMutation = useMutation({
@@ -91,7 +94,7 @@ export function InvoiceDetailModal({
             <div>
 
               {/* SECTION 1: DELIVERED ORDERS (revenue detail) */}
-              <SectionHeader icon={Package} title={`Delivered Orders (Revenue)${(counts?.cross_delivered_count ?? 0) > 0 ? ` (incl. ${counts.cross_delivered_count} cross-invoice)` : ''}`} color="text-success" count={counts?.delivered_count ?? 0} />
+              <SectionHeader icon={Package} title={`Delivered Orders (Revenue)${isAdmin && (counts?.cross_delivered_count ?? 0) > 0 ? ` (incl. ${counts.cross_delivered_count} cross-invoice)` : ''}`} color="text-success" count={counts?.delivered_count ?? 0} />
               {deliveredOrders.length > 0 ? (
                 <InvoiceOrdersTable orders={deliveredOrders} productWeightMap={productWeightMap} />
               ) : (
@@ -99,7 +102,7 @@ export function InvoiceDetailModal({
               )}
 
               {/* SECTION 2: SHIPPING FEES (summary only — count × rate by weight bracket) */}
-              <SectionHeader icon={Truck} title={`Shipping Fees${(counts?.cross_shipped_count ?? 0) > 0 ? ` (incl. ${counts.cross_shipped_count} cross-invoice)` : ''}`} color="text-info" count={counts?.shipped_count ?? 0} />
+              <SectionHeader icon={Truck} title={`Shipping Fees${isAdmin && (counts?.cross_shipped_count ?? 0) > 0 ? ` (incl. ${counts.cross_shipped_count} cross-invoice)` : ''}`} color="text-info" count={counts?.shipped_count ?? 0} />
               <div className="px-4 py-2 space-y-1.5">
                 {shippingBreakdown.length === 0 ? (
                   <div className="text-center py-2 text-muted-foreground text-xs">No shipping fees</div>

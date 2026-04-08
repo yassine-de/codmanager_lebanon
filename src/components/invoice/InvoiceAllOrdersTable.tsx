@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { formatPKR } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -59,6 +60,8 @@ function shouldShowOrder(order: Order, invoiceStatus: string): boolean {
 }
 
 export function InvoiceAllOrdersTable({ orders, invoiceStatus }: Props) {
+  const { authUser } = useAuth();
+  const isAdmin = authUser?.role === "admin";
   const [search, setSearch] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -194,7 +197,7 @@ export function InvoiceAllOrdersTable({ orders, invoiceStatus }: Props) {
                             {o.adjustment_invoice_number || "Adj"}
                           </span>
                         )}
-                        {o.is_cross_invoice && (
+                        {o.is_cross_invoice && isAdmin && (
                           <span
                             title={`Fee from ${o.original_invoice_number}`}
                             className="inline-flex items-center gap-0.5 text-[9px] font-medium text-info bg-info/10 px-1 py-0.5 rounded"
