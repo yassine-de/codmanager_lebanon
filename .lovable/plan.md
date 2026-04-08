@@ -1,34 +1,101 @@
 
 
-# Fix: Shipping Reversal Adjustment Should Be Positive
+# Fix: Cross-Invoice Re-Delivered Orders Missing from Open Invoice
 
 ## Problem
-When an order reverts from `shipped` → `pending` on a closed invoice, the adjustment trigger creates a **negative** `shipping_difference`. This is wrong — the seller already **paid** the shipping fee in the closed invoice (it was deducted from their payout). Reversing it should **refund** the fee, meaning `shipping_difference` should be **positive**.
+When an order in a closed invoice goes `delivered → shipped → delivered`, the revenue is counted via `v_cross_delivered_revenue` but the order never appears in `v_delivered_orders`. The UI shows correct totals but the order is invisible in the delivered orders list.
 
 ## Root Cause
-In `create_invoice_adjustment_on_status_change`:
-```sql
-v_shipping_diff := -v_prev_shipping;  -- e.g. -3.00
-```
-Since `adjustment_net` is **added** to `net_payable`, a negative value here deducts even more from the seller instead of refunding the already-charged fee.
+The `v_delivered_orders` list only gets cross-invoice orders from the `cross_shipped` CTE (filtered to `delivery_status = 'delivered'`). But `cross_shipped` excludes orders already shipped before close (our earlier fix). Re-delivered orders from closed invoices are therefore invisible — they have no dedicated path into `v_delivered_orders`.
 
-## Fix
-Change the sign in the trigger — one line:
-```sql
-v_shipping_diff := +v_prev_shipping;  -- e.g. +3.00 (refund)
-```
-Also update the adjustment insert to store `previous_shipping_fee` and `new_shipping_fee` correctly:
-- `previous_shipping_fee = v_prev_shipping` (what was charged)
-- `new_shipping_fee = 0` (no longer shipped)
-- `shipping_difference = +v_prev_shipping` (refund)
+## Fix: Add Dedicated Cross-Delivered Query
 
-### Database Migration
-Replace `v_shipping_diff := -v_prev_shipping` with `v_shipping_diff := v_prev_shipping` in the shipping reversal block of `create_invoice_adjustment_on_status_change`.
+### Database Migration — Update `get_invoice_summary`
+
+**1. Add a new `cross_delivered_only` CTE** (after the `cross_shipped` block, before revenue calc):
+
+Query orders from closed invoices that:
+- Belong to a `ready`/`paid` invoice
+- Currently have `delivery_status = 'delivered'`
+- Have a `delivered` event in `order_history` after `inv_orig.finalized_at` AND within `v_period_start..v_period_end`
+- Use last-event-in-period logic: the last `delivery_status` event in the period must be `delivered` (prevents counting reverted orders)
+- Exclude orders already in `cross_shipped` CTE (to avoid double-counting in both delivered list and shipping)
+
+Build JSON from this CTE and append to `v_delivered_orders` and `v_all_orders`.
+
+**2. Replace `v_cross_delivered_revenue`** — compute it from the `cross_delivered_only` CTE instead of the current standalone query. This ensures revenue matches the visible orders exactly and avoids double-counting with orders already captured via `cross_shipped`.
+
+**3. Update `v_cross_delivered_count`** — derive from the same CTE.
+
+**4. Update `v_delivered_count`** — add `cross_delivered_only` count.
+
+### Key SQL Pattern (cross_delivered_only)
+```sql
+WITH cross_delivered_only AS (
+  SELECT o.id, o.order_id, o.customer_name, ...
+  FROM public.orders o
+  JOIN public.invoices inv_orig ON inv_orig.id = o.invoice_id
+  LEFT JOIN public.products p ON ...
+  WHERE o.seller_id = v_invoice.seller_id
+    AND o.invoice_id != p_invoice_id
+    AND inv_orig.status IN ('ready','paid')
+    AND inv_orig.finalized_at IS NOT NULL
+    AND o.delivery_status = 'delivered'
+    -- Has a delivered event after close, within period
+    AND EXISTS (
+      SELECT 1 FROM public.order_history oh
+      WHERE oh.order_id = o.order_id
+        AND oh.field_changed = 'delivery_status'
+        AND oh.new_value = 'delivered'
+        AND oh.created_at > inv_orig.finalized_at
+        AND oh.created_at > v_period_start
+        AND oh.created_at <= v_period_end
+    )
+    -- Last delivery event in period must be 'delivered'
+    AND NOT EXISTS (
+      SELECT 1 FROM public.order_history oh_last
+      WHERE oh_last.order_id = o.order_id
+        AND oh_last.field_changed = 'delivery_status'
+        AND oh_last.created_at > v_period_start
+        AND oh_last.created_at <= v_period_end
+        AND oh_last.created_at = (
+          SELECT MAX(created_at) FROM public.order_history
+          WHERE order_id = o.order_id
+            AND field_changed = 'delivery_status'
+            AND created_at > v_period_start
+            AND created_at <= v_period_end
+        )
+        AND oh_last.new_value != 'delivered'
+    )
+    -- Exclude orders already captured via cross_shipped
+    AND NOT EXISTS (
+      SELECT 1 FROM public.order_history oh_ship
+      WHERE oh_ship.order_id = o.order_id
+        AND oh_ship.field_changed = 'delivery_status'
+        AND oh_ship.new_value = 'shipped'
+        AND oh_ship.created_at > inv_orig.finalized_at
+        AND oh_ship.created_at > v_period_start
+        AND oh_ship.created_at <= v_period_end
+        AND NOT EXISTS (
+          SELECT 1 FROM public.order_history oh_prev
+          WHERE oh_prev.order_id = o.order_id
+            AND oh_prev.field_changed = 'delivery_status'
+            AND oh_prev.new_value = 'shipped'
+            AND oh_prev.created_at <= inv_orig.finalized_at
+        )
+    )
+)
+```
+
+Orders from this CTE get `is_cross_invoice = true` and `original_invoice_number` set.
 
 ### No Frontend Changes
-The Adjustments page already displays the sign correctly (+ green / - red).
+The Invoice Detail Modal already renders `delivered_orders` with `is_cross_invoice` badge support.
 
 ## Result
-- Shipped → pending on closed invoice: adjustment shows **+$X.XX** shipping refund
-- Net payable in next invoice increases by that amount (seller gets money back)
+- Order stays in closed invoice (immutability preserved)
+- Re-delivered order appears in open invoice's delivered orders list
+- Revenue and delivered count match the visible list
+- No double-counting between cross-shipped and cross-delivered
+- Each delivered event counted once per period via last-event logic
 
