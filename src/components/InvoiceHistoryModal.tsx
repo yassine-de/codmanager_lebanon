@@ -114,8 +114,8 @@ export default function InvoiceHistoryModal({ open, onOpenChange, invoiceId, inv
         })
         .map(h => {
           let direction: "in" | "out" = "in";
-          if (h.event_type === "order_removed") direction = "out";
-          else if (h.event_type === "order_added") direction = "in";
+          if (h.event_type === "order_removed" || h.event_type === "delivery_out") direction = "out";
+          else if (h.event_type === "order_added" || h.event_type === "delivery_in") direction = "in";
           else if (h.old_value === "delivered") direction = "out";
           else direction = "in";
 
