@@ -480,17 +480,22 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
               </Button>
             )}
 
-            {/* Quantity & Unit Price */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Quantity, Landed Price & Seller Price */}
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Quantity</Label>
                 <Input type="number" min={1} step={1} value={quantity} onChange={e => setQuantity(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.quantity ? "border-destructive" : ""}`} />
                 {errors.quantity && <p className="text-[11px] text-destructive">{errors.quantity}</p>}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Unit Price ($)</Label>
-                <Input type="number" min={0} step={0.01} value={unitPrice} onChange={e => setUnitPrice(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.unitPrice ? "border-destructive" : ""}`} />
-                {errors.unitPrice && <p className="text-[11px] text-destructive">{errors.unitPrice}</p>}
+                <Label className="text-xs">Landed Price ($)</Label>
+                <Input type="number" min={0} step={0.01} value={landedPrice} onChange={e => setLandedPrice(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.landedPrice ? "border-destructive" : ""}`} />
+                {errors.landedPrice && <p className="text-[11px] text-destructive">{errors.landedPrice}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Seller Price ($)</Label>
+                <Input type="number" min={0} step={0.01} value={sellerPrice} onChange={e => setSellerPrice(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.sellerPrice ? "border-destructive" : ""}`} />
+                {errors.sellerPrice && <p className="text-[11px] text-destructive">{errors.sellerPrice}</p>}
               </div>
             </div>
 
@@ -501,29 +506,11 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
               {errors.shippingCost && <p className="text-[11px] text-destructive">{errors.shippingCost}</p>}
             </div>
 
-            {/* Total */}
-            <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5">
-              <span className="text-xs text-muted-foreground">Total Cost</span>
-              <span className="text-sm font-semibold tabular-nums">{totalPrice.toLocaleString()} $</span>
-            </div>
-
-            {/* Pricing */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-1 h-4 rounded-full bg-primary" />
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pricing</span>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Landed Price ($)</Label>
-                  <Input type="number" min={0} step={0.01} value={landedPrice} onChange={e => setLandedPrice(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.landedPrice ? "border-destructive" : ""}`} />
-                  {errors.landedPrice && <p className="text-[11px] text-destructive">{errors.landedPrice}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Seller Price ($)</Label>
-                  <Input type="number" min={0} step={0.01} value={sellerPrice} onChange={e => setSellerPrice(e.target.value === "" ? "" : Number(e.target.value))} className={`h-9 text-sm ${errors.sellerPrice ? "border-destructive" : ""}`} />
-                  {errors.sellerPrice && <p className="text-[11px] text-destructive">{errors.sellerPrice}</p>}
-                </div>
+            {/* Totals */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5">
+                <span className="text-xs text-muted-foreground">Total Cost</span>
+                <span className="text-sm font-semibold tabular-nums">{totalPrice.toLocaleString()} $</span>
               </div>
               <div className={`flex items-center justify-between rounded-lg border px-4 py-2.5 ${sourcingProfit > 0 ? "bg-success/10 border-success/25" : sourcingProfit < 0 ? "bg-destructive/10 border-destructive/25" : "bg-muted/30"}`}>
                 <span className="text-xs text-muted-foreground">Sourcing Profit</span>
