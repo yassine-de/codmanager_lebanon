@@ -311,7 +311,7 @@ export default function Orders() {
         seller: profileMap.get(o.seller_id) || "Unknown",
         agentName: o.agent_id ? (profileMap.get(o.agent_id) || undefined) : (o.original_agent_id ? (profileMap.get(o.original_agent_id) || undefined) : undefined),
         upsell: false,
-        
+        warehouseState: "in_stock" as const,
         history: [],
         attemptCount: o.attempt_count || 0,
       }));
