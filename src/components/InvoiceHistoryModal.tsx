@@ -106,16 +106,16 @@ export default function InvoiceHistoryModal({ open, onOpenChange, invoiceId, inv
       const orderEventTypes = ["order_added", "order_removed", "status_change", "adjustment_created"];
       const orderEvents: OrderEvent[] = (history || [])
         .filter(h => {
-          // Order assignment events
           if (h.event_type === "order_added" || h.event_type === "order_removed") return true;
-          // Delivery IN/OUT events
+          if (h.event_type === "delivery_in" || h.event_type === "delivery_out") return true;
+          // Legacy: delivery_status field changes
           if (h.field_changed === "delivery_status" && (h.new_value === "delivered" || h.old_value === "delivered")) return true;
           return false;
         })
         .map(h => {
           let direction: "in" | "out" = "in";
-          if (h.event_type === "order_removed") direction = "out";
-          else if (h.event_type === "order_added") direction = "in";
+          if (h.event_type === "order_removed" || h.event_type === "delivery_out") direction = "out";
+          else if (h.event_type === "order_added" || h.event_type === "delivery_in") direction = "in";
           else if (h.old_value === "delivered") direction = "out";
           else direction = "in";
 
@@ -206,11 +206,18 @@ export default function InvoiceHistoryModal({ open, onOpenChange, invoiceId, inv
   // ── Order row ──
   const renderOrderRow = (o: OrderEvent) => {
     const isAssignment = o.event_type === "order_added" || o.event_type === "order_removed";
-    const meta = o.metadata || {};
-    const productName = meta.product_name;
-    const qty = meta.quantity;
-    const price = meta.price;
+    const isDelivery = o.event_type === "delivery_in" || o.event_type === "delivery_out";
+    const metaObj = (o.metadata || {}) as Record<string, any>;
+    const productName = metaObj.product_name;
+    const qty = metaObj.quantity;
+    const price = metaObj.price;
     const totalPkr = price && qty ? price * qty : null;
+
+    const eventLabel = isAssignment
+      ? (o.event_type === "order_added" ? "Assigned" : "Removed")
+      : isDelivery
+        ? (o.event_type === "delivery_in" ? "Delivered" : "Undelivered")
+        : null;
 
     return (
       <div
@@ -227,14 +234,14 @@ export default function InvoiceHistoryModal({ open, onOpenChange, invoiceId, inv
             <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold leading-none ${o.direction === "in" ? "bg-success/15 text-success border-success/20" : "bg-destructive/15 text-destructive border-destructive/20"}`}>
               {o.direction === "in" ? "IN" : "OUT"}
             </span>
-            {isAssignment && (
-              <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-none bg-primary/10 text-primary">
-                {o.event_type === "order_added" ? "Assigned" : "Removed"}
+            {eventLabel && (
+              <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-none ${isDelivery ? (o.direction === "in" ? "bg-success/10 text-success" : "bg-warning/10 text-warning") : "bg-primary/10 text-primary"}`}>
+                {eventLabel}
               </span>
             )}
           </div>
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            {isAssignment ? (
+            {(isAssignment || isDelivery) ? (
               <>
                 {productName && <span className="text-[10px] text-muted-foreground">{productName}</span>}
                 {qty && <span className="text-[10px] text-muted-foreground/60">· x{qty}</span>}
