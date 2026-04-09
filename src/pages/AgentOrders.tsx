@@ -21,6 +21,16 @@ import {
   Pencil, Plus, Trash2, X, Check, Loader2, Clock, RotateCcw, Copy, AlertTriangle
 } from "lucide-react";
 
+const PAKISTANI_CITIES = [
+  "Karachi", "Lahore", "Islamabad", "Rawalpindi", "Faisalabad", "Multan",
+  "Peshawar", "Quetta", "Sialkot", "Gujranwala", "Hyderabad", "Bahawalpur",
+  "Sargodha", "Abbottabad", "Mardan", "Sukkur", "Larkana", "Sahiwal",
+  "Rahim Yar Khan", "Sheikhupura", "Jhang", "Dera Ghazi Khan", "Gujrat",
+  "Kasur", "Mingora", "Chiniot", "Kamoke", "Mandi Bahauddin", "Jhelum",
+  "Sadiqabad", "Jacobabad", "Shikarpur", "Khairpur", "Kohat", "Muzaffargarh",
+  "Okara", "Vehari", "Burewala", "Hafizabad", "Turbat", "Other",
+];
+
 const CANCEL_REASONS = [
   { value: "high_price", label: "💰 High Price" },
   { value: "product_issue", label: "⚠️ Product Issue" },
