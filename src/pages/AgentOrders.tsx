@@ -922,7 +922,16 @@ const AgentOrders = () => {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] text-muted-foreground">City</Label>
-                    <Input className="h-8 text-xs" value={editCustomer.city} onChange={(e) => setEditCustomer((c) => ({ ...c, city: e.target.value }))} />
+                    <Select value={editCustomer.city} onValueChange={(v) => setEditCustomer((c) => ({ ...c, city: v }))}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Select city" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px]">
+                        {PAKISTANI_CITIES.map((city) => (
+                          <SelectItem key={city} value={city} className="text-xs">{city}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] text-muted-foreground">Address</Label>
