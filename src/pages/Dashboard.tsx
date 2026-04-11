@@ -375,6 +375,9 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* ═══════════ TEAM STATUS (admin only) ═══════════ */}
+        {!isSeller && <OnlineStatusPanel />}
+
         {/* ═══════════ TOP: 7-DAY SPARKLINES ═══════════ */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <SparkMiniChart data={last7} dataKey="dropped" color="hsl(210,60%,52%)" gradientId="spark7O"
@@ -474,8 +477,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ═══════════ TEAM STATUS (admin only) ═══════════ */}
-        {!isSeller && <OnlineStatusPanel />}
+        {/* Team status moved to top */}
 
         {/* ═══════════ TOP PERFORMERS ═══════════ */}
         <div className={`grid grid-cols-1 ${!isSeller ? 'lg:grid-cols-2' : ''} gap-4`}>
