@@ -128,6 +128,11 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
       const treatDate = getTreatmentDate(o);
       return isAfter(treatDate, date) && !isAfter(treatDate, nextDay);
     });
+    // Dropped = orders created on this day (based on created_at, not treatment date)
+    const dropped = orders.filter((o) => {
+      const createdDate = new Date(o.created_at);
+      return isAfter(createdDate, date) && !isAfter(createdDate, nextDay);
+    }).length;
     const total = dayOrders.length;
     const confirmed = dayOrders.filter(o => o.confirmation_status === 'confirmed').length;
     const delivered = dayOrders.filter(o => o.delivery_status === 'delivered').length;
@@ -135,6 +140,7 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
     return {
       day: `${format(date, "EEE")}\n${format(date, "dd/MM")}`,
       orders: total,
+      dropped,
       confirmed,
       shipped,
       delivered,
