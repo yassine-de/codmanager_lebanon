@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Calculator, Package, TrendingUp, TrendingDown, DollarSign, ShoppingCart, Truck, Weight, Users, Target, BarChart3, Zap, ArrowRight, CalendarIcon } from "lucide-react";
+import { USD_TO_PKR } from "@/lib/currency";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -212,7 +213,7 @@ export default function Simulation() {
       if (!selectedProduct) return null;
       const buyingPrice = selectedProduct.landed_price ? Number(selectedProduct.landed_price) : Math.round(Number(selectedProduct.price) * 0.4);
       return {
-        sellingPrice: Number(selectedProduct.price),
+        sellingPrice: Number(selectedProduct.price) / USD_TO_PKR,
         buyingPrice,
         confirmationRate: orderMetrics.confirmationRate,
         deliveryRate: orderMetrics.deliveryRate,
