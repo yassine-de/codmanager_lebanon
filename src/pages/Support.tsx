@@ -424,7 +424,6 @@ export default function Support() {
                               );
                             })()}
                           </p>
-                          </p>
                           <p className={cn(
                             "text-xs mt-1 truncate",
                             hasUnread ? "text-foreground/70 font-medium" : "text-muted-foreground/70"
@@ -500,8 +499,6 @@ export default function Support() {
                         <span className="ml-1 font-mono">· #{selectedTicket.related_id}</span>
                       );
                     })()}
-                    <span className="ml-2">· {format(new Date(selectedTicket.created_at), "MMM dd, yyyy")}</span>
-                  </p>
                     <span className="ml-2">· {format(new Date(selectedTicket.created_at), "MMM dd, yyyy")}</span>
                   </p>
                 </div>
