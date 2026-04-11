@@ -61,6 +61,62 @@ const issueLabels: Record<string, string> = {
 // Priority order for sorting
 const statusPriority: Record<string, number> = { open: 0, in_progress: 1, closed: 2 };
 
+// Build link for a related ID based on issue type
+function getRelatedLink(issueType: string, relatedId: string): string | null {
+  if (!relatedId) return null;
+  switch (issueType) {
+    case "order":
+      return `/orders/${relatedId}`;
+    case "product":
+      // Product related_id could be display_id like PRD-001 or uuid
+      return `/products/${relatedId}`;
+    case "sourcing":
+      return `/sourcing`;
+    default:
+      return null;
+  }
+}
+
+// Detect IDs in message text and render them as clickable links
+const ID_PATTERN = /\b([A-Z]{2,4}-(?:S)?\d{3,})\b/g;
+
+function renderMessageWithLinks(text: string) {
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  const regex = new RegExp(ID_PATTERN.source, "g");
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const id = match[1];
+    // Determine link: if contains -S it's sourcing, otherwise try order
+    const isSourcing = /-S\d/.test(id);
+    const href = isSourcing ? `/sourcing` : `/orders/${id}`;
+    parts.push(
+      <Link
+        key={`${id}-${match.index}`}
+        to={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-0.5 font-mono text-xs px-1.5 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20 underline-offset-2 hover:underline"
+        onClick={(e) => e.stopPropagation()}
+      >
+        #{id}
+        <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+      </Link>
+    );
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
 export default function Support() {
   const { authUser } = useAuth();
   const queryClient = useQueryClient();
