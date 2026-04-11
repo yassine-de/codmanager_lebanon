@@ -67,6 +67,8 @@ const AgentConfirmedOrders = () => {
   const [search, setSearch] = useState("");
   const [filterConfirmation, setFilterConfirmation] = useState<string>("all");
   const [filterDelivery, setFilterDelivery] = useState<string>("all");
+  const [pageSize, setPageSize] = useState(25);
+  const [currentPage, setCurrentPage] = useState(1);
   const [editOrder, setEditOrder] = useState<any>(null);
   const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; product_url: string | null; video_url: string | null }[]>([]);
   const [editForm, setEditForm] = useState<EditForm>({
@@ -171,6 +173,14 @@ const AgentConfirmedOrders = () => {
       );
     });
   }, [orders, search, filterConfirmation, filterDelivery]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterConfirmation, filterDelivery, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const canEdit = (order: any) => !SHIPPED_STATUSES.includes(order.delivery_status || "");
 
@@ -282,7 +292,7 @@ const AgentConfirmedOrders = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredOrders.map((order: any) => {
+                  paginatedOrders.map((order: any) => {
                     const cBadge = confirmationBadge[order.confirmation_status] || { label: order.confirmation_status, className: "bg-muted text-muted-foreground" };
                     const dBadge = order.delivery_status ? (deliveryBadge[order.delivery_status] || { label: order.delivery_status, className: "bg-muted text-muted-foreground" }) : null;
                     const editable = canEdit(order);
@@ -358,7 +368,35 @@ const AgentConfirmedOrders = () => {
         </CardContent>
       </Card>
 
-      {/* Edit Order Dialog */}
+      {/* Pagination Controls */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>Showing {Math.min((currentPage - 1) * pageSize + 1, filteredOrders.length)}–{Math.min(currentPage * pageSize, filteredOrders.length)} of {filteredOrders.length} orders</span>
+          <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+            <SelectTrigger className="h-8 w-[80px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[25, 50, 100, 200].map((n) => (
+                <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span>per page</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" className="h-8 text-xs" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => p - 1)}>
+            Previous
+          </Button>
+          <span className="text-xs text-muted-foreground px-2">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button variant="outline" size="sm" className="h-8 text-xs" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)}>
+            Next
+          </Button>
+        </div>
+      </div>
+
       <Dialog open={!!editOrder} onOpenChange={(open) => !open && setEditOrder(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
