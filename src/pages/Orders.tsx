@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { eachDayOfInterval, startOfDay, subDays, isAfter, format as fmtDate } from "date-fns";
 import { Search, SlidersHorizontal, X, Columns3, CalendarIcon, Filter, Pencil, History, MessageCircle, Download, RefreshCw, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { FinancialIndicators } from "@/components/FinancialIndicators";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataVisibility, MaskedValue } from "@/contexts/DataVisibilityContext";
@@ -64,7 +65,7 @@ function StatusBadge({ label, cls, attemptCount }: { label: string; cls: string;
 }
 
 /* ── Column definitions ── */
-type ColumnKey = 'systemId' | 'id' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'amount' | 'confirmationStatus' | 'deliveryStatus' | 'attempts';
+type ColumnKey = 'systemId' | 'id' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'amount' | 'confirmationStatus' | 'deliveryStatus' | 'attempts' | 'financial';
 
 const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean; adminOnly?: boolean }[] = [
   { key: 'systemId', label: 'System ID', defaultVisible: true, adminOnly: true },
@@ -80,6 +81,7 @@ const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean; admi
   { key: 'confirmationStatus', label: 'Confirmation', defaultVisible: true },
   { key: 'attempts', label: 'Attempts', defaultVisible: true },
   { key: 'deliveryStatus', label: 'Delivery', defaultVisible: true },
+  { key: 'financial', label: 'Financial', defaultVisible: true },
 ];
 
 /* ── Sparkline KPI Cards ── */
