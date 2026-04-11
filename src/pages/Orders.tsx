@@ -874,6 +874,7 @@ export default function Orders() {
                 <div className="flex items-center gap-1.5">
                   <StatusBadge {...confirmationConfig[order.confirmationStatus]} attemptCount={order.confirmationStatus === 'no_answer' ? order.attemptCount : undefined} />
                   <StatusBadge {...deliveryConfig[order.deliveryStatus]} />
+                  <FinancialIndicators confirmationStatus={order.confirmationStatus} deliveryStatus={order.deliveryStatus} invoiceId={order.invoiceId} invoiceStatus={order.invoiceStatus} isAdmin={isAdmin} />
                 </div>
                 {(isAdmin || order.confirmationStatus === 'new') && (
                   <button
