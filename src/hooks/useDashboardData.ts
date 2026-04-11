@@ -180,6 +180,7 @@ export function useDashboardData(dateRange?: DateRange) {
 
   const totals7 = useMemo(() => ({
     orders: last7.reduce((s, d) => s + d.orders, 0),
+    dropped: last7.reduce((s, d) => s + d.dropped, 0),
     confirmed: last7.reduce((s, d) => s + d.confirmed, 0),
     delivered: last7.reduce((s, d) => s + d.delivered, 0),
   }), [last7]);
