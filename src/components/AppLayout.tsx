@@ -80,11 +80,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </span>
               )}
 
-              {/* Data Visibility Toggle */}
+              {/* Data Visibility Toggle - hidden for agents */}
+              {authUser?.role !== 'agent' && (
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-all" onClick={toggleDataVisibility}
                 title={isDataVisible ? "Hide data" : "Show data"}>
                 {isDataVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
               </Button>
+              )}
 
               {/* Dark/Light Mode Toggle */}
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-all" onClick={toggleTheme}
