@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Users, Wifi, WifiOff, Clock } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 type PresenceStatus = "online" | "idle" | "offline";
 
@@ -116,9 +116,17 @@ export default function OnlineStatusPanel() {
     });
   }, [rolesData, profiles, presenceData]);
 
+  const [activeFilter, setActiveFilter] = useState<PresenceStatus | null>(null);
+
   const onlineCount = users.filter((u) => u.status === "online").length;
   const idleCount = users.filter((u) => u.status === "idle").length;
   const offlineCount = users.filter((u) => u.status === "offline").length;
+
+  const filteredUsers = activeFilter ? users.filter((u) => u.status === activeFilter) : users;
+
+  const toggleFilter = (status: PresenceStatus) => {
+    setActiveFilter((prev) => (prev === status ? null : status));
+  };
 
   return (
     <div
@@ -137,20 +145,29 @@ export default function OnlineStatusPanel() {
         </div>
         <div className="flex items-center gap-2">
           {onlineCount > 0 && (
-            <span className="flex items-center gap-1 text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full">
+            <button
+              onClick={() => toggleFilter("online")}
+              className={`flex items-center gap-1 text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full transition-all cursor-pointer ${activeFilter === "online" ? "ring-2 ring-emerald-500/40" : "hover:ring-1 hover:ring-emerald-500/20"}`}
+            >
               <Wifi className="w-2.5 h-2.5" />
               {onlineCount} online
-            </span>
+            </button>
           )}
           {idleCount > 0 && (
-            <span className="flex items-center gap-1 text-[10px] font-semibold bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full">
+            <button
+              onClick={() => toggleFilter("idle")}
+              className={`flex items-center gap-1 text-[10px] font-semibold bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full transition-all cursor-pointer ${activeFilter === "idle" ? "ring-2 ring-amber-500/40" : "hover:ring-1 hover:ring-amber-500/20"}`}
+            >
               <Clock className="w-2.5 h-2.5" />
               {idleCount} idle
-            </span>
+            </button>
           )}
-          <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground/60">
+          <button
+            onClick={() => toggleFilter("offline")}
+            className={`flex items-center gap-1 text-[10px] font-medium text-muted-foreground/60 transition-all cursor-pointer rounded-full px-2 py-0.5 ${activeFilter === "offline" ? "ring-2 ring-muted-foreground/30 bg-muted" : "hover:bg-muted/50"}`}
+          >
             {offlineCount} offline
-          </span>
+          </button>
         </div>
       </div>
 
@@ -162,7 +179,7 @@ export default function OnlineStatusPanel() {
             <p className="text-xs">No team members found</p>
           </div>
         ) : (
-          users.map((u) => {
+          filteredUsers.map((u) => {
             const cfg = statusConfig[u.status];
             return (
               <div
