@@ -42,6 +42,7 @@ const confirmationConfig: Record<ConfirmationStatus, { label: string; cls: strin
 
 const deliveryConfig: Record<DeliveryStatus, { label: string; cls: string }> = {
   pending: { label: 'Pending', cls: 'bg-[hsl(30,6%,50%)]/12 text-[hsl(30,6%,50%)] border-[hsl(30,6%,50%)]/20' },
+  booked: { label: 'Booked', cls: 'bg-[hsl(200,65%,50%)]/12 text-[hsl(200,65%,50%)] border-[hsl(200,65%,50%)]/20' },
   shipped: { label: 'Shipped', cls: 'bg-[hsl(210,60%,52%)]/12 text-[hsl(210,60%,52%)] border-[hsl(210,60%,52%)]/20' },
   in_transit: { label: 'In Transit', cls: 'bg-[hsl(230,55%,55%)]/12 text-[hsl(230,55%,55%)] border-[hsl(230,55%,55%)]/20' },
   with_courier: { label: 'With Courier', cls: 'bg-[hsl(185,55%,42%)]/12 text-[hsl(185,55%,42%)] border-[hsl(185,55%,42%)]/20' },

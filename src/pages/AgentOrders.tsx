@@ -614,7 +614,7 @@ const AgentOrders = () => {
 
       if (selectedStatus === "confirmed") {
         updateData.confirmed_at = new Date().toISOString();
-        updateData.delivery_status = shippingStatus === "shipped" ? "shipped" : "pending";
+        updateData.delivery_status = shippingStatus === "shipped" ? "booked" : "pending";
       }
       if (selectedStatus === "cancelled") {
         updateData.cancel_reason = cancelReason === "other" ? note.trim() : cancelReason;
@@ -692,7 +692,7 @@ const AgentOrders = () => {
       trackChange("quantity", currentOrder.quantity, activeItems.reduce((sum, item) => sum + item.qty, 0));
       trackChange("price", currentOrder.price, activeItems[0]?.price);
       trackChange("total_amount", currentOrder.total_amount, orderTotal);
-      if (selectedStatus === "confirmed") trackChange("delivery_status", currentOrder.delivery_status, shippingStatus === "shipped" ? "shipped" : "pending");
+      if (selectedStatus === "confirmed") trackChange("delivery_status", currentOrder.delivery_status, shippingStatus === "shipped" ? "booked" : "pending");
       if (selectedStatus === "cancelled") trackChange("cancel_reason", currentOrder.cancel_reason, cancelReason === "other" ? note.trim() : cancelReason);
       if (note.trim() && note.trim() !== (currentOrder.note || "")) trackChange("note", currentOrder.note, note.trim());
       if (selectedStatus === "postponed") {
@@ -1264,7 +1264,7 @@ const AgentOrders = () => {
                       <SelectValue placeholder="Select shipping status..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="shipped" className="text-xs">🚚 Shipped — Sent to shipping company</SelectItem>
+                      <SelectItem value="shipped" className="text-xs">📦 Booked — Ready for shipping</SelectItem>
                       <SelectItem value="not_yet" className="text-xs">⏳ Not Yet — Pending shipment</SelectItem>
                     </SelectContent>
                   </Select>
