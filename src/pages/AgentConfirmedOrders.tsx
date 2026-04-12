@@ -632,6 +632,59 @@ const AgentConfirmedOrders = () => {
               </div>
             </div>
 
+            {/* Postpone Schedule - shown when status is postponed */}
+            {isPostponed && (
+              <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide flex items-center gap-1.5">
+                  <CalendarIcon className="h-3.5 w-3.5" /> Schedule Follow-up
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("h-9 w-full justify-start text-left text-sm font-normal", !editForm.postpone_date && "text-muted-foreground")}>
+                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                          {editForm.postpone_date ? format(editForm.postpone_date, "dd/MM/yyyy") : "Pick date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={editForm.postpone_date || undefined}
+                          onSelect={(d) => setEditForm(prev => ({ ...prev, postpone_date: d || null, postpone_time: "" }))}
+                          disabled={(date) => isBefore(startOfDay(date), startOfDay(new Date()))}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Time</Label>
+                    <Input
+                      type="time"
+                      className="h-9 text-sm"
+                      value={editForm.postpone_time}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, postpone_time: e.target.value }))}
+                    />
+                    {isPostponeTimeInvalid && (
+                      <p className="text-[10px] text-destructive">Time has already passed</p>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Follow-up Note</Label>
+                  <Input
+                    className="h-9 text-sm"
+                    value={editForm.postpone_note}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, postpone_note: e.target.value }))}
+                    maxLength={300}
+                    placeholder="Reason for postponement..."
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Note */}
             <div className="space-y-1.5">
               <Label className="text-xs">Note</Label>
@@ -646,7 +699,11 @@ const AgentConfirmedOrders = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setEditOrder(null)}>Cancel</Button>
-            <Button size="sm" onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
+            <Button
+              size="sm"
+              onClick={() => updateMutation.mutate()}
+              disabled={updateMutation.isPending || (isPostponed && (!editForm.postpone_date || isPostponeTimeInvalid))}
+            >
               {updateMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
