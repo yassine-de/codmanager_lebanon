@@ -1,7 +1,7 @@
 export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled' | 'returned' | 'postponed' | 'no_answer' | 'double' | 'wrong_number' | 'in_transit' | 'with_courier';
 
 export type ConfirmationStatus = 'new' | 'confirmed' | 'no_answer' | 'postponed' | 'cancelled' | 'wrong_number' | 'double';
-export type DeliveryStatus = 'pending' | 'shipped' | 'in_transit' | 'with_courier' | 'delivered' | 'returned' | 'cancelled' | 'no_answer' | 'postponed';
+export type DeliveryStatus = 'pending' | 'booked' | 'shipped' | 'in_transit' | 'with_courier' | 'delivered' | 'returned' | 'cancelled' | 'no_answer' | 'postponed';
 
 export interface OrderHistoryEvent {
   id: string;
