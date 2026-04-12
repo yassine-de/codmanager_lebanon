@@ -1092,8 +1092,8 @@ const AgentOrders = () => {
                             <span className="inline-flex items-center gap-1 text-muted-foreground">
                               <Tag className="h-3 w-3" /> Qty: {op.qty}
                             </span>
-                            <span className="inline-flex items-center gap-1 text-muted-foreground">
-                              <DollarSign className="h-3 w-3" /> {orderTotal} PKR
+                            <span className="inline-flex items-center gap-1 text-sm font-bold text-foreground">
+                              <DollarSign className="h-4 w-4" /> {orderTotal} PKR
                             </span>
                           </div>
                         )}
