@@ -1,58 +1,39 @@
 
 
-# Fix: Delivered Orders Appearing in Closed Invoices
+# Add ORIO ID Column with Tracking Popup
 
-## Problem
-BS-INV-001 (finalized at 14:23) shows 5 delivered orders with revenue, but all 5 were delivered at 14:51 — **after** the invoice was closed. The function uses the order's **current** `delivery_status` column instead of checking when the delivery event actually occurred.
+## Overview
+Add a clickable "ORIO ID" column (admin-only) after "Seller ID" in the Orders table. Clicking it opens a modal showing tracking details from the ORIO Track API.
 
-## Affected Locations (4 places in `get_invoice_summary`)
+## Changes
 
-1. **`v_delivered_count`** — `WHERE o.delivery_status = 'delivered'` with no time check
-2. **`v_delivered_revenue_usd`** — same: sums revenue from currently-delivered orders regardless of timing
-3. **Delivered orders CTE** — builds the delivered orders list using current status
-4. **All orders CTE → `was_delivered`** — checks if order was ever delivered, not if it was delivered within the period
+### 1. Update `Order` interface (`src/lib/data.ts`)
+Add `orioOrderId?: number | null` to the Order interface.
 
-## Fix (1 migration)
+### 2. Update data mapping (`src/pages/Orders.tsx`)
+- Map `orio_order_id` from the DB query to `orioOrderId` on the Order object
+- Add `'orioId'` to `ColumnKey` type and `allColumns` array (after `'id'`, admin-only)
+- Add table header for "ORIO ID"
+- Add table cell: if `orioOrderId` exists, render it as a clickable link (blue, underlined). On click, stop propagation and open tracking modal.
 
-Add an `EXISTS` check on `order_history` to each location, requiring the delivery event to fall within `v_period_start` and `v_period_end`.
+### 3. Create `OrioTrackingModal` component (`src/components/OrioTrackingModal.tsx`)
+- Props: `orioOrderId: number`, `open: boolean`, `onClose: () => void`
+- On open, call the `orio-sync` edge function with `action: "track"` and `order_id`
+- Display a dialog styled like the screenshot:
+  - Header: "TRACK DETAIL - {consignment_no}"
+  - Summary row: STATUS, CN#, DATE, CUSTOMER, COD, FROM TO (from `payload` fields)
+  - "COURIER SHIPPING LABEL: {consignment_no}"
+  - Timeline of events from `payload.detail[]` array, each showing `dateTime` and `status`
+- Loading and error states
 
-### Location 1: `v_delivered_count`
-```sql
-SELECT COUNT(DISTINCT o.id) INTO v_delivered_count
-FROM public.orders o
-WHERE o.invoice_id = p_invoice_id
-  AND o.delivery_status = 'delivered'
-  AND EXISTS (
-    SELECT 1 FROM public.order_history oh
-    WHERE oh.order_id = o.order_id
-      AND oh.field_changed = 'delivery_status'
-      AND oh.new_value = 'delivered'
-      AND oh.created_at > v_period_start
-      AND oh.created_at <= v_period_end
-  );
-```
+### 4. Update edge function tracking (`supabase/functions/orio-sync/index.ts`)
+The existing `trackShipment` function sends `order_id` (the ORIO numeric ID) but expects a DB UUID as input. Need to adjust:
+- Accept ORIO order ID directly for tracking (add a new action `track-by-orio-id` or modify `track` to accept `orio_order_id`)
+- The track API response (from docs) returns: `payload.order_id`, `payload.status`, `payload.consigment_no`, `payload.order_date`, `payload.consignee_name`, `payload.cod_amount`, `payload.shipping_charges`, `payload.origin`, `payload.destination`, `payload.detail[]` (array of `{dateTime, status}`)
+- Return full payload to the frontend
 
-### Location 2: `v_delivered_revenue_usd`
-Same `EXISTS` filter added.
-
-### Location 3: Delivered orders CTE
-Same `EXISTS` filter in the `WHERE` clause.
-
-### Location 4: `was_delivered` in all orders CTE
-Time-bound the `EXISTS` check:
-```sql
-(o.delivery_status = 'delivered' AND EXISTS (
-  SELECT 1 FROM public.order_history oh
-  WHERE oh.order_id = o.order_id
-    AND oh.field_changed = 'delivery_status'
-    AND oh.new_value = 'delivered'
-    AND oh.created_at > v_period_start
-    AND oh.created_at <= v_period_end
-)) AS was_delivered
-```
-
-## Result
-- BS-INV-001 will show 0 delivered, $0 revenue (correct — all deliveries happened after close)
-- The cross-invoice logic in the open invoice already picks these up correctly
-- No frontend changes needed
+### Technical Details
+- Track API: `POST https://apis.orio.digital/api/track` with `{order_id: <integer>, acno: "OR-04820"}`
+- Response: array with `[{status: "1", message: "success", payload: {order_id, status, consigment_no, detail: [{dateTime, status}]}}]`
+- The `order_id` parameter must be an integer (the ORIO order ID stored in `orders.orio_order_id`)
 
