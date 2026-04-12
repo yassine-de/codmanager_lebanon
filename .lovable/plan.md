@@ -1,58 +1,51 @@
 
 
-# Sourcing History Tracking
+# Fix: Add Time Bounds to Direct-Invoice Shipping Queries
 
-## What we're building
-A history tracking system for sourcing requests that logs every status change with who made it, plus a history icon button in the sourcing table for admins to view the timeline.
+## Problem Found
+Two queries in `get_invoice_summary` count shipped events for **direct invoice orders** without requiring the shipped event to fall within the invoice period (`v_period_start` to `v_period_end`). This means an order shipped in a previous or future period can be incorrectly counted.
 
-## Plan
+### Affected Queries
+1. **`v_shipped_count`** — the `EXISTS` subquery that detects a "shipped" event has no `created_at` time filter
+2. **Shipping breakdown (first UNION half)** — same missing time filter on the `EXISTS` check
 
-### 1. Create `sourcing_history` database table
-- Columns: `id`, `sourcing_request_id` (text, references display_id or uuid), `field_changed`, `old_value`, `new_value`, `changed_by` (uuid), `action_type` (default 'status_change'), `created_at`
-- RLS: Admins full access, sellers can view history for their own sourcing requests
-- Enable RLS
+### What's Already Correct
+- Cross-invoice shipped: ✅ time-bounded
+- Cross-invoice confirmed: ✅ time-bounded  
+- Direct-invoice confirmed: ✅ time-bounded
+- Dropped count: ✅ uses `o.created_at` within period
+- Cross-invoice delivered-only: ✅ time-bounded
 
-### 2. Log history in EditSourcingModal
-- In the `doUpdate` function, before updating, compare the current `request.status` with the new `status`
-- If status changed, insert a row into `sourcing_history` with old/new values and `auth.uid()` as `changed_by`
-- Also track other important field changes: `payment_status`, `seller_validated`, `quantity`, `landed_price`, `seller_price`
+## Fix (1 migration)
 
-### 3. Create `SourcingHistoryModal` component
-- Similar pattern to `OrderHistoryModal` — a dialog with a scrollable timeline
-- Fetch history entries for a given sourcing request ID, joined with profiles to show the admin's name
-- Display each entry as a timeline item: date, who changed it, old → new value, with appropriate icons
-- Clean, modern design matching existing modals
+Add `AND oh.created_at > v_period_start AND oh.created_at <= v_period_end` to the initial `EXISTS` check in both locations. This replaces the current approach of "any shipped event exists + exclude pre-period ones" with a direct "shipped event exists within the period."
 
-### 4. Add history button to Sourcing table
-- Add a `History` icon (clock/history icon) column in the table next to the Edit button
-- Clicking opens the `SourcingHistoryModal` for that request
-- Only visible to admins (already on admin-only page)
-
-## Technical details
-
-**Migration SQL:**
+### Location 1: `v_shipped_count`
 ```sql
-CREATE TABLE public.sourcing_history (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  sourcing_request_id uuid NOT NULL,
-  field_changed text NOT NULL,
-  old_value text,
-  new_value text,
-  changed_by uuid NOT NULL,
-  action_type text NOT NULL DEFAULT 'status_change',
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+-- Current (no time filter on initial EXISTS):
+AND EXISTS (
+  SELECT 1 FROM public.order_history oh
+  WHERE oh.order_id = o.order_id 
+    AND oh.field_changed = 'delivery_status' 
+    AND oh.new_value = 'shipped'
+)
 
-ALTER TABLE public.sourcing_history ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Admins full access sourcing_history"
-  ON public.sourcing_history FOR ALL TO authenticated
-  USING (is_admin(auth.uid()))
-  WITH CHECK (is_admin(auth.uid()));
+-- Fixed:
+AND EXISTS (
+  SELECT 1 FROM public.order_history oh
+  WHERE oh.order_id = o.order_id 
+    AND oh.field_changed = 'delivery_status' 
+    AND oh.new_value = 'shipped'
+    AND oh.created_at > v_period_start
+    AND oh.created_at <= v_period_end
+)
 ```
 
-**Files to create/edit:**
-- New: `src/components/SourcingHistoryModal.tsx`
-- Edit: `src/components/EditSourcingModal.tsx` — add history logging in `doUpdate`
-- Edit: `src/pages/Sourcing.tsx` — add history icon button + column
+With this positive time filter, the second `NOT EXISTS` (excluding pre-period events) becomes redundant and can be removed for clarity.
+
+### Location 2: Shipping breakdown first UNION half
+Same change — add time bounds to the `EXISTS` check and remove the now-redundant `NOT EXISTS` for pre-period events.
+
+### No frontend changes needed
+The function output shape is unchanged. Only the correctness of which orders are counted is affected.
 
