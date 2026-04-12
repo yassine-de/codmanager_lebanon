@@ -635,14 +635,30 @@ const AgentConfirmedOrders = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Delivery Status (read-only)</Label>
-                  <div className="h-9 px-3 flex items-center rounded-md border bg-muted/50 text-sm text-muted-foreground">
-                    {editOrder?.delivery_status
-                      ? (deliveryBadge[editOrder.delivery_status]?.label || editOrder.delivery_status)
-                      : "—"}
+                {/* Show editable "Booked" option only for confirmed orders with no shipping status */}
+                {editForm.confirmation_status === "confirmed" && !editOrder?.delivery_status ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Shipping Status</Label>
+                    <Select value={editForm.delivery_status} onValueChange={(v) => updateField("delivery_status", v)}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="No status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Status</SelectItem>
+                        <SelectItem value="booked">📦 Booked</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Delivery Status (read-only)</Label>
+                    <div className="h-9 px-3 flex items-center rounded-md border bg-muted/50 text-sm text-muted-foreground">
+                      {editOrder?.delivery_status
+                        ? (deliveryBadge[editOrder.delivery_status]?.label || editOrder.delivery_status)
+                        : "—"}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
