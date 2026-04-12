@@ -27,6 +27,7 @@ import CreateOrderModal from "@/components/CreateOrderModal";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
+import OrioTrackingModal from "@/components/OrioTrackingModal";
 
 /* ── Status badge configs ── */
 const confirmationConfig: Record<ConfirmationStatus, { label: string; cls: string }> = {
@@ -167,6 +168,7 @@ export default function Orders() {
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [historyOrder, setHistoryOrder] = useState<Order | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [trackingOrioId, setTrackingOrioId] = useState<number | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sellerNames, setSellerNames] = useState<string[]>([]);
   const [agentNames, setAgentNames] = useState<string[]>([]);
