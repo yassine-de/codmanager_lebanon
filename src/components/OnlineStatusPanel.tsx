@@ -116,9 +116,17 @@ export default function OnlineStatusPanel() {
     });
   }, [rolesData, profiles, presenceData]);
 
+  const [activeFilter, setActiveFilter] = useState<PresenceStatus | null>(null);
+
   const onlineCount = users.filter((u) => u.status === "online").length;
   const idleCount = users.filter((u) => u.status === "idle").length;
   const offlineCount = users.filter((u) => u.status === "offline").length;
+
+  const filteredUsers = activeFilter ? users.filter((u) => u.status === activeFilter) : users;
+
+  const toggleFilter = (status: PresenceStatus) => {
+    setActiveFilter((prev) => (prev === status ? null : status));
+  };
 
   return (
     <div
