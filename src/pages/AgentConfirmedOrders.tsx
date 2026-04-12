@@ -27,6 +27,7 @@ const confirmationBadge: Record<string, { label: string; className: string }> = 
 };
 
 const deliveryBadge: Record<string, { label: string; className: string }> = {
+  booked: { label: "📦 Booked", className: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
   shipped: { label: "📦 Shipped", className: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
   in_transit: { label: "🚚 In Transit", className: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
   with_courier: { label: "🏍️ With Courier", className: "bg-amber-500/10 text-amber-600 border-amber-500/20" },
