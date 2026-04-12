@@ -735,8 +735,13 @@ const AgentOrders = () => {
   };
 
   const handleWhatsApp = () => {
-    const phone = editCustomer.phone.replace(/\s/g, "");
-    window.open(`https://wa.me/${phone}`, "_blank");
+    let phone = editCustomer.phone.replace(/[\s\-\(\)]/g, "");
+    // Ensure proper international format (remove leading + or 00, keep digits)
+    phone = phone.replace(/^\+/, "");
+    if (phone.startsWith("00")) phone = phone.substring(2);
+    // Pakistani numbers: convert leading 0 to 92
+    if (phone.startsWith("0")) phone = "92" + phone.substring(1);
+    window.open(`https://api.whatsapp.com/send?phone=${phone}`, "_blank");
   };
 
   const updateItem = (index: number, field: "qty" | "price", value: number) => {
