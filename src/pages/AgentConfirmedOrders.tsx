@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Search, Package, MapPin, Pencil, DollarSign, Tag, Store, Video, ExternalLink, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import { CheckCircle2, Search, Package, MapPin, Pencil, DollarSign, Tag, Store, Video, ExternalLink, Plus, Trash2, CalendarIcon } from "lucide-react";
+import { format, addMinutes, isToday, isBefore, startOfDay } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
