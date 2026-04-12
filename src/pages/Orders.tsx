@@ -65,11 +65,12 @@ function StatusBadge({ label, cls, attemptCount }: { label: string; cls: string;
 }
 
 /* ── Column definitions ── */
-type ColumnKey = 'systemId' | 'id' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'amount' | 'confirmationStatus' | 'deliveryStatus' | 'attempts' | 'financial';
+type ColumnKey = 'systemId' | 'id' | 'orioId' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'amount' | 'confirmationStatus' | 'deliveryStatus' | 'attempts' | 'financial';
 
 const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean; adminOnly?: boolean }[] = [
   { key: 'systemId', label: 'System ID', defaultVisible: true, adminOnly: true },
   { key: 'id', label: 'Seller ID', defaultVisible: true },
+  { key: 'orioId', label: 'ORIO ID', defaultVisible: true, adminOnly: true },
   { key: 'createdAt', label: 'Created', defaultVisible: true },
   { key: 'updatedAt', label: 'Updated', defaultVisible: true },
   { key: 'seller', label: 'Seller', defaultVisible: true },
