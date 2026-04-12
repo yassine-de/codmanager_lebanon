@@ -106,11 +106,41 @@ const AgentConfirmedOrders = () => {
     enabled: !!userId,
   });
 
+  const isPostponed = editForm.confirmation_status === "postponed";
+
+  // Auto-suggest time 30min from now when selecting today
+  useEffect(() => {
+    if (isPostponed && editForm.postpone_date && isToday(editForm.postpone_date) && !editForm.postpone_time) {
+      const suggested = format(addMinutes(new Date(), 30), "HH:mm");
+      setEditForm(prev => ({ ...prev, postpone_time: suggested }));
+    }
+  }, [editForm.postpone_date, isPostponed]);
+
+  const isPostponeTimeInvalid = useMemo(() => {
+    if (!isPostponed || !editForm.postpone_date || !editForm.postpone_time) return false;
+    if (!isToday(editForm.postpone_date)) return false;
+    const [h, m] = editForm.postpone_time.split(":").map(Number);
+    const scheduled = new Date(editForm.postpone_date);
+    scheduled.setHours(h, m, 0, 0);
+    return isBefore(scheduled, new Date());
+  }, [isPostponed, editForm.postpone_date, editForm.postpone_time]);
+
   const updateMutation = useMutation({
     mutationFn: async () => {
       if (!editOrder) return;
       const totalAmount = editForm.price * editForm.quantity;
       const confirmed_at = editForm.confirmation_status === "confirmed" ? new Date().toISOString() : null;
+
+      // Build postpone_date ISO from date + time
+      let postpone_date: string | null = null;
+      if (editForm.confirmation_status === "postponed" && editForm.postpone_date) {
+        const d = new Date(editForm.postpone_date);
+        if (editForm.postpone_time) {
+          const [h, m] = editForm.postpone_time.split(":").map(Number);
+          d.setHours(h, m, 0, 0);
+        }
+        postpone_date = d.toISOString();
+      }
 
       const { error } = await supabase
         .from("orders")
@@ -126,6 +156,8 @@ const AgentConfirmedOrders = () => {
           confirmation_status: editForm.confirmation_status,
           confirmed_at,
           note: editForm.note.trim(),
+          postpone_date,
+          postpone_note: editForm.confirmation_status === "postponed" ? editForm.postpone_note.trim() : null,
         })
         .eq("id", editOrder.id);
       if (error) throw error;
