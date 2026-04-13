@@ -50,11 +50,11 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">Order ID</TableHead>
-                  <TableHead className="text-xs">Kunde</TableHead>
-                  <TableHead className="text-xs">Stadt</TableHead>
+                  <TableHead className="text-xs">Customer</TableHead>
+                  <TableHead className="text-xs">City</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Fehler</TableHead>
-                  <TableHead className="text-xs">Datum</TableHead>
+                  <TableHead className="text-xs">Error</TableHead>
+                  <TableHead className="text-xs">Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
