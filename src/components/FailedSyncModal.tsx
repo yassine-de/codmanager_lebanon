@@ -120,6 +120,22 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {format(new Date(order.updated_at), "dd.MM.yy HH:mm")}
                     </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        title="Retry sync"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRetry(order.order_id, order.order_id);
+                        }}
+                        disabled={retryingId === order.order_id}
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${retryingId === order.order_id ? "animate-spin" : ""}`} />
+                      </Button>
+                    </TableCell>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
