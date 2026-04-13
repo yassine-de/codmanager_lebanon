@@ -204,7 +204,7 @@ export default function OrderDetail() {
               <p className="text-sm font-medium mt-0.5">{cancelReason}</p>
             </div>
           )}
-          {postponeDate && (
+          {postponeDate && authUser?.role !== 'seller' && (
             <div className="rounded-lg border bg-warning/10 border-warning/20 p-3 text-center">
               <p className="text-[10px] text-warning uppercase tracking-wider">Postponed To</p>
               <p className="text-sm font-semibold mt-0.5">{format(new Date(postponeDate), 'dd MMM yyyy')}</p>
