@@ -86,7 +86,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     setLandedPrice(request.landed_price || prevLandedPrice || 0);
     setSellerPrice(request.seller_price || prevSellerPrice || 0);
     setQuantity(request.quantity);
-    setStatus(request.status);
+    setStatus(request.status === "validated" ? "received" : request.status);
     setNotes(request.notes ?? "");
     setPaymentStatus(request.payment_status ?? "unpaid");
     setPaymentMethod(request.payment_method ?? null);
