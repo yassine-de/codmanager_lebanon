@@ -290,6 +290,22 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action, order_id, orio_order_id } = body;
 
+    // Check if ORIO API is enabled (skip for read-only actions like cities/track)
+    const writeActions = ["sync-order", "sync-all-pending"];
+    if (writeActions.includes(action)) {
+      const { data: enabledSetting } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "orio_api_enabled")
+        .maybeSingle();
+      if (!enabledSetting || enabledSetting.value !== "true") {
+        return new Response(
+          JSON.stringify({ error: "ORIO API is disabled. Enable it in Settings → Integrations." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     let result: any;
 
     switch (action) {
