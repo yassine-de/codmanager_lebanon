@@ -377,7 +377,16 @@ const Users = () => {
                       <TableCell className="py-2.5">
                         <Switch checked={u.active} onCheckedChange={() => toggleActive(u)} className="scale-75" />
                       </TableCell>
-                      <TableCell className="text-[10px] text-muted-foreground py-2.5 font-mono max-w-[120px] truncate" title={u.user_id}>{u.user_id.slice(0, 8)}…</TableCell>
+                      <TableCell className="py-2.5">
+                        <button
+                          type="button"
+                          onClick={() => { navigator.clipboard.writeText(u.user_id); }}
+                          className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-mono hover:text-foreground transition-colors cursor-pointer"
+                          title={`Click to copy: ${u.user_id}`}
+                        >
+                          {u.user_id.slice(0, 4)}…{u.user_id.slice(-4)}
+                        </button>
+                      </TableCell>
                       <TableCell className="text-xs font-medium py-2.5">{u.name}</TableCell>
                       <TableCell className="text-xs text-muted-foreground py-2.5">{u.email}</TableCell>
                       <TableCell className="py-2.5">
