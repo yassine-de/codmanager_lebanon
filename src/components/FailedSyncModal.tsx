@@ -36,7 +36,7 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <AlertTriangle className="w-4 h-4 text-destructive" />
-            ORIO Sync Fehler ({failedOrders.length})
+            ORIO Sync Errors ({failedOrders.length})
           </DialogTitle>
         </DialogHeader>
 
@@ -44,17 +44,17 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
           {isLoading ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
           ) : failedOrders.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">Keine fehlgeschlagenen Syncs.</p>
+            <p className="text-sm text-muted-foreground py-8 text-center">No failed syncs.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">Order ID</TableHead>
-                  <TableHead className="text-xs">Kunde</TableHead>
-                  <TableHead className="text-xs">Stadt</TableHead>
+                  <TableHead className="text-xs">Customer</TableHead>
+                  <TableHead className="text-xs">City</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Fehler</TableHead>
-                  <TableHead className="text-xs">Datum</TableHead>
+                  <TableHead className="text-xs">Error</TableHead>
+                  <TableHead className="text-xs">Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
