@@ -23,6 +23,7 @@ interface UserData {
   active: boolean;
   created_at: string;
   role: string;
+  display_id: string | null;
   permissions: string[];
   rates: { rate_1kg: number; rate_2kg: number; rate_3kg: number } | null;
   rate_settings: { dropped_order_rate: number; confirmed_order_rate: number; cod_fee_per_delivery: number } | null;

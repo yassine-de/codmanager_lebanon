@@ -358,6 +358,14 @@ Deno.serve(async (req) => {
 
       if (role === "seller") {
         await ensureSellerData(supabaseAdmin, userId, name, rates);
+        // Generate display_id for seller if not already set
+        const { data: profile } = await supabaseAdmin.from("profiles").select("display_id").eq("user_id", userId).maybeSingle();
+        if (!profile?.display_id) {
+          const { data: didData } = await supabaseAdmin.rpc("generate_seller_display_id", { p_name: name });
+          if (didData) {
+            await supabaseAdmin.from("profiles").update({ display_id: didData }).eq("user_id", userId);
+          }
+        }
         // Update rate_settings with confirmation rates if provided
         if (rateSettings) {
           // Wait a moment for the trigger to create the rate_settings record
