@@ -299,45 +299,51 @@ const Integrations = () => {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-muted-foreground">{apiEnabled ? "Enabled" : "Disabled"}</span>
-              <Switch checked={apiEnabled} onCheckedChange={setApiEnabled} />
+              <Switch checked={apiEnabled} onCheckedChange={async (checked) => {
+                setApiEnabled(checked);
+                // Auto-save the enabled state immediately
+                const now = new Date().toISOString();
+                await supabase
+                  .from("app_settings")
+                  .upsert({ key: "orio_api_enabled", value: String(checked), updated_at: now }, { onConflict: "key" });
+                toast.success(checked ? "ORIO API activated" : "ORIO API deactivated");
+              }} />
             </div>
           </div>
 
-          {apiEnabled && (
-            <div className="space-y-3 pt-2 border-t">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs flex items-center gap-1.5">
-                    <Key className="w-3 h-3" /> API Key / Token
-                  </Label>
-                  <Input
-                    className="h-9 text-xs font-mono"
-                    type="password"
-                    placeholder="Enter API token..."
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs flex items-center gap-1.5">
-                    <Hash className="w-3 h-3" /> Account Number
-                  </Label>
-                  <Input
-                    className="h-9 text-xs font-mono"
-                    placeholder="Enter account number..."
-                    value={apiAccountNumber}
-                    onChange={(e) => setApiAccountNumber(e.target.value)}
-                  />
-                </div>
+          <div className="space-y-3 pt-2 border-t">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <Key className="w-3 h-3" /> API Key / Token
+                </Label>
+                <Input
+                  className="h-9 text-xs font-mono"
+                  type="password"
+                  placeholder="Enter API token..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
               </div>
-              <div className="flex justify-end">
-                <Button size="sm" className="h-8 text-xs gap-1.5" onClick={saveApiConfig} disabled={apiSaving}>
-                  {apiSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                  Save API Settings
-                </Button>
+              <div className="space-y-1.5">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <Hash className="w-3 h-3" /> Account Number
+                </Label>
+                <Input
+                  className="h-9 text-xs font-mono"
+                  placeholder="Enter account number..."
+                  value={apiAccountNumber}
+                  onChange={(e) => setApiAccountNumber(e.target.value)}
+                />
               </div>
             </div>
-          )}
+            <div className="flex justify-end">
+              <Button size="sm" className="h-8 text-xs gap-1.5" onClick={saveApiConfig} disabled={apiSaving}>
+                {apiSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                Save API Settings
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
