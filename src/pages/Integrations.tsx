@@ -41,6 +41,8 @@ interface SellerOption {
 }
 
 const Integrations = () => {
+  const { authUser } = useAuth();
+  const isAdmin = authUser?.role === "admin";
   const [sheets, setSheets] = useState<IntegrationSheet[]>([]);
   const [sellers, setSellers] = useState<SellerOption[]>([]);
   const [loading, setLoading] = useState(true);
