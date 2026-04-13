@@ -90,9 +90,10 @@ async function createShipment(
 
   // Resolve city
   const cities = await getCities(supabase);
+  console.log(`Cities loaded: ${cities.length}, looking for: "${order.customer_city}"`);
   const cityName = (order.customer_city || "").trim().toLowerCase();
   const matchedCity = cities.find(
-    (c: any) => (c.city_name || "").toLowerCase() === cityName
+    (c: any) => (c.city_name || "").trim().toLowerCase() === cityName
   );
 
   if (!matchedCity) {
