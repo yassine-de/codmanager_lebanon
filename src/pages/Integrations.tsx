@@ -61,6 +61,8 @@ const Integrations = () => {
   const [apiAccountNumber, setApiAccountNumber] = useState("");
   const [apiSaving, setApiSaving] = useState(false);
   const [apiLoaded, setApiLoaded] = useState(false);
+  const [syncInterval, setSyncInterval] = useState("5");
+  const [lastStatusSync, setLastStatusSync] = useState("");
   // Create/Edit modal
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<IntegrationSheet | null>(null);
