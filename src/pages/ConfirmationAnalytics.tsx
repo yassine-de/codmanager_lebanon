@@ -25,7 +25,7 @@ export default function ConfirmationAnalytics() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_id, confirmation_status, delivery_status, cancel_reason, product_name, seller_id, agent_id, original_agent_id, created_at, confirmed_at, delivered_at, assigned_at, price, quantity, postpone_date, attempt_count")
+        .select("id, order_id, confirmation_status, delivery_status, cancel_reason, product_name, seller_id, agent_id, original_agent_id, created_at, confirmed_at, delivered_at, assigned_at, last_attempt_at, last_activity_at, updated_at, price, quantity, postpone_date, attempt_count")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -107,13 +107,21 @@ export default function ConfirmationAnalytics() {
   }, [orders]);
 
   // Filter orders — use original_agent_id as fallback for released orders
+  // Treatment date: the most relevant action timestamp for an order
+  const getTreatmentDate = (o: typeof orders[0]): Date => {
+    if (o.confirmation_status === 'confirmed' && o.confirmed_at) return new Date(o.confirmed_at);
+    if (o.last_attempt_at) return new Date(o.last_attempt_at);
+    if (o.last_activity_at) return new Date(o.last_activity_at);
+    return new Date(o.updated_at);
+  };
+
   const filteredOrders = useMemo(() => {
     let filtered = [...orders];
     if (agentFilter !== "all") filtered = filtered.filter(o => o.agent_id === agentFilter || o.original_agent_id === agentFilter);
     if (sellerFilter !== "all") filtered = filtered.filter(o => o.seller_id === sellerFilter);
     if (productFilter !== "all") filtered = filtered.filter(o => o.product_name === productFilter);
-    if (dateRange?.from) filtered = filtered.filter(o => new Date(o.created_at) >= dateRange.from!);
-    if (dateRange?.to) filtered = filtered.filter(o => new Date(o.created_at) <= dateRange.to!);
+    if (dateRange?.from) filtered = filtered.filter(o => getTreatmentDate(o) >= dateRange.from!);
+    if (dateRange?.to) filtered = filtered.filter(o => getTreatmentDate(o) <= dateRange.to!);
     return filtered;
   }, [orders, agentFilter, sellerFilter, productFilter, dateRange]);
 
