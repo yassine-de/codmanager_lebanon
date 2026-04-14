@@ -88,12 +88,14 @@ const Integrations = () => {
     const { data } = await supabase
       .from("app_settings")
       .select("key, value")
-      .in("key", ["orio_api_enabled", "orio_api_token", "orio_account_number"]);
+      .in("key", ["orio_api_enabled", "orio_api_token", "orio_account_number", "orio_sync_interval_minutes", "orio_last_status_sync"]);
     if (data) {
       data.forEach((d) => {
         if (d.key === "orio_api_enabled") setApiEnabled(d.value === "true");
         if (d.key === "orio_api_token") setApiKey(d.value);
         if (d.key === "orio_account_number") setApiAccountNumber(d.value);
+        if (d.key === "orio_sync_interval_minutes") setSyncInterval(d.value);
+        if (d.key === "orio_last_status_sync") setLastStatusSync(d.value);
       });
     }
     setApiLoaded(true);
