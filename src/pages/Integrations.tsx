@@ -61,6 +61,8 @@ const Integrations = () => {
   const [apiAccountNumber, setApiAccountNumber] = useState("");
   const [apiSaving, setApiSaving] = useState(false);
   const [apiLoaded, setApiLoaded] = useState(false);
+  const [syncInterval, setSyncInterval] = useState("5");
+  const [lastStatusSync, setLastStatusSync] = useState("");
   // Create/Edit modal
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<IntegrationSheet | null>(null);
@@ -86,12 +88,14 @@ const Integrations = () => {
     const { data } = await supabase
       .from("app_settings")
       .select("key, value")
-      .in("key", ["orio_api_enabled", "orio_api_token", "orio_account_number"]);
+      .in("key", ["orio_api_enabled", "orio_api_token", "orio_account_number", "orio_sync_interval_minutes", "orio_last_status_sync"]);
     if (data) {
       data.forEach((d) => {
         if (d.key === "orio_api_enabled") setApiEnabled(d.value === "true");
         if (d.key === "orio_api_token") setApiKey(d.value);
         if (d.key === "orio_account_number") setApiAccountNumber(d.value);
+        if (d.key === "orio_sync_interval_minutes") setSyncInterval(d.value);
+        if (d.key === "orio_last_status_sync") setLastStatusSync(d.value);
       });
     }
     setApiLoaded(true);
@@ -104,6 +108,7 @@ const Integrations = () => {
       { key: "orio_api_enabled", value: String(apiEnabled), updated_at: now },
       { key: "orio_api_token", value: apiKey, updated_at: now },
       { key: "orio_account_number", value: apiAccountNumber, updated_at: now },
+      { key: "orio_sync_interval_minutes", value: syncInterval, updated_at: now },
     ];
     const { error } = await supabase
       .from("app_settings")
@@ -338,6 +343,28 @@ const Integrations = () => {
                   value={apiAccountNumber}
                   onChange={(e) => setApiAccountNumber(e.target.value)}
                 />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <RefreshCw className="w-3 h-3" /> Status Sync Interval (min)
+                </Label>
+                <Input
+                  className="h-9 text-xs font-mono"
+                  type="number"
+                  min="1"
+                  max="60"
+                  placeholder="5"
+                  value={syncInterval}
+                  onChange={(e) => setSyncInterval(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Last Status Sync</Label>
+                <p className="text-xs font-mono h-9 flex items-center">
+                  {lastStatusSync ? formatDistanceToNow(new Date(lastStatusSync), { addSuffix: true }) : "Never"}
+                </p>
               </div>
             </div>
             <div className="flex justify-end">

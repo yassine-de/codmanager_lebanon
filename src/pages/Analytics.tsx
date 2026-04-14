@@ -15,6 +15,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   wrong_number: 'hsl(0, 50%, 50%)',
   in_transit: 'hsl(210, 50%, 55%)',
   with_courier: 'hsl(155, 35%, 38%)',
+  failed: 'hsl(25, 85%, 55%)',
 };
 
 export default function Analytics() {

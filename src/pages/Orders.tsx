@@ -51,6 +51,7 @@ const deliveryConfig: Record<DeliveryStatus, { label: string; cls: string }> = {
   cancelled: { label: 'Cancelled', cls: 'bg-[hsl(0,65%,52%)]/12 text-[hsl(0,65%,52%)] border-[hsl(0,65%,52%)]/20' },
   no_answer: { label: 'No Answer', cls: 'bg-[hsl(38,90%,55%)]/12 text-[hsl(38,90%,55%)] border-[hsl(38,90%,55%)]/20' },
   postponed: { label: 'Postponed', cls: 'bg-[hsl(25,85%,55%)]/12 text-[hsl(25,85%,55%)] border-[hsl(25,85%,55%)]/20' },
+  failed: { label: 'Failed', cls: 'bg-[hsl(25,85%,55%)]/12 text-[hsl(25,85%,55%)] border-[hsl(25,85%,55%)]/20' },
 };
 
 const shippedDeliveryStatuses: DeliveryStatus[] = ["shipped", "in_transit", "with_courier"];
