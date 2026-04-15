@@ -44,54 +44,30 @@ const roleConfig: Record<string, { label: string; icon: typeof Shield; color: st
 };
 
 const Users = () => {
-  const [users, setUsers] = useState<UserData[]>([]);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserData | null>(null);
+  const queryClient = useQueryClient();
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    phone: "",
-    role: "seller" as string,
-    rate_1kg: "",
-    rate_2kg: "",
-    rate_3kg: "",
-    dropped_order_rate: "",
-    confirmed_order_rate: "",
-    cod_fee_per_delivery: "",
-    selectedPermissions: [] as string[],
-    customRoleName: "",
-    agentProductScope: "all" as "all" | "specific",
-    agentProducts: [] as string[],
+  const { data: users = [], isLoading: loading } = useQuery({
+    queryKey: ["manage-users-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("manage-users", {
+        body: { action: "list-users" },
+      });
+      if (error) throw error;
+      return (data.users || []) as UserData[];
+    },
+    staleTime: 60000,
   });
 
-  useEffect(() => {
-    fetchUsers();
-    fetchPermissions();
-  }, []);
+  const { data: permissions = [] } = useQuery({
+    queryKey: ["permissions-list"],
+    queryFn: async () => {
+      const { data } = await supabase.from("permissions").select("*").order("key");
+      return (data || []) as Permission[];
+    },
+    staleTime: 300000,
+  });
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    const { data, error } = await supabase.functions.invoke("manage-users", {
-      body: { action: "list-users" },
-    });
-    if (error) {
-      toast.error("Erreur de chargement des utilisateurs");
-      console.error(error);
-    } else {
-      setUsers(data.users || []);
-    }
-    setLoading(false);
-  };
-
-  const fetchPermissions = async () => {
-    const { data } = await supabase.from("permissions").select("*").order("key");
-    if (data) setPermissions(data);
-  };
+  const refetchUsers = () => queryClient.invalidateQueries({ queryKey: ["manage-users-list"] });
 
   const openCreate = () => {
     setEditingUser(null);
