@@ -45,6 +45,27 @@ const roleConfig: Record<string, { label: string; icon: typeof Shield; color: st
 
 const Users = () => {
   const queryClient = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserData | null>(null);
+
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    phone: "",
+    role: "seller" as string,
+    rate_1kg: "",
+    rate_2kg: "",
+    rate_3kg: "",
+    dropped_order_rate: "",
+    confirmed_order_rate: "",
+    cod_fee_per_delivery: "",
+    selectedPermissions: [] as string[],
+    customRoleName: "",
+    agentProductScope: "all" as "all" | "specific",
+    agentProducts: [] as string[],
+  });
 
   const { data: users = [], isLoading: loading } = useQuery({
     queryKey: ["manage-users-list"],
