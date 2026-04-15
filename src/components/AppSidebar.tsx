@@ -52,6 +52,7 @@ const settingsSubItems = [
   { title: "users", url: "/users", icon: Users, permission: "access_to_users" },
   { title: "Rates", url: "/rates", icon: BadgeDollarSign, permission: "access_to_settings" },
   { title: "integrations", url: "/integrations", icon: Link2, permission: "access_to_settings" },
+  { title: "System Health", url: "/system-health", icon: Activity, permission: "access_to_settings" },
 ];
 
 export function AppSidebar() {
