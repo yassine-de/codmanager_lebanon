@@ -317,6 +317,29 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // ── Price sanity validation ──
+        // Block if unit price is suspiciously low (< 50 PKR) — almost certainly a parsing error
+        // or wildly off vs the product's configured price (e.g. parsed "8,372" as "8")
+        const productPrice = Number(product.price) || 0;
+        if (orderData.unit_price > 0 && orderData.unit_price < 50) {
+          await supabase.from("integration_errors").insert({
+            sheet_id: sheet.id,
+            order_data: orderData as any,
+            error_message: `Price "${priceStr}" parsed as ${orderData.unit_price} PKR is suspiciously low (< 50). Likely a number format issue (commas/separators). Please verify the sheet column for "Price".`,
+          });
+          errorsCount++;
+          continue;
+        }
+        if (productPrice > 100 && orderData.unit_price > 0 && orderData.unit_price < productPrice * 0.1) {
+          await supabase.from("integration_errors").insert({
+            sheet_id: sheet.id,
+            order_data: orderData as any,
+            error_message: `Price ${orderData.unit_price} PKR is far below product price ${productPrice} PKR. Likely a parsing or column mapping error.`,
+          });
+          errorsCount++;
+          continue;
+        }
+
         // Duplicate check
         const today = new Date();
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
