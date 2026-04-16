@@ -698,6 +698,52 @@ const Integrations = () => {
               <Label className="text-xs">Google Sheet URL *</Label>
               <Input className="text-sm" placeholder="https://docs.google.com/spreadsheets/d/..." value={form.sheet_url} onChange={(e) => setForm((f) => ({ ...f, sheet_url: e.target.value }))} />
             </div>
+
+            {/* Column Mapping */}
+            <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">Column Mapping</Label>
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, column_mapping: { ...DEFAULT_MAPPING } }))}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  Reset to defaults (A → J)
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Configure which spreadsheet column holds each field. Use letters (A, B, C…). Numbers like "8,372.00" are parsed safely.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ["order_id", "Order ID"],
+                  ["customer_name", "Customer Name"],
+                  ["phone", "Phone"],
+                  ["address", "Address"],
+                  ["city", "City"],
+                  ["product_name", "Product Name"],
+                  ["sku", "SKU"],
+                  ["quantity", "Quantity"],
+                  ["price", "Price"],
+                  ["total", "Total"],
+                ] as const).map(([key, label]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <Label className="text-[10px] flex-1 truncate">{label}</Label>
+                    <Input
+                      className="h-7 w-14 text-center text-xs uppercase"
+                      maxLength={2}
+                      value={form.column_mapping[key]}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          column_mapping: { ...f.column_mapping, [key]: e.target.value.toUpperCase() },
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>Cancel</Button>
