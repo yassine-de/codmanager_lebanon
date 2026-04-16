@@ -190,8 +190,9 @@ const Integrations = () => {
     }
 
     setSheets(
-      (data || []).map((s) => ({
+      (data || []).map((s: any) => ({
         ...s,
+        column_mapping: (s.column_mapping as ColumnMapping) || { ...DEFAULT_MAPPING },
         seller_name: sellerMap[s.seller_id] || "Unassigned",
       }))
     );
@@ -216,13 +217,19 @@ const Integrations = () => {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", sheet_name: "", sheet_url: "", seller_id: "" });
+    setForm({ name: "", sheet_name: "", sheet_url: "", seller_id: "", column_mapping: { ...DEFAULT_MAPPING } });
     setModalOpen(true);
   };
 
   const openEdit = (sheet: IntegrationSheet) => {
     setEditing(sheet);
-    setForm({ name: sheet.name, sheet_name: sheet.sheet_name, sheet_url: sheet.sheet_url, seller_id: sheet.seller_id });
+    setForm({
+      name: sheet.name,
+      sheet_name: sheet.sheet_name,
+      sheet_url: sheet.sheet_url,
+      seller_id: sheet.seller_id,
+      column_mapping: { ...DEFAULT_MAPPING, ...(sheet.column_mapping || {}) },
+    });
     setModalOpen(true);
   };
 
@@ -231,10 +238,25 @@ const Integrations = () => {
       toast.error("Please fill in Name and Sheet Name");
       return;
     }
+    const invalidCol = Object.entries(form.column_mapping).find(
+      ([, v]) => !/^[A-Za-z]{1,2}$/.test((v || "").trim())
+    );
+    if (invalidCol) {
+      toast.error(`Invalid column "${invalidCol[1]}" for ${invalidCol[0]}. Use letters like A, B, ..., Z.`);
+      return;
+    }
+    const normalizedMapping = Object.fromEntries(
+      Object.entries(form.column_mapping).map(([k, v]) => [k, v.toUpperCase().trim()])
+    );
+
     if (editing) {
       const { error } = await supabase
         .from("integration_sheets")
-        .update({ name: form.name, sheet_name: form.sheet_name, sheet_url: form.sheet_url, seller_id: form.seller_id || editing.seller_id })
+        .update({
+          name: form.name, sheet_name: form.sheet_name, sheet_url: form.sheet_url,
+          seller_id: form.seller_id || editing.seller_id,
+          column_mapping: normalizedMapping as any,
+        })
         .eq("id", editing.id);
       if (error) { toast.error("Error updating"); return; }
       toast.success("Integration updated");
@@ -242,6 +264,7 @@ const Integrations = () => {
       if (!form.seller_id) { toast.error("Please select a seller"); return; }
       const { error } = await supabase.from("integration_sheets").insert({
         name: form.name, sheet_name: form.sheet_name, sheet_url: form.sheet_url, seller_id: form.seller_id,
+        column_mapping: normalizedMapping as any,
       });
       if (error) { toast.error("Error creating"); return; }
       toast.success("Integration created");
