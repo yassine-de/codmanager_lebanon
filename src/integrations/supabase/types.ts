@@ -154,6 +154,7 @@ export type Database = {
       integration_sheets: {
         Row: {
           active: boolean
+          column_mapping: Json | null
           created_at: string
           errors_count: number
           id: string
@@ -168,6 +169,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          column_mapping?: Json | null
           created_at?: string
           errors_count?: number
           id?: string
@@ -182,6 +184,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          column_mapping?: Json | null
           created_at?: string
           errors_count?: number
           id?: string

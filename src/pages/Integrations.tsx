@@ -12,6 +12,24 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
+interface ColumnMapping {
+  order_id: string;
+  customer_name: string;
+  phone: string;
+  address: string;
+  city: string;
+  product_name: string;
+  sku: string;
+  quantity: string;
+  price: string;
+  total: string;
+}
+
+const DEFAULT_MAPPING: ColumnMapping = {
+  order_id: "A", customer_name: "B", phone: "C", address: "D", city: "E",
+  product_name: "F", sku: "G", quantity: "H", price: "I", total: "J",
+};
+
 interface IntegrationSheet {
   id: string;
   seller_id: string;
@@ -24,6 +42,7 @@ interface IntegrationSheet {
   active: boolean;
   created_at: string;
   last_imported_row: number;
+  column_mapping?: ColumnMapping | null;
   seller_name?: string;
 }
 
@@ -66,7 +85,10 @@ const Integrations = () => {
   // Create/Edit modal
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<IntegrationSheet | null>(null);
-  const [form, setForm] = useState({ name: "", sheet_name: "", sheet_url: "", seller_id: "" });
+  const [form, setForm] = useState<{
+    name: string; sheet_name: string; sheet_url: string; seller_id: string;
+    column_mapping: ColumnMapping;
+  }>({ name: "", sheet_name: "", sheet_url: "", seller_id: "", column_mapping: { ...DEFAULT_MAPPING } });
 
   // Errors modal
   const [errorsModalOpen, setErrorsModalOpen] = useState(false);
@@ -168,8 +190,9 @@ const Integrations = () => {
     }
 
     setSheets(
-      (data || []).map((s) => ({
+      (data || []).map((s: any) => ({
         ...s,
+        column_mapping: (s.column_mapping as ColumnMapping) || { ...DEFAULT_MAPPING },
         seller_name: sellerMap[s.seller_id] || "Unassigned",
       }))
     );
@@ -194,13 +217,19 @@ const Integrations = () => {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", sheet_name: "", sheet_url: "", seller_id: "" });
+    setForm({ name: "", sheet_name: "", sheet_url: "", seller_id: "", column_mapping: { ...DEFAULT_MAPPING } });
     setModalOpen(true);
   };
 
   const openEdit = (sheet: IntegrationSheet) => {
     setEditing(sheet);
-    setForm({ name: sheet.name, sheet_name: sheet.sheet_name, sheet_url: sheet.sheet_url, seller_id: sheet.seller_id });
+    setForm({
+      name: sheet.name,
+      sheet_name: sheet.sheet_name,
+      sheet_url: sheet.sheet_url,
+      seller_id: sheet.seller_id,
+      column_mapping: { ...DEFAULT_MAPPING, ...(sheet.column_mapping || {}) },
+    });
     setModalOpen(true);
   };
 
@@ -209,10 +238,25 @@ const Integrations = () => {
       toast.error("Please fill in Name and Sheet Name");
       return;
     }
+    const invalidCol = Object.entries(form.column_mapping).find(
+      ([, v]) => !/^[A-Za-z]{1,2}$/.test((v || "").trim())
+    );
+    if (invalidCol) {
+      toast.error(`Invalid column "${invalidCol[1]}" for ${invalidCol[0]}. Use letters like A, B, ..., Z.`);
+      return;
+    }
+    const normalizedMapping = Object.fromEntries(
+      Object.entries(form.column_mapping).map(([k, v]) => [k, v.toUpperCase().trim()])
+    );
+
     if (editing) {
       const { error } = await supabase
         .from("integration_sheets")
-        .update({ name: form.name, sheet_name: form.sheet_name, sheet_url: form.sheet_url, seller_id: form.seller_id || editing.seller_id })
+        .update({
+          name: form.name, sheet_name: form.sheet_name, sheet_url: form.sheet_url,
+          seller_id: form.seller_id || editing.seller_id,
+          column_mapping: normalizedMapping as any,
+        })
         .eq("id", editing.id);
       if (error) { toast.error("Error updating"); return; }
       toast.success("Integration updated");
@@ -220,6 +264,7 @@ const Integrations = () => {
       if (!form.seller_id) { toast.error("Please select a seller"); return; }
       const { error } = await supabase.from("integration_sheets").insert({
         name: form.name, sheet_name: form.sheet_name, sheet_url: form.sheet_url, seller_id: form.seller_id,
+        column_mapping: normalizedMapping as any,
       });
       if (error) { toast.error("Error creating"); return; }
       toast.success("Integration created");
@@ -652,6 +697,52 @@ const Integrations = () => {
             <div className="space-y-1.5">
               <Label className="text-xs">Google Sheet URL *</Label>
               <Input className="text-sm" placeholder="https://docs.google.com/spreadsheets/d/..." value={form.sheet_url} onChange={(e) => setForm((f) => ({ ...f, sheet_url: e.target.value }))} />
+            </div>
+
+            {/* Column Mapping */}
+            <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">Column Mapping</Label>
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, column_mapping: { ...DEFAULT_MAPPING } }))}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  Reset to defaults (A → J)
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Configure which spreadsheet column holds each field. Use letters (A, B, C…). Numbers like "8,372.00" are parsed safely.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ["order_id", "Order ID"],
+                  ["customer_name", "Customer Name"],
+                  ["phone", "Phone"],
+                  ["address", "Address"],
+                  ["city", "City"],
+                  ["product_name", "Product Name"],
+                  ["sku", "SKU"],
+                  ["quantity", "Quantity"],
+                  ["price", "Price"],
+                  ["total", "Total"],
+                ] as const).map(([key, label]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <Label className="text-[10px] flex-1 truncate">{label}</Label>
+                    <Input
+                      className="h-7 w-14 text-center text-xs uppercase"
+                      maxLength={2}
+                      value={form.column_mapping[key]}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          column_mapping: { ...f.column_mapping, [key]: e.target.value.toUpperCase() },
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>
