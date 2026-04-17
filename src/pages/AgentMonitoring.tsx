@@ -299,7 +299,7 @@ export default function AgentMonitoring() {
                             const severe = g.gapMs >= 10 * 60 * 1000;
                             return (
                               <TableRow key={idx}>
-                                <TableCell className="font-medium text-sm">{agent.name}</TableCell>
+                                <TableCell className="font-medium text-sm">{agentNameById.get(g.activity.agent_id) || agent.name}</TableCell>
                                 <TableCell>
                                   <Badge
                                     variant="secondary"
