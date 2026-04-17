@@ -65,9 +65,10 @@ export default function OrioTrackingModal({ orioOrderId, systemId, sellerId, ope
             <Package className="w-4 h-4" />
             TRACK DETAIL {payload?.consigment_no ? `- ${payload.consigment_no}` : `- ORIO #${orioOrderId}`}
           </DialogTitle>
-          <div className="flex items-center gap-3 mt-1">
-            <span className="text-[10px] font-semibold text-muted-foreground">ORIO ID: <span className="text-foreground">{orioOrderId}</span></span>
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
             {systemId && <span className="text-[10px] font-semibold text-muted-foreground">SYSTEM ID: <span className="text-foreground">{systemId}</span></span>}
+            {sellerId && <span className="text-[10px] font-semibold text-muted-foreground">SELLER ID: <span className="text-foreground">{sellerId}</span></span>}
+            <span className="text-[10px] font-semibold text-muted-foreground">ORIO ID: <span className="text-foreground">{orioOrderId}</span></span>
           </div>
         </DialogHeader>
 
