@@ -29,7 +29,7 @@ interface TrackingPayload {
   detail: TrackingDetail[];
 }
 
-export default function OrioTrackingModal({ orioOrderId, systemId, open, onClose }: OrioTrackingModalProps) {
+export default function OrioTrackingModal({ orioOrderId, systemId, sellerId, open, onClose }: OrioTrackingModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<TrackingPayload | null>(null);
