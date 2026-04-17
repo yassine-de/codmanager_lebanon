@@ -6,6 +6,7 @@ import { Loader2, Package, MapPin, Calendar, User, DollarSign, Truck } from "luc
 interface OrioTrackingModalProps {
   orioOrderId: number;
   systemId?: number | null;
+  sellerId?: string | null;
   open: boolean;
   onClose: () => void;
 }
