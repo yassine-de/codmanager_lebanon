@@ -939,11 +939,13 @@ export default function Orders() {
       </div>
 
       {/* ORIO Tracking Modal */}
-      {trackingOrioId && (
+      {trackingTarget && (
         <OrioTrackingModal
-          orioOrderId={trackingOrioId}
-          open={!!trackingOrioId}
-          onClose={() => setTrackingOrioId(null)}
+          orioOrderId={trackingTarget.orioId}
+          systemId={trackingTarget.systemId}
+          sellerId={trackingTarget.sellerId}
+          open={!!trackingTarget}
+          onClose={() => setTrackingTarget(null)}
         />
       )}
 
