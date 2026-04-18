@@ -85,7 +85,7 @@ export default function SystemStatusPanel() {
   const items: StatusItem[] = [
     {
       id: "sync-errors",
-      label: "ORIO Sync Errors",
+      label: "Shipping Sync Errors",
       count: failedSyncCount,
       severity: failedSyncCount > 0 ? "error" : "ok",
       icon: <AlertTriangle className="w-4 h-4" />,
