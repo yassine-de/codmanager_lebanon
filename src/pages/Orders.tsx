@@ -352,6 +352,7 @@ export default function Orders() {
   useEffect(() => {
     const conf = searchParams.get('confirmation');
     const del = searchParams.get('delivery');
+    const searchParam = searchParams.get('search');
     if (conf) {
       setFilterConfirmation(conf);
       setAppliedFilters(prev => ({ ...prev, confirmation: conf }));
@@ -362,8 +363,11 @@ export default function Orders() {
       setAppliedFilters(prev => ({ ...prev, delivery: del }));
       setShowFilters(true);
     }
+    if (searchParam) {
+      setSearch(searchParam);
+    }
     // Clear URL params after reading
-    if (conf || del) {
+    if (conf || del || searchParam) {
       setSearchParams({}, { replace: true });
     }
   }, []);
