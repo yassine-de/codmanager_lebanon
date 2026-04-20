@@ -404,7 +404,8 @@ export default function Orders() {
       dateRange: undefined as DateRange | undefined,
       product: 'all', seller: 'all', agent: 'all',
       confirmation: conf || 'all',
-      delivery: del || 'all', 
+      delivery: del || 'all',
+      subStatus: 'all',
       upsell: 'all',
     };
   });
@@ -428,22 +429,31 @@ export default function Orders() {
     new Set(allColumns.filter(c => c.defaultVisible).map(c => c.key))
   );
 
+  // Unique sub-statuses present in current orders (for filter dropdown)
+  const subStatusOptions = useMemo(() => {
+    const set = new Set<string>();
+    orders.forEach(o => { if (o.orioShippingStatus) set.add(o.orioShippingStatus); });
+    return Array.from(set).sort();
+  }, [orders]);
+
   const applyFilters = useCallback(() => {
     setAppliedFilters({
       dateRange, product: filterProduct, seller: filterSeller, agent: filterAgent,
       confirmation: filterConfirmation, delivery: filterDelivery,
+      subStatus: filterSubStatus,
       upsell: filterUpsell,
     });
-  }, [dateRange, filterProduct, filterSeller, filterAgent, filterConfirmation, filterDelivery, filterUpsell]);
+  }, [dateRange, filterProduct, filterSeller, filterAgent, filterConfirmation, filterDelivery, filterSubStatus, filterUpsell]);
 
   const clearFilters = useCallback(() => {
     setDateRange(undefined);
     setFilterProduct('all'); setFilterSeller('all'); setFilterAgent('all');
     setFilterConfirmation('all'); setFilterDelivery('all');
+    setFilterSubStatus('all');
     setFilterUpsell('all');
     setAppliedFilters({
       dateRange: undefined, product: 'all', seller: 'all', agent: 'all',
-      confirmation: 'all', delivery: 'all', upsell: 'all',
+      confirmation: 'all', delivery: 'all', subStatus: 'all', upsell: 'all',
     });
   }, []);
 
@@ -455,9 +465,8 @@ export default function Orders() {
     if (appliedFilters.agent !== 'all') count++;
     if (appliedFilters.confirmation !== 'all') count++;
     if (appliedFilters.delivery !== 'all') count++;
+    if (appliedFilters.subStatus !== 'all') count++;
     if (appliedFilters.upsell !== 'all') count++;
-    
-    
     return count;
   }, [appliedFilters]);
 
@@ -475,6 +484,7 @@ export default function Orders() {
         if (f.agent !== 'all' && o.agentName !== f.agent) return false;
         if (f.confirmation !== 'all' && o.confirmationStatus !== f.confirmation) return false;
         if (f.delivery !== 'all' && o.deliveryStatus !== f.delivery) return false;
+        if (f.subStatus !== 'all' && (o.orioShippingStatus || '') !== f.subStatus) return false;
         if (f.upsell !== 'all') {
           if (f.upsell === 'yes' && !o.upsell) return false;
           if (f.upsell === 'no' && o.upsell) return false;
