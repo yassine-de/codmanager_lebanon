@@ -52,6 +52,28 @@ const deliveryConfig: Record<DeliveryStatus, { label: string; cls: string }> = {
   no_answer: { label: 'No Answer', cls: 'bg-[hsl(38,90%,55%)]/12 text-[hsl(38,90%,55%)] border-[hsl(38,90%,55%)]/20' },
   postponed: { label: 'Postponed', cls: 'bg-[hsl(25,85%,55%)]/12 text-[hsl(25,85%,55%)] border-[hsl(25,85%,55%)]/20' },
   failed: { label: 'Failed', cls: 'bg-[hsl(25,85%,55%)]/12 text-[hsl(25,85%,55%)] border-[hsl(25,85%,55%)]/20' },
+  failed_attempt: { label: 'Failed Attempt', cls: 'bg-[hsl(25,85%,55%)]/12 text-[hsl(25,85%,55%)] border-[hsl(25,85%,55%)]/20' },
+  ready_for_return: { label: 'Ready for Return', cls: 'bg-[hsl(15,75%,55%)]/12 text-[hsl(15,75%,55%)] border-[hsl(15,75%,55%)]/20' },
+  rejected: { label: 'Rejected', cls: 'bg-[hsl(0,65%,52%)]/12 text-[hsl(0,65%,52%)] border-[hsl(0,65%,52%)]/20' },
+  return: { label: 'Return', cls: 'bg-[hsl(340,65%,52%)]/12 text-[hsl(340,65%,52%)] border-[hsl(340,65%,52%)]/20' },
+};
+
+// Pretty label for ORIO sub-status (kept verbatim from API)
+const subStatusLabel = (raw?: string | null) => {
+  if (!raw) return null;
+  return raw.replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+const subStatusClass = (raw?: string | null): string => {
+  if (!raw) return 'bg-muted text-muted-foreground border-border';
+  const s = raw.toLowerCase().trim();
+  if (s === 'delivered') return 'bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)] border-[hsl(155,50%,42%)]/20';
+  if (s === 'cancelled' || s === 'refused to accept') return 'bg-[hsl(0,65%,52%)]/12 text-[hsl(0,65%,52%)] border-[hsl(0,65%,52%)]/20';
+  if (s === 'failed attempt') return 'bg-[hsl(25,85%,55%)]/12 text-[hsl(25,85%,55%)] border-[hsl(25,85%,55%)]/20';
+  if (s === 'ready for return' || s.startsWith('return')) return 'bg-[hsl(340,65%,52%)]/12 text-[hsl(340,65%,52%)] border-[hsl(340,65%,52%)]/20';
+  if (s === 'new') return 'bg-[hsl(210,60%,52%)]/12 text-[hsl(210,60%,52%)] border-[hsl(210,60%,52%)]/20';
+  // All in-flight courier states
+  return 'bg-[hsl(200,65%,50%)]/12 text-[hsl(200,65%,50%)] border-[hsl(200,65%,50%)]/20';
 };
 
 const shippedDeliveryStatuses: DeliveryStatus[] = ["shipped", "in_transit", "with_courier"];
