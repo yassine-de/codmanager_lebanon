@@ -107,7 +107,7 @@ const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean; admi
   { key: 'confirmationStatus', label: 'Confirmation', defaultVisible: true },
   { key: 'attempts', label: 'Attempts', defaultVisible: true },
   { key: 'deliveryStatus', label: 'Delivery', defaultVisible: true },
-  { key: 'subStatus', label: 'Sub Status', defaultVisible: true },
+  { key: 'subStatus', label: 'Sub Status', defaultVisible: true, adminOnly: true },
 ];
 
 /* ── Sparkline KPI Cards ── */
@@ -658,7 +658,8 @@ export default function Orders() {
                 className="w-full"
               />
             </div>
-            {/* Sub Status (ORIO) */}
+            {/* Sub Status (ORIO) - admin only */}
+            {isAdmin && (
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Sub Status</label>
               <SearchableSelect
@@ -670,6 +671,7 @@ export default function Orders() {
                 className="w-full"
               />
             </div>
+            )}
             {/* Upsell */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Upsell</label>
@@ -814,7 +816,7 @@ export default function Orders() {
                 {isCol('confirmationStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Confirmation</th>}
                 
                 {isCol('deliveryStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Delivery</th>}
-                {isCol('subStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Sub Status</th>}
+                {isAdmin && isCol('subStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Sub Status</th>}
                 
                 <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Actions</th>
               </tr>
@@ -863,7 +865,7 @@ export default function Orders() {
                   {isCol('amount') && <td className="py-2.5 px-4 text-xs font-medium tabular-nums text-right">{order.total.toLocaleString()} PKR</td>}
 {isCol('confirmationStatus') && <td className="py-2.5 px-4"><StatusBadge {...confirmationConfig[order.confirmationStatus]} attemptCount={order.confirmationStatus === 'no_answer' ? order.attemptCount : undefined} /></td>}
                   {isCol('deliveryStatus') && <td className="py-2.5 px-4"><StatusBadge {...deliveryConfig[order.deliveryStatus]} /></td>}
-                  {isCol('subStatus') && (
+                  {isAdmin && isCol('subStatus') && (
                     <td className="py-2.5 px-4">
                       {order.orioShippingStatus ? (
                         <StatusBadge label={subStatusLabel(order.orioShippingStatus)!} cls={subStatusClass(order.orioShippingStatus)} />
