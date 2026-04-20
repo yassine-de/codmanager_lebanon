@@ -367,6 +367,7 @@ export default function Orders() {
   const [filterAgent, setFilterAgent] = useState('all');
   const [filterConfirmation, setFilterConfirmation] = useState('all');
   const [filterDelivery, setFilterDelivery] = useState('all');
+  const [filterSubStatus, setFilterSubStatus] = useState('all');
   const [filterUpsell, setFilterUpsell] = useState('all');
   
   
@@ -791,6 +792,7 @@ export default function Orders() {
                 {isCol('confirmationStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Confirmation</th>}
                 
                 {isCol('deliveryStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Delivery</th>}
+                {isCol('subStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Sub Status</th>}
                 
                 <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Actions</th>
               </tr>
@@ -839,6 +841,15 @@ export default function Orders() {
                   {isCol('amount') && <td className="py-2.5 px-4 text-xs font-medium tabular-nums text-right">{order.total.toLocaleString()} PKR</td>}
 {isCol('confirmationStatus') && <td className="py-2.5 px-4"><StatusBadge {...confirmationConfig[order.confirmationStatus]} attemptCount={order.confirmationStatus === 'no_answer' ? order.attemptCount : undefined} /></td>}
                   {isCol('deliveryStatus') && <td className="py-2.5 px-4"><StatusBadge {...deliveryConfig[order.deliveryStatus]} /></td>}
+                  {isCol('subStatus') && (
+                    <td className="py-2.5 px-4">
+                      {order.orioShippingStatus ? (
+                        <StatusBadge label={subStatusLabel(order.orioShippingStatus)!} cls={subStatusClass(order.orioShippingStatus)} />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  )}
                   
                   <td className="py-2.5 px-4">
                     <div className="flex items-center gap-1.5">
