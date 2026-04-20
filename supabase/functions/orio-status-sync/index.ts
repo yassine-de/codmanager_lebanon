@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       .from("orders")
       .select("id, order_id, orio_order_id, delivery_status, orio_shipping_status, updated_at")
       .not("orio_order_id", "is", null)
-      .not("delivery_status", "in", '("delivered","returned","cancelled")')
+      .not("delivery_status", "in", '("delivered","returned","cancelled","return","rejected")')
       .order("updated_at", { ascending: true, nullsFirst: true })
       .limit(300);
 
