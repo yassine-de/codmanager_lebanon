@@ -179,45 +179,52 @@ export default function LandingPage() {
       </Reveal>
 
       {/* ─── 2. OPPORTUNITY ─── */}
-      <Reveal id="opportunity" className="relative py-24 md:py-32">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="relative rounded-3xl overflow-hidden border border-blue-400/20 shadow-[0_0_80px_rgba(56,128,255,0.35)]">
-            {/* Background image */}
-            <img
-              src={opportunityImg}
-              alt="Pakistan growth opportunity"
-              loading="lazy"
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            {/* Gradient overlays for legibility */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#04060f]/95 via-[#04060f]/70 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#04060f]/80 via-transparent to-transparent" />
+      <Reveal id="opportunity" className="relative w-full overflow-hidden">
+        {/* Full-bleed background image */}
+        <img
+          src={opportunityImg}
+          alt="Pakistan growth opportunity"
+          loading="lazy"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        {/* Cinematic overlays */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#04060f] via-[#04060f]/40 to-[#04060f]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#04060f]/90 via-transparent to-[#04060f]/70" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(4,6,15,0.6)_100%)]" />
 
-            {/* Content */}
-            <div className="relative grid lg:grid-cols-2 gap-10 p-8 md:p-14 lg:p-20 min-h-[640px]">
-              <div className="flex flex-col justify-center">
-                <div className="text-blue-300 text-xs uppercase tracking-[0.2em] font-semibold mb-4">The Opportunity</div>
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-5 text-white">
-                  Pakistan = Your Next <span className="bg-gradient-to-r from-blue-300 to-blue-500 bg-clip-text text-transparent">Growth Engine</span>
-                </h2>
-                <p className="text-white/80 text-lg mb-8 leading-relaxed max-w-xl">
-                  While everyone fights over saturated markets, Pakistan is wide open — ready, willing and waiting.
-                </p>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {opportunityPoints.map((p) => (
-                    <div key={p.title} className="group relative rounded-2xl border border-white/15 bg-white/[0.06] backdrop-blur-md p-5 hover:border-blue-400/50 hover:bg-white/[0.1] transition">
-                      <div className="w-10 h-10 rounded-lg grid place-items-center bg-blue-500/20 border border-blue-400/40 text-blue-300 mb-3">
-                        <p.icon className="w-5 h-5" />
-                      </div>
-                      <div className="font-semibold mb-1 text-white">{p.title}</div>
-                      <div className="text-sm text-white/70">{p.desc}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {/* Right column intentionally empty — image fills it on large screens */}
-              <div className="hidden lg:block" />
+        {/* Content */}
+        <div className="relative mx-auto max-w-7xl px-6 py-28 md:py-36 lg:py-44 min-h-[760px] flex flex-col justify-between gap-16">
+          {/* Top: headline */}
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 text-blue-300 text-xs uppercase tracking-[0.25em] font-semibold mb-5">
+              <span className="w-8 h-px bg-blue-400/60" />
+              The Opportunity
             </div>
+            <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 text-white leading-[1.05]">
+              Pakistan = Your Next{" "}
+              <span className="bg-gradient-to-r from-blue-300 via-blue-400 to-blue-600 bg-clip-text text-transparent">
+                Growth Engine
+              </span>
+            </h2>
+            <p className="text-white/75 text-lg md:text-xl leading-relaxed max-w-2xl">
+              While everyone fights over saturated markets, Pakistan is wide open — ready, willing and waiting.
+            </p>
+          </div>
+
+          {/* Bottom: KPI cards anchored */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            {opportunityPoints.map((p) => (
+              <div
+                key={p.title}
+                className="group relative rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-5 md:p-6 hover:border-blue-400/50 hover:bg-white/[0.08] transition-all duration-300 hover:-translate-y-1"
+              >
+                <div className="w-10 h-10 rounded-lg grid place-items-center bg-blue-500/15 border border-blue-400/30 text-blue-300 mb-3">
+                  <p.icon className="w-5 h-5" />
+                </div>
+                <div className="font-semibold mb-1 text-white text-base md:text-lg">{p.title}</div>
+                <div className="text-xs md:text-sm text-white/65 leading-relaxed">{p.desc}</div>
+              </div>
+            ))}
           </div>
         </div>
       </Reveal>
