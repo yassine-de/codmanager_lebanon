@@ -265,6 +265,7 @@ export default function FollowUps() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [savingId, setSavingId] = useState<string | null>(null);
   const [historyOrder, setHistoryOrder] = useState<{ id: string; customer: string } | null>(null);
+  const [trackingTarget, setTrackingTarget] = useState<{ orioId: number; sellerId: string } | null>(null);
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => loadColumnConfig());
 
