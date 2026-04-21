@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { KPICard } from "@/components/KPICard";
-import { Phone, CheckCircle2, PhoneCall, Clock, XCircle, AlertTriangle, Truck, Users, ShoppingCart, Loader2, Timer, Hourglass, ClipboardCheck, MousePointerClick } from "lucide-react";
+import { Phone, CheckCircle2, PhoneCall, Clock, XCircle, AlertTriangle, Truck, ShoppingCart, Loader2, Timer, Hourglass, ClipboardCheck, MousePointerClick } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";
