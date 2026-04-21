@@ -475,33 +475,40 @@ export default function FollowUps() {
         </div>
 
         {/* Filters */}
-        <Card className="p-4 space-y-3">
-          <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
-            <div className="relative flex-1 max-w-md">
+        <Card className="p-3 sm:p-4 space-y-3">
+          {/* Row 1: Search + actions */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
+            <div className="relative flex-1 sm:max-w-md min-w-0">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search order, customer, phone, city, seller, agent..."
+                placeholder="Search..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 h-9"
+                className="pl-8 h-9 text-xs sm:text-sm"
               />
             </div>
 
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-2 sm:ml-auto flex-shrink-0">
               {activeFilterCount > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 text-xs gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="h-9 text-xs gap-1 flex-1 sm:flex-initial"
+                >
                   <X className="h-3.5 w-3.5" />
-                  Clear ({activeFilterCount})
+                  <span className="hidden xs:inline">Clear</span> ({activeFilterCount})
                 </Button>
               )}
               <ColumnsManager columns={columns} onChange={setColumns} />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+          {/* Row 2: Filter dropdowns - fully responsive grid */}
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
             {/* Segment filter */}
             <Select value={segment} onValueChange={(v) => setSegment(v as Segment)}>
-              <SelectTrigger className="h-9 text-xs">
+              <SelectTrigger className="h-9 text-xs min-w-0">
                 <SelectValue placeholder="Segment" />
               </SelectTrigger>
               <SelectContent>
@@ -514,7 +521,7 @@ export default function FollowUps() {
             </Select>
 
             <Select value={filterDelivery} onValueChange={setFilterDelivery}>
-              <SelectTrigger className="h-9 text-xs">
+              <SelectTrigger className="h-9 text-xs min-w-0">
                 <SelectValue placeholder="Delivery Status" />
               </SelectTrigger>
               <SelectContent>
@@ -526,7 +533,7 @@ export default function FollowUps() {
             </Select>
 
             <Select value={filterSeller} onValueChange={setFilterSeller}>
-              <SelectTrigger className="h-9 text-xs">
+              <SelectTrigger className="h-9 text-xs min-w-0">
                 <SelectValue placeholder="Seller" />
               </SelectTrigger>
               <SelectContent>
@@ -538,7 +545,7 @@ export default function FollowUps() {
             </Select>
 
             <Select value={filterAgent} onValueChange={setFilterAgent}>
-              <SelectTrigger className="h-9 text-xs">
+              <SelectTrigger className="h-9 text-xs min-w-0">
                 <SelectValue placeholder="Agent" />
               </SelectTrigger>
               <SelectContent>
@@ -550,7 +557,7 @@ export default function FollowUps() {
             </Select>
 
             <Select value={filterFollowUp} onValueChange={setFilterFollowUp}>
-              <SelectTrigger className="h-9 text-xs">
+              <SelectTrigger className="h-9 text-xs min-w-0">
                 <SelectValue placeholder="Follow Up Status" />
               </SelectTrigger>
               <SelectContent>
@@ -561,10 +568,10 @@ export default function FollowUps() {
               </SelectContent>
             </Select>
 
-            {/* Date range filter */}
-            <div className="flex gap-1">
+            {/* Date range filter - keeps field selector + date side-by-side */}
+            <div className="flex gap-1 min-w-0">
               <Select value={dateField} onValueChange={(v) => setDateField(v as DateField)}>
-                <SelectTrigger className="h-9 text-xs w-[90px] flex-shrink-0">
+                <SelectTrigger className="h-9 text-xs w-[78px] sm:w-[88px] flex-shrink-0 px-2">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -577,7 +584,7 @@ export default function FollowUps() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`h-9 text-xs flex-1 justify-start gap-1.5 px-2 ${
+                    className={`h-9 text-xs flex-1 min-w-0 justify-start gap-1.5 px-2 ${
                       dateRange?.from ? "" : "text-muted-foreground"
                     }`}
                   >
@@ -586,12 +593,12 @@ export default function FollowUps() {
                       {dateRange?.from
                         ? dateRange.to
                           ? `${format(dateRange.from, "dd MMM")} - ${format(dateRange.to, "dd MMM")}`
-                          : format(dateRange.from, "dd MMM yyyy")
+                          : format(dateRange.from, "dd MMM")
                         : "Pick date"}
                     </span>
                     {dateRange?.from && (
                       <X
-                        className="h-3 w-3 ml-auto hover:text-foreground"
+                        className="h-3 w-3 ml-auto hover:text-foreground flex-shrink-0"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDateRange(undefined);
@@ -600,13 +607,14 @@ export default function FollowUps() {
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
+                <PopoverContent className="w-auto p-0 max-w-[calc(100vw-2rem)]" align="end">
                   <Calendar
                     mode="range"
                     selected={dateRange}
                     onSelect={setDateRange}
-                    numberOfMonths={2}
+                    numberOfMonths={typeof window !== "undefined" && window.innerWidth < 640 ? 1 : 2}
                     initialFocus
+                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
