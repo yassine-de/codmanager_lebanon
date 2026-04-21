@@ -25,6 +25,9 @@ interface DailyConfirmationReportProps {
   profileNameMap: Record<string, string>;
   agentIds: string[];
   agentScores?: AgentScore[];
+  treatedOrders?: number;
+  firstCallAvg?: string;
+  handlingTime?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
