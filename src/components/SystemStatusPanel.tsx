@@ -53,6 +53,25 @@ export default function SystemStatusPanel() {
     refetchInterval: 30_000,
   });
 
+  // Stuck pending syncs (confirmed+booked, no orio_order_id, pending > 1h)
+  const { data: stuckPendingCount = 0 } = useQuery({
+    queryKey: ["system-stuck-pending-syncs"],
+    queryFn: async () => {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { count, error } = await supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("confirmation_status", "confirmed")
+        .eq("delivery_status", "booked")
+        .is("orio_order_id", null)
+        .or("orio_sync_status.is.null,orio_sync_status.eq.pending")
+        .lt("updated_at", oneHourAgo);
+      if (error) throw error;
+      return count || 0;
+    },
+    refetchInterval: 30_000,
+  });
+
   // Pending adjustments
   const { data: pendingAdjustments = 0 } = useQuery({
     queryKey: ["system-pending-adjustments"],
