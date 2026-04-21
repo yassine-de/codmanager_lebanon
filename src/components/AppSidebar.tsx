@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingCart, Package, BarChart3, Package2, BoxIcon, Settings, Users, ChevronDown, Link2, CheckSquare, Store, DollarSign, PhoneForwarded, FileText, FileSpreadsheet, Calculator, Headphones, Play, ListChecks, BadgeDollarSign, MessageSquare, Megaphone, ArrowUpDown, Activity } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Package, BarChart3, Package2, BoxIcon, Settings, Users, ChevronDown, Link2, CheckSquare, Store, DollarSign, PhoneForwarded, FileText, FileSpreadsheet, Calculator, Headphones, Play, ListChecks, BadgeDollarSign, MessageSquare, Megaphone, ArrowUpDown, Activity, ClipboardCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -31,6 +31,7 @@ const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUn
   { title: "Alerts", url: "/alerts", icon: Megaphone, permission: "access_to_settings" },
   { title: "invoices", url: "/invoices", icon: FileText, permission: "access_to_settings", sellerVisible: true },
   { title: "Adjustments", url: "/adjustments", icon: ArrowUpDown, permission: "access_to_settings", badge: pendingAdjustments > 0 ? pendingAdjustments : undefined },
+  { title: "Follow Ups", url: "/follow-ups", icon: ClipboardCheck, adminAgentOnly: true },
   { title: "sourcing", url: "/seller-sourcing", icon: Package2, sellerOnly: true, badge: sourcingUnseen > 0 ? sourcingUnseen : undefined },
   { title: "sheets", url: "/sheets", icon: FileSpreadsheet, sellerOnly: true },
   { title: "simulation", url: "/simulation", icon: Calculator, sellerOnly: true },
@@ -169,6 +170,7 @@ export function AppSidebar() {
   const visibleItems = navItems.filter((item: any) => {
     if (item.agentOnly) return isAgent;
     if (item.sellerOnly) return isSeller;
+    if (item.adminAgentOnly) return isAdmin || isAgent;
     if (isAgent) return false;
     if (isSeller) return !item.permission || item.sellerVisible;
     return !item.permission || hasPermission(item.permission);
