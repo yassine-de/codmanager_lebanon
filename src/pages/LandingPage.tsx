@@ -193,7 +193,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(4,6,15,0.6)_100%)]" />
 
         {/* Content */}
-        <div className="relative mx-auto max-w-7xl px-6 py-28 md:py-36 lg:py-44 min-h-[760px] flex flex-col justify-between gap-16">
+        <div className="relative mx-auto max-w-7xl px-6 py-20 md:py-24 lg:py-28 min-h-[560px] flex flex-col justify-between gap-12">
           {/* Top: headline */}
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 text-blue-300 text-xs uppercase tracking-[0.25em] font-semibold mb-5">
@@ -243,7 +243,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(4,6,15,0.7)_100%)]" />
 
         {/* Content */}
-        <div className="relative mx-auto max-w-7xl px-6 py-28 md:py-36 lg:py-44 min-h-[680px] flex items-center justify-center text-center">
+        <div className="relative mx-auto max-w-7xl px-6 py-20 md:py-24 lg:py-28 min-h-[440px] flex items-center justify-center text-center">
           <div className="max-w-4xl">
             <div className="inline-flex items-center gap-2 text-blue-300 text-xs uppercase tracking-[0.25em] font-semibold mb-5">
               <span className="w-8 h-px bg-blue-400/60" />
