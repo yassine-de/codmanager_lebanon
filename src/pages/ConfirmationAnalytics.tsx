@@ -548,7 +548,7 @@ export default function ConfirmationAnalytics() {
       </div>
 
       {/* Product performance tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-6">
         <div className="bg-card rounded-lg border animate-slide-up overflow-hidden" style={{ animationDelay: '200ms' }}>
           <div className="p-5 pb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Confirmation Rate by Product</h2>
@@ -557,25 +557,33 @@ export default function ConfirmationAnalytics() {
           {confirmByProduct.length === 0 ? (
             <p className="text-muted-foreground text-sm text-center py-10">No data</p>
           ) : (
-            <div className="max-h-[420px] overflow-y-auto">
+            <div className="max-h-[480px] overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-card z-10 border-y">
                   <tr className="text-left">
                     <th className="px-5 py-2 text-xs font-medium text-muted-foreground w-10">#</th>
                     <th className="px-2 py-2 text-xs font-medium text-muted-foreground">Product</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">Leads</th>
                     <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">Claimed</th>
-                    <th className="px-5 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums w-20">Rate</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">Pending</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">Confirmed</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">Cancelled</th>
+                    <th className="px-5 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums w-24">Conf. Rate</th>
                   </tr>
                 </thead>
                 <tbody>
                   {confirmByProduct.map((entry, idx) => (
                     <tr key={entry.name} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
                       <td className="px-5 py-2.5 text-xs text-muted-foreground tabular-nums">{idx + 1}</td>
-                      <td className="px-2 py-2.5 font-medium truncate max-w-[180px]" title={entry.name}>{entry.name}</td>
-                      <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{entry.total}</td>
+                      <td className="px-2 py-2.5 font-medium truncate max-w-[280px]" title={entry.name}>{entry.name}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{entry.leads}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{entry.claimed}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{entry.pending}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-foreground">{entry.confirmed}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{entry.cancelled}</td>
                       <td className="px-5 py-2.5 text-right">
                         <span
-                          className="inline-flex items-center justify-center min-w-[48px] px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums"
+                          className="inline-flex items-center justify-center min-w-[52px] px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums"
                           style={{ backgroundColor: `${rateColor(entry.rate)}20`, color: rateColor(entry.rate) }}
                         >
                           {entry.rate}%
@@ -597,25 +605,35 @@ export default function ConfirmationAnalytics() {
           {deliveryByProduct.length === 0 ? (
             <p className="text-muted-foreground text-sm text-center py-10">No data</p>
           ) : (
-            <div className="max-h-[420px] overflow-y-auto">
+            <div className="max-h-[480px] overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-card z-10 border-y">
                   <tr className="text-left">
                     <th className="px-5 py-2 text-xs font-medium text-muted-foreground w-10">#</th>
                     <th className="px-2 py-2 text-xs font-medium text-muted-foreground">Product</th>
                     <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">Confirmed</th>
-                    <th className="px-5 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums w-20">Rate</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">Shipped</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">In Transit</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">Delivered</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">Returned</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums w-20">Return %</th>
+                    <th className="px-5 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums w-24">Del. Rate</th>
                   </tr>
                 </thead>
                 <tbody>
                   {deliveryByProduct.map((entry, idx) => (
                     <tr key={entry.name} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
                       <td className="px-5 py-2.5 text-xs text-muted-foreground tabular-nums">{idx + 1}</td>
-                      <td className="px-2 py-2.5 font-medium truncate max-w-[180px]" title={entry.name}>{entry.name}</td>
+                      <td className="px-2 py-2.5 font-medium truncate max-w-[280px]" title={entry.name}>{entry.name}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{entry.confirmed}</td>
                       <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{entry.shipped}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{entry.inTransit}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-foreground">{entry.delivered}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{entry.returned}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-xs text-muted-foreground">{entry.returnRate}%</td>
                       <td className="px-5 py-2.5 text-right">
                         <span
-                          className="inline-flex items-center justify-center min-w-[48px] px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums"
+                          className="inline-flex items-center justify-center min-w-[52px] px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums"
                           style={{ backgroundColor: `${rateColor(entry.rate)}20`, color: rateColor(entry.rate) }}
                         >
                           {entry.rate}%
@@ -629,6 +647,5 @@ export default function ConfirmationAnalytics() {
           )}
         </div>
       </div>
-    </div>
   );
 }
