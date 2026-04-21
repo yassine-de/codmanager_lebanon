@@ -124,6 +124,9 @@ Deno.serve(async (req) => {
     const results: any[] = [];
     const BATCH_SIZE = 15;
 
+    // Statuses considered "post-shipped" — must have a shipped history event
+    const POST_SHIPPED = new Set(["shipped", "delivered", "rejected", "returned", "failed_attempt", "ready_for_return", "return"]);
+
     // Process a single order: track + update
     const processOrder = async (order: any) => {
       try {
@@ -178,6 +181,56 @@ Deno.serve(async (req) => {
           if (updateErr) {
             console.error(`Error updating order ${order.order_id}:`, updateErr);
             return { order_id: order.order_id, error: updateErr.message };
+          }
+
+          // Log status change to order_history (single source of truth for billing)
+          if (mappedStatus && mappedStatus !== order.delivery_status) {
+            const historyRows: any[] = [];
+            const now = new Date();
+
+            // If new status is post-shipped, ensure a "shipped" event exists first
+            if (POST_SHIPPED.has(mappedStatus) && mappedStatus !== "shipped") {
+              const { data: existingShipped } = await supabase
+                .from("order_history")
+                .select("id")
+                .eq("order_id", order.order_id)
+                .eq("field_changed", "delivery_status")
+                .eq("new_value", "shipped")
+                .limit(1)
+                .maybeSingle();
+
+              if (!existingShipped) {
+                // Insert synthetic shipped event 1ms before the real change so ordering is preserved
+                historyRows.push({
+                  order_id: order.order_id,
+                  field_changed: "delivery_status",
+                  old_value: order.delivery_status || "booked",
+                  new_value: "shipped",
+                  changed_by: "00000000-0000-0000-0000-000000000000",
+                  changed_by_role: "system",
+                  action_type: "orio_sync_synthetic",
+                  created_at: new Date(now.getTime() - 1).toISOString(),
+                });
+                console.log(`Order ${order.order_id}: inserting synthetic 'shipped' history event (jumped to ${mappedStatus})`);
+              }
+            }
+
+            // The actual status change
+            historyRows.push({
+              order_id: order.order_id,
+              field_changed: "delivery_status",
+              old_value: order.delivery_status,
+              new_value: mappedStatus,
+              changed_by: "00000000-0000-0000-0000-000000000000",
+              changed_by_role: "system",
+              action_type: "orio_sync",
+              created_at: now.toISOString(),
+            });
+
+            const { error: historyErr } = await supabase.from("order_history").insert(historyRows);
+            if (historyErr) {
+              console.error(`Error logging history for ${order.order_id}:`, historyErr);
+            }
           }
         }
 
