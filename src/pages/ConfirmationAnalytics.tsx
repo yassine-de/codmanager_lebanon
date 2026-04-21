@@ -518,47 +518,85 @@ export default function ConfirmationAnalytics() {
         )}
       </div>
 
-      {/* Charts */}
+      {/* Product performance tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-card rounded-lg border p-5 animate-slide-up" style={{ animationDelay: '200ms' }}>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Confirmation Rate by Product</h2>
-          {confirmByProduct.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={confirmByProduct} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={110} />
-                <Tooltip formatter={(v: number) => `${v}%`} contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', fontSize: '12px', background: 'hsl(var(--card))' }} />
-                <Bar dataKey="rate" radius={[0, 4, 4, 0]} name="Confirmation Rate">
-                  {confirmByProduct.map((entry) => (
-                    <Cell key={entry.name} fill={rateColor(entry.rate)} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
+        <div className="bg-card rounded-lg border animate-slide-up overflow-hidden" style={{ animationDelay: '200ms' }}>
+          <div className="p-5 pb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Confirmation Rate by Product</h2>
+            <span className="text-xs text-muted-foreground">{confirmByProduct.length} products</span>
+          </div>
+          {confirmByProduct.length === 0 ? (
             <p className="text-muted-foreground text-sm text-center py-10">No data</p>
+          ) : (
+            <div className="max-h-[420px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-card z-10 border-y">
+                  <tr className="text-left">
+                    <th className="px-5 py-2 text-xs font-medium text-muted-foreground w-10">#</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground">Product</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">Claimed</th>
+                    <th className="px-5 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums w-20">Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {confirmByProduct.map((entry, idx) => (
+                    <tr key={entry.name} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
+                      <td className="px-5 py-2.5 text-xs text-muted-foreground tabular-nums">{idx + 1}</td>
+                      <td className="px-2 py-2.5 font-medium truncate max-w-[180px]" title={entry.name}>{entry.name}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{entry.total}</td>
+                      <td className="px-5 py-2.5 text-right">
+                        <span
+                          className="inline-flex items-center justify-center min-w-[48px] px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums"
+                          style={{ backgroundColor: `${rateColor(entry.rate)}20`, color: rateColor(entry.rate) }}
+                        >
+                          {entry.rate}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
-        <div className="bg-card rounded-lg border p-5 animate-slide-up" style={{ animationDelay: '250ms' }}>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Delivery Rate by Product</h2>
-          {deliveryByProduct.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={deliveryByProduct} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={110} />
-                <Tooltip formatter={(v: number) => `${v}%`} contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', fontSize: '12px', background: 'hsl(var(--card))' }} />
-                <Bar dataKey="rate" radius={[0, 4, 4, 0]} name="Delivery Rate">
-                  {deliveryByProduct.map((entry) => (
-                    <Cell key={entry.name} fill={rateColor(entry.rate)} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
+        <div className="bg-card rounded-lg border animate-slide-up overflow-hidden" style={{ animationDelay: '250ms' }}>
+          <div className="p-5 pb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Delivery Rate by Product</h2>
+            <span className="text-xs text-muted-foreground">{deliveryByProduct.length} products</span>
+          </div>
+          {deliveryByProduct.length === 0 ? (
             <p className="text-muted-foreground text-sm text-center py-10">No data</p>
+          ) : (
+            <div className="max-h-[420px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-card z-10 border-y">
+                  <tr className="text-left">
+                    <th className="px-5 py-2 text-xs font-medium text-muted-foreground w-10">#</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground">Product</th>
+                    <th className="px-2 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums">Confirmed</th>
+                    <th className="px-5 py-2 text-xs font-medium text-muted-foreground text-right tabular-nums w-20">Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deliveryByProduct.map((entry, idx) => (
+                    <tr key={entry.name} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
+                      <td className="px-5 py-2.5 text-xs text-muted-foreground tabular-nums">{idx + 1}</td>
+                      <td className="px-2 py-2.5 font-medium truncate max-w-[180px]" title={entry.name}>{entry.name}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{entry.shipped}</td>
+                      <td className="px-5 py-2.5 text-right">
+                        <span
+                          className="inline-flex items-center justify-center min-w-[48px] px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums"
+                          style={{ backgroundColor: `${rateColor(entry.rate)}20`, color: rateColor(entry.rate) }}
+                        >
+                          {entry.rate}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>
