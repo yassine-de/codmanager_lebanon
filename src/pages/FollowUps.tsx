@@ -700,7 +700,7 @@ export default function FollowUps() {
             orioOrderId={trackingTarget.orioId}
             systemId={null}
             sellerId={trackingTarget.sellerId}
-            isOpen={!!trackingTarget}
+            open={!!trackingTarget}
             onClose={() => setTrackingTarget(null)}
           />
         )}
