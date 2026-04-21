@@ -36,6 +36,7 @@ import Support from "./pages/Support";
 import Alerts from "./pages/Alerts";
 import Adjustments from "./pages/Adjustments";
 import SystemHealth from "./pages/SystemHealth";
+import FollowUps from "./pages/FollowUps";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -158,6 +159,7 @@ function AppRoutes() {
         <Route path="/alerts" element={<ProtectedRoute permission="access_to_settings"><Alerts /></ProtectedRoute>} />
         <Route path="/adjustments" element={<ProtectedRoute permission="access_to_settings"><Adjustments /></ProtectedRoute>} />
         <Route path="/system-health" element={<ProtectedRoute permission="access_to_settings"><SystemHealth /></ProtectedRoute>} />
+        <Route path="/follow-ups" element={<ProtectedRoute><FollowUps /></ProtectedRoute>} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
