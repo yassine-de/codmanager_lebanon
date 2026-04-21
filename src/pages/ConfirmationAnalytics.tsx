@@ -464,6 +464,9 @@ export default function ConfirmationAnalytics() {
         }))}
         profileNameMap={profileNameMap}
         agentIds={agentIds}
+        treatedOrders={stats.treated}
+        firstCallAvg={timeStats.firstCallAvg}
+        handlingTime={timeStats.handlingTime}
         agentScores={agentScores.map(a => ({
           id: a.id,
           confirmed: a.confirmed,
