@@ -98,7 +98,6 @@ const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean; admi
   { key: 'orioId', label: 'ORIO ID', defaultVisible: true, adminOnly: true },
   { key: 'createdAt', label: 'Created', defaultVisible: true },
   { key: 'updatedAt', label: 'Updated', defaultVisible: true },
-  { key: 'seller', label: 'Seller', defaultVisible: true },
   { key: 'customer', label: 'Client', defaultVisible: true },
   { key: 'city', label: 'City', defaultVisible: true },
   { key: 'phone', label: 'Phone', defaultVisible: true },
@@ -606,20 +605,6 @@ export default function Orders() {
                 className="w-full"
               />
             </div>
-            {/* Seller - admin only */}
-            {isAdmin && (
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Seller</label>
-              <SearchableSelect
-                value={filterSeller}
-                onValueChange={setFilterSeller}
-                options={sellerNames.map(s => ({ value: s, label: s }))}
-                placeholder="Seller"
-                allLabel="All Sellers"
-                className="w-full"
-              />
-            </div>
-            )}
             {/* Agent - admin only */}
             {isAdmin && (
             <div className="space-y-1">
