@@ -139,11 +139,6 @@ export default function FollowUps() {
     };
   }, [queryClient]);
 
-  // Block sellers
-  if (!authLoading && authUser && authUser.role === "seller") {
-    return <Navigate to="/" replace />;
-  }
-
   const enriched = useMemo(
     () =>
       rows.map((r) => ({
@@ -178,6 +173,13 @@ export default function FollowUps() {
       return true;
     });
   }, [enriched, segment, search]);
+
+  // Block sellers / unauthorized — AFTER all hooks
+  if (!authLoading && authUser) {
+    if (authUser.role !== "admin" && authUser.role !== "agent") {
+      return <Navigate to="/" replace />;
+    }
+  }
 
   async function handleStatusChange(orderId: string, newStatus: string) {
     if (!authUser) return;
