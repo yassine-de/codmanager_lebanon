@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
     if (!isAdmin) return new Response(JSON.stringify({ ok: false, error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const apiKey = await getApiKey(admin);
     const body = (await req.json()) as Body;
 
     const { data: settings } = await admin.from("whatsapp_ai_settings").select("*").eq("singleton", true).maybeSingle();
