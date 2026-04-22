@@ -262,6 +262,8 @@ export default function WhatsappInbox() {
     return null;
   };
 
+  if (!isAdmin) return <Navigate to="/" replace />;
+
   return (
     <div className="grid grid-cols-12 gap-0 h-[calc(100vh-220px)] min-h-[560px] rounded-xl border border-border overflow-hidden bg-card">
       {/* LEFT PANEL */}
