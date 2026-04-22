@@ -77,8 +77,50 @@ export default function WhatsappAI() {
   const [memSearch, setMemSearch] = useState("");
   const [connTesting, setConnTesting] = useState(false);
   const [connStatus, setConnStatus] = useState<{ ok: boolean; configured?: boolean; key_masked?: string; model_count?: number; error?: string } | null>(null);
+  const [keyInput, setKeyInput] = useState("");
+  const [savingKey, setSavingKey] = useState(false);
+  const [storedKey, setStoredKey] = useState<{ configured: boolean; key_masked?: string | null; updated_at?: string | null } | null>(null);
 
-  useEffect(() => { load(); loadMemory(); testConnection(); }, []);
+  useEffect(() => { load(); loadMemory(); loadStoredKey(); testConnection(); }, []);
+
+  async function loadStoredKey() {
+    try {
+      const { data, error } = await supabase.functions.invoke("openai-key-save", { body: { action: "get" }, headers: { "x-action": "get" } });
+      if (error) throw error;
+      setStoredKey(data);
+    } catch { /* ignore */ }
+  }
+
+  async function saveKey() {
+    if (!keyInput.trim()) { toast.error("Enter an API key first"); return; }
+    setSavingKey(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("openai-key-save", { body: { action: "save", api_key: keyInput.trim() } });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Save failed");
+      toast.success("API key saved");
+      setKeyInput("");
+      setStoredKey({ configured: true, key_masked: data.key_masked });
+      await testConnection();
+    } catch (e: any) {
+      toast.error(e.message || "Save failed");
+    } finally {
+      setSavingKey(false);
+    }
+  }
+
+  async function deleteKey() {
+    if (!confirm("Remove the saved OpenAI API key?")) return;
+    try {
+      const { error } = await supabase.functions.invoke("openai-key-save", { body: { action: "delete" } });
+      if (error) throw error;
+      toast.success("API key removed");
+      setStoredKey({ configured: false });
+      setConnStatus(null);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
 
   async function testConnection() {
     setConnTesting(true);
@@ -202,14 +244,50 @@ export default function WhatsappAI() {
 
               {/* API Key management */}
               <div className="rounded-lg border p-4 space-y-3">
-                <div>
-                  <Label className="text-sm font-medium">API Key Management</Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Your OpenAI API key is stored as an encrypted secret on the backend (<code className="text-[11px] bg-muted px-1 py-0.5 rounded">OPENAI_API_KEY</code>).
-                    It is never exposed to the browser.
-                  </p>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <Label className="text-sm font-medium">OpenAI API Key</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Saved securely on the backend. Entered once — used by all AI features.
+                    </p>
+                  </div>
+                  {storedKey?.configured && (
+                    <Badge variant="outline" className="gap-1 shrink-0">
+                      <CheckCircle2 className="h-3 w-3 text-primary" />
+                      Saved
+                    </Badge>
+                  )}
                 </div>
-                <div className="flex flex-wrap gap-2">
+
+                {storedKey?.configured && (
+                  <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-xs">
+                    <div>
+                      <div className="text-muted-foreground">Current key</div>
+                      <div className="font-mono mt-0.5">{storedKey.key_masked}</div>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={deleteKey} className="text-destructive hover:text-destructive">
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      Remove
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Input
+                    type="password"
+                    placeholder={storedKey?.configured ? "Paste a new key to replace…" : "sk-..."}
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    autoComplete="off"
+                    className="font-mono text-xs"
+                  />
+                  <Button onClick={saveKey} disabled={savingKey || !keyInput.trim()} size="sm">
+                    {savingKey ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
+                    Save
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-1">
                   <Button
                     variant="outline"
                     size="sm"
@@ -217,14 +295,6 @@ export default function WhatsappAI() {
                   >
                     <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
                     Get API Key from OpenAI
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toast.info("To update the key, ask the assistant: 'Update my OPENAI_API_KEY'")}
-                  >
-                    <KeyRound className="h-3.5 w-3.5 mr-1.5" />
-                    How to update key
                   </Button>
                 </div>
               </div>
