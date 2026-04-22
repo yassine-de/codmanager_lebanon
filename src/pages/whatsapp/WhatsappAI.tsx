@@ -77,8 +77,50 @@ export default function WhatsappAI() {
   const [memSearch, setMemSearch] = useState("");
   const [connTesting, setConnTesting] = useState(false);
   const [connStatus, setConnStatus] = useState<{ ok: boolean; configured?: boolean; key_masked?: string; model_count?: number; error?: string } | null>(null);
+  const [keyInput, setKeyInput] = useState("");
+  const [savingKey, setSavingKey] = useState(false);
+  const [storedKey, setStoredKey] = useState<{ configured: boolean; key_masked?: string | null; updated_at?: string | null } | null>(null);
 
-  useEffect(() => { load(); loadMemory(); testConnection(); }, []);
+  useEffect(() => { load(); loadMemory(); loadStoredKey(); testConnection(); }, []);
+
+  async function loadStoredKey() {
+    try {
+      const { data, error } = await supabase.functions.invoke("openai-key-save", { body: { action: "get" }, headers: { "x-action": "get" } });
+      if (error) throw error;
+      setStoredKey(data);
+    } catch { /* ignore */ }
+  }
+
+  async function saveKey() {
+    if (!keyInput.trim()) { toast.error("Enter an API key first"); return; }
+    setSavingKey(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("openai-key-save", { body: { action: "save", api_key: keyInput.trim() } });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Save failed");
+      toast.success("API key saved");
+      setKeyInput("");
+      setStoredKey({ configured: true, key_masked: data.key_masked });
+      await testConnection();
+    } catch (e: any) {
+      toast.error(e.message || "Save failed");
+    } finally {
+      setSavingKey(false);
+    }
+  }
+
+  async function deleteKey() {
+    if (!confirm("Remove the saved OpenAI API key?")) return;
+    try {
+      const { error } = await supabase.functions.invoke("openai-key-save", { body: { action: "delete" } });
+      if (error) throw error;
+      toast.success("API key removed");
+      setStoredKey({ configured: false });
+      setConnStatus(null);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
 
   async function testConnection() {
     setConnTesting(true);
