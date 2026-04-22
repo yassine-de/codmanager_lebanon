@@ -80,6 +80,19 @@ function renderPreview(text: string) {
   );
 }
 
+const VAR_SUGGESTIONS = [
+  { name: "customer_name", label: "Customer name" },
+  { name: "order_id", label: "Order ID" },
+  { name: "product_name", label: "Product name" },
+  { name: "price", label: "Price" },
+  { name: "quantity", label: "Quantity" },
+  { name: "city", label: "City" },
+  { name: "address", label: "Address" },
+  { name: "phone", label: "Phone" },
+  { name: "tracking_number", label: "Tracking number" },
+  { name: "store_name", label: "Store name" },
+];
+
 export default function WhatsappTemplates() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -88,6 +101,15 @@ export default function WhatsappTemplates() {
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [previewTpl, setPreviewTpl] = useState<any | null>(null);
+
+  // @ mention autocomplete state for body textarea
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const [mention, setMention] = useState<{
+    open: boolean;
+    query: string;
+    start: number;
+    activeIdx: number;
+  }>({ open: false, query: "", start: -1, activeIdx: 0 });
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["wts-templates"],
