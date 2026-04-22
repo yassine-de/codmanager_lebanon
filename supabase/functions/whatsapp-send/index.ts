@@ -207,7 +207,7 @@ Deno.serve(async (req) => {
       conversation_id: conv!.id,
       order_id: order?.order_id ?? null,
       direction: "out",
-      message_type: mode === "template" ? "template" : (mode === "text" ? "text" : "interactive"),
+      message_type: ["template","text","image","document","audio"].includes(mode) ? mode : "interactive",
       body: bodyText,
       payload,
       meta_message_id: metaMsgId,
