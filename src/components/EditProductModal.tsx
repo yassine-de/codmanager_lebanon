@@ -231,7 +231,30 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
 
   const sectionTitle = "text-xs font-semibold text-foreground uppercase tracking-wider mb-2";
 
+  const confirmWhatsappChange = async () => {
+    if (pendingWhatsappValue === null || !product) return;
+    const newValue = pendingWhatsappValue;
+    setWhatsappSaving(true);
+    const { error } = await supabase
+      .from("products")
+      .update({ whatsapp_confirmation_enabled: newValue, updated_at: new Date().toISOString() })
+      .eq("id", product.id);
+    setWhatsappSaving(false);
+    if (error) {
+      toast.error("Failed to update WhatsApp setting");
+      setPendingWhatsappValue(null);
+      return;
+    }
+    setWhatsappEnabled(newValue);
+    setPendingWhatsappValue(null);
+    queryClient.invalidateQueries({ queryKey: ["db-products"] });
+    toast.success(newValue
+      ? "WhatsApp confirmation enabled for this product"
+      : "WhatsApp confirmation disabled for this product");
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] p-0 gap-0">
         <DialogHeader className="px-5 pt-5 pb-3 border-b">
