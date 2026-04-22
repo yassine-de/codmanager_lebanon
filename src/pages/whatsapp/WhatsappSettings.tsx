@@ -110,8 +110,14 @@ export default function WhatsappSettings() {
           </div>
           <div>
             <Label>Access Token</Label>
+            <Input
+              type="password"
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
+              placeholder="EAAG... (paste new token to update)"
+            />
             <div className="text-[11px] text-muted-foreground mt-1">
-              Stored securely as the secret <code>WHATSAPP_META_ACCESS_TOKEN</code>.
+              Stored securely as <code>WHATSAPP_META_ACCESS_TOKEN</code>. Leave empty to keep current token.
             </div>
           </div>
           <div className="flex gap-2 pt-2">
