@@ -674,9 +674,55 @@ export default function WhatsappInbox() {
                                 <FileText className="h-3 w-3" /> Template
                               </div>
                             )}
-                            <div className="whitespace-pre-wrap break-words">
-                              {m.body || <em className="opacity-70">[{m.message_type}]</em>}
-                            </div>
+                            {(() => {
+                              const mediaUrl =
+                                m.payload?.image?.link ||
+                                m.payload?.document?.link ||
+                                m.payload?.audio?.link ||
+                                m.payload?.image?.url ||
+                                m.payload?.document?.url ||
+                                m.payload?.audio?.url ||
+                                null;
+                              const mediaName =
+                                m.payload?.document?.filename || "file";
+                              if (m.message_type === "image" && mediaUrl) {
+                                return (
+                                  <a href={mediaUrl} target="_blank" rel="noreferrer">
+                                    <img
+                                      src={mediaUrl}
+                                      alt="attachment"
+                                      className="rounded-lg max-w-full max-h-64 object-cover mb-1"
+                                    />
+                                    {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
+                                  </a>
+                                );
+                              }
+                              if (m.message_type === "audio" && mediaUrl) {
+                                return <audio controls src={mediaUrl} className="max-w-full" />;
+                              }
+                              if (m.message_type === "document" && mediaUrl) {
+                                return (
+                                  <a
+                                    href={mediaUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={cn(
+                                      "flex items-center gap-2 px-2 py-1.5 rounded-md",
+                                      isOut ? "bg-white/10" : "bg-muted",
+                                    )}
+                                  >
+                                    <FileText className="h-4 w-4 shrink-0" />
+                                    <span className="text-xs truncate flex-1">{mediaName}</span>
+                                    <Download className="h-3.5 w-3.5 shrink-0" />
+                                  </a>
+                                );
+                              }
+                              return (
+                                <div className="whitespace-pre-wrap break-words">
+                                  {m.body || <em className="opacity-70">[{m.message_type}]</em>}
+                                </div>
+                              );
+                            })()}
                             <div
                               className={cn(
                                 "text-[10px] mt-1 flex items-center gap-1",
