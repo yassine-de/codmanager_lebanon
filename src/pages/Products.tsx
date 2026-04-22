@@ -150,7 +150,8 @@ export default function Products() {
         weight: (p as any).weight || undefined,
         weightKg: (p as any).weight_kg ?? null,
         active: (p as any).active ?? false,
-      };
+        whatsappEnabled: (p as any).whatsapp_confirmation_enabled ?? false,
+      } as Product & { whatsappEnabled: boolean };
     });
     return dbMapped;
   }, [dbProducts, dbSellerNameMap, localProducts, isAdmin, authUser, productOrderStatsMap]);
