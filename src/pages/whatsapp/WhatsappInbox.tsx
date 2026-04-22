@@ -594,11 +594,51 @@ export default function WhatsappInbox() {
                       </Badge>
                     )}
                   </div>
-                  <div className="text-[11px] text-muted-foreground truncate">
-                    {conv.customer_phone}
+                  <div className="text-[11px] text-muted-foreground truncate flex items-center gap-1.5 flex-wrap">
+                    <span>{conv.customer_phone}</span>
                     {order && (
                       <>
-                        {" • "}#{order.order_id} • {order.product_name}
+                        <span>•</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(order.order_id);
+                            toast.success(`Copied #${order.order_id}`);
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`/orders/${order.order_id}`, "_blank");
+                          }}
+                          title="Click to copy • Double-click to open"
+                          className="font-mono text-foreground hover:text-primary transition-colors"
+                        >
+                          #{order.order_id}
+                        </button>
+                        <span>•</span>
+                        <span className="truncate">{order.product_name}</span>
+                        {order.confirmation_status && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] h-4 px-1.5",
+                              confirmationStatusCls(order.confirmation_status),
+                            )}
+                          >
+                            {order.confirmation_status.replace(/_/g, " ")}
+                          </Badge>
+                        )}
+                        {order.delivery_status && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] h-4 px-1.5",
+                              deliveryStatusCls(order.delivery_status),
+                            )}
+                          >
+                            {order.delivery_status.replace(/_/g, " ")}
+                          </Badge>
+                        )}
                       </>
                     )}
                   </div>
