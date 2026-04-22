@@ -203,14 +203,17 @@ export default function Products() {
   const applyFilters = useCallback(() => {
     setAppliedSeller(filterSeller);
     setAppliedStatus(filterStatus);
+    setAppliedWhatsapp(filterWhatsapp);
     setCurrentPage(1);
-  }, [filterSeller, filterStatus]);
+  }, [filterSeller, filterStatus, filterWhatsapp]);
 
   const clearFilters = useCallback(() => {
     setFilterSeller("all");
     setAppliedSeller("all");
     setFilterStatus("all");
     setAppliedStatus("all");
+    setFilterWhatsapp("all");
+    setAppliedWhatsapp("all");
     setSearch("");
     setCurrentPage(1);
   }, []);
@@ -219,8 +222,9 @@ export default function Products() {
     let c = 0;
     if (appliedSeller !== "all") c++;
     if (appliedStatus !== "all") c++;
+    if (appliedWhatsapp !== "all") c++;
     return c;
-  }, [appliedSeller, appliedStatus]);
+  }, [appliedSeller, appliedStatus, appliedWhatsapp]);
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -229,6 +233,11 @@ export default function Products() {
         const isActive = !!(p as any).active;
         if (appliedStatus === "active" && !isActive) return false;
         if (appliedStatus === "inactive" && isActive) return false;
+      }
+      if (appliedWhatsapp !== "all") {
+        const wa = !!(p as any).whatsappEnabled;
+        if (appliedWhatsapp === "enabled" && !wa) return false;
+        if (appliedWhatsapp === "disabled" && wa) return false;
       }
       if (search) {
         const s = search.toLowerCase();
