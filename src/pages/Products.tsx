@@ -186,6 +186,8 @@ export default function Products() {
   const [appliedSeller, setAppliedSeller] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [appliedStatus, setAppliedStatus] = useState("all");
+  const [filterWhatsapp, setFilterWhatsapp] = useState("all");
+  const [appliedWhatsapp, setAppliedWhatsapp] = useState("all");
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
