@@ -201,10 +201,7 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
             {/* Products */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-foreground">Products</h3>
-                <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addProduct}>
-                  <Plus className="w-3 h-3" /> Add
-                </Button>
+                <h3 className="text-sm font-semibold text-foreground">Product</h3>
               </div>
               <div className="space-y-2">
                 {products.map((p, idx) => (
