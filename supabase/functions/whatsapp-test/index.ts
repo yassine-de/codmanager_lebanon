@@ -9,6 +9,8 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const startedAt = Date.now();
+
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -33,22 +35,68 @@ Deno.serve(async (req) => {
     if (!s) throw new Error("Settings missing");
 
     const accessToken = (s as any).access_token || Deno.env.get("WHATSAPP_META_ACCESS_TOKEN");
-    if (!accessToken) throw new Error("Access token missing. Add it in WhatsApp Settings.");
-
     const { mode, phone } = await req.json();
 
     if (mode === "connection") {
-      if (!s.phone_number_id) throw new Error("phone_number_id missing");
-      const r = await fetch(`${s.api_base_url}/${s.phone_number_id}`, {
+      const checks: Array<{ name: string; ok: boolean; detail?: string }> = [];
+
+      // Step 1: Configuration
+      const hasPhoneId = !!s.phone_number_id?.trim();
+      const hasToken = !!accessToken;
+      const hasApiBase = !!s.api_base_url?.trim();
+      const configOk = hasPhoneId && hasToken && hasApiBase;
+      checks.push({
+        name: "Configuration",
+        ok: configOk,
+        detail: configOk
+          ? "Phone Number ID, Access Token & API base set"
+          : `Missing: ${[!hasPhoneId && "Phone Number ID", !hasToken && "Access Token", !hasApiBase && "API base"].filter(Boolean).join(", ")}`,
+      });
+
+      if (!configOk) {
+        return new Response(JSON.stringify({ ok: false, checks, duration_ms: Date.now() - startedAt }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Step 2 & 3: Call Meta — validates token + phone number id together
+      const r = await fetch(`${s.api_base_url}/${s.phone_number_id}?fields=display_phone_number,verified_name,id`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const j = await r.json();
-      return new Response(JSON.stringify({ ok: r.ok, response: j }), {
-        status: r.ok ? 200 : 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+
+      if (!r.ok) {
+        const errMsg = j?.error?.message || "Request failed";
+        const isAuth = j?.error?.type === "OAuthException" || /token/i.test(errMsg);
+        checks.push({
+          name: "Token Validation",
+          ok: !isAuth,
+          detail: isAuth ? errMsg : "Token accepted",
+        });
+        checks.push({
+          name: "Phone Number Verification",
+          ok: false,
+          detail: isAuth ? "Skipped" : errMsg,
+        });
+        return new Response(JSON.stringify({ ok: false, checks, response: j, duration_ms: Date.now() - startedAt }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      checks.push({ name: "Token Validation", ok: true, detail: "Access token is valid" });
+      checks.push({
+        name: "Phone Number Verification",
+        ok: true,
+        detail: j?.display_phone_number ? `📞 ${j.display_phone_number}` : `ID ${j?.id ?? s.phone_number_id}`,
+      });
+
+      return new Response(JSON.stringify({ ok: true, checks, response: j, duration_ms: Date.now() - startedAt }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (mode === "message") {
+      if (!accessToken) throw new Error("Access token missing. Add it in WhatsApp Settings.");
       if (!phone) throw new Error("phone required");
       const to = String(phone).replace(/[^\d]/g, "");
       const r = await fetch(`${s.api_base_url}/${s.phone_number_id}/messages`, {

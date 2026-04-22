@@ -6,8 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Save, Activity, Send } from "lucide-react";
+import { Save, Activity, Send, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+type Check = { name: string; ok: boolean; detail?: string };
+type TestResult = { ok: boolean; checks: Check[]; duration_ms?: number } | null;
 
 export default function WhatsappSettings() {
   const qc = useQueryClient();
@@ -28,6 +31,7 @@ export default function WhatsappSettings() {
   const [testPhone, setTestPhone] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [busy, setBusy] = useState(false);
+  const [testResult, setTestResult] = useState<TestResult>(null);
 
   useEffect(() => {
     if (settings) setForm(settings);
@@ -86,9 +90,20 @@ export default function WhatsappSettings() {
       body: { mode: "connection" },
     });
     setBusy(false);
-    if (error) toast.error(error.message);
-    else if (data?.ok) toast.success("Connection OK");
-    else toast.error(data?.error ?? "Failed");
+    if (error) {
+      toast.error(error.message);
+      setTestResult(null);
+      return;
+    }
+    if (data?.checks) {
+      setTestResult({ ok: !!data.ok, checks: data.checks, duration_ms: data.duration_ms });
+      if (data.ok) toast.success("Connection OK");
+      else toast.error("Connection failed");
+    } else if (data?.ok) {
+      toast.success("Connection OK");
+    } else {
+      toast.error(data?.error ?? "Failed");
+    }
   };
 
   const sendTest = async () => {
@@ -142,9 +157,39 @@ export default function WhatsappSettings() {
               <Save className="h-4 w-4 mr-2" /> Save
             </Button>
             <Button variant="outline" onClick={testConnection} disabled={busy} size="sm">
-              <Activity className="h-4 w-4 mr-2" /> Test connection
+              {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Activity className="h-4 w-4 mr-2" />}
+              Test connection
             </Button>
           </div>
+
+          {testResult && (
+            <div className="mt-3 rounded-lg border bg-muted/30 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className={`text-sm font-medium flex items-center gap-1.5 ${testResult.ok ? "text-primary" : "text-destructive"}`}>
+                  {testResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                  {testResult.ok ? "All checks passed" : "Some checks failed"}
+                </div>
+                {testResult.duration_ms != null && (
+                  <span className="text-[11px] text-muted-foreground">{testResult.duration_ms}ms</span>
+                )}
+              </div>
+              <ul className="space-y-1.5">
+                {testResult.checks.map((c, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs">
+                    {c.ok ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 mt-0.5 text-destructive shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-medium">{c.name}</div>
+                      {c.detail && <div className="text-muted-foreground">{c.detail}</div>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </CardContent>
       </Card>
 
