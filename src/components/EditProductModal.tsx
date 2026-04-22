@@ -1,16 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, ExternalLink, Video, Tag, Loader2, Weight, Copy, Check } from "lucide-react";
+import { Plus, Trash2, ExternalLink, Video, Tag, Loader2, Weight, Copy, Check, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { type Product, type ProductVariant, type ProductOffer } from "@/lib/products-data";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 const isValidUrl = (str: string): boolean => {
   if (!str.trim()) return false;
@@ -29,6 +33,7 @@ interface EditProductModalProps {
 export function EditProductModal({ product, open, onOpenChange, onSave }: EditProductModalProps) {
   const { authUser } = useAuth();
   const isSeller = authUser?.role === "seller";
+  const isAdmin = authUser?.role === "admin";
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [seller, setSeller] = useState("");
@@ -46,9 +51,27 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [skuCopied, setSkuCopied] = useState(false);
   const [prevId, setPrevId] = useState<string | null>(null);
+  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
+  const [pendingWhatsappValue, setPendingWhatsappValue] = useState<boolean | null>(null);
+  const [whatsappSaving, setWhatsappSaving] = useState(false);
 
   // Check if this is a DB product (UUID format)
   const isDbProduct = product ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id) : false;
+
+  // Fetch current whatsapp_confirmation_enabled value when opening a DB product (admin only)
+  useEffect(() => {
+    if (!open || !product || !isDbProduct || !isAdmin) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("products")
+        .select("whatsapp_confirmation_enabled")
+        .eq("id", product.id)
+        .maybeSingle();
+      if (!cancelled) setWhatsappEnabled(!!data?.whatsapp_confirmation_enabled);
+    })();
+    return () => { cancelled = true; };
+  }, [open, product?.id, isDbProduct, isAdmin]);
 
   const dbUpdateMutation = useMutation({
     mutationFn: async () => {
@@ -208,7 +231,30 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
 
   const sectionTitle = "text-xs font-semibold text-foreground uppercase tracking-wider mb-2";
 
+  const confirmWhatsappChange = async () => {
+    if (pendingWhatsappValue === null || !product) return;
+    const newValue = pendingWhatsappValue;
+    setWhatsappSaving(true);
+    const { error } = await supabase
+      .from("products")
+      .update({ whatsapp_confirmation_enabled: newValue, updated_at: new Date().toISOString() })
+      .eq("id", product.id);
+    setWhatsappSaving(false);
+    if (error) {
+      toast.error("Failed to update WhatsApp setting");
+      setPendingWhatsappValue(null);
+      return;
+    }
+    setWhatsappEnabled(newValue);
+    setPendingWhatsappValue(null);
+    queryClient.invalidateQueries({ queryKey: ["db-products"] });
+    toast.success(newValue
+      ? "WhatsApp confirmation enabled for this product"
+      : "WhatsApp confirmation disabled for this product");
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] p-0 gap-0">
         <DialogHeader className="px-5 pt-5 pb-3 border-b">
@@ -270,6 +316,44 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                 </div>
               </div>
             </div>
+
+            {/* WhatsApp Confirmation (Admin only, DB products only) */}
+            {isAdmin && isDbProduct && (
+              <div>
+                <h3 className={sectionTitle}>
+                  <span className="flex items-center gap-1.5">
+                    <MessageCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                    WhatsApp Confirmation
+                  </span>
+                </h3>
+                <div className="flex items-start justify-between gap-4 rounded-lg border bg-muted/20 p-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium">Enable WhatsApp Confirmation</Label>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px] h-5",
+                          whatsappEnabled
+                            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "border-muted-foreground/30 bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {whatsappEnabled ? "WhatsApp Enabled" : "Agent Confirmation"}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      If enabled, all new orders for this product will go through WhatsApp confirmation before reaching agents.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={whatsappEnabled}
+                    disabled={whatsappSaving}
+                    onCheckedChange={(v) => setPendingWhatsappValue(v)}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Pricing & Stock */}
             <div>
@@ -521,5 +605,32 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={pendingWhatsappValue !== null} onOpenChange={(o) => { if (!o) setPendingWhatsappValue(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {pendingWhatsappValue ? "Enable WhatsApp Confirmation?" : "Disable WhatsApp Confirmation?"}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="whitespace-pre-line">
+            {pendingWhatsappValue
+              ? "Are you sure you want to enable WhatsApp confirmation for this product?\n\nAll new orders will be handled by the WhatsApp automation first and will not appear in the agent queue unless needed."
+              : "Are you sure you want to disable WhatsApp confirmation for this product?\n\nNew orders will go directly to agents for manual confirmation."}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={whatsappSaving}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => { e.preventDefault(); void confirmWhatsappChange(); }}
+            disabled={whatsappSaving}
+            className={pendingWhatsappValue === false ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined}
+          >
+            {whatsappSaving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+            Confirm
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
