@@ -32,9 +32,16 @@ function normalizeModel(model: string): string {
   return model;
 }
 
-async function callAI(model: string, messages: any[], opts: { temperature?: number; max_tokens?: number; tools?: any[]; tool_choice?: any } = {}) {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
+async function getApiKey(admin: any): Promise<string> {
+  // Prefer DB-stored key (managed via UI), fallback to env
+  const { data } = await admin.from("app_settings").select("value").eq("key", "openai_api_key").maybeSingle();
+  const fromDb = (data?.value as string)?.trim();
+  return fromDb || Deno.env.get("OPENAI_API_KEY") || "";
+}
+
+async function callAI(model: string, messages: any[], opts: { temperature?: number; max_tokens?: number; tools?: any[]; tool_choice?: any; apiKey?: string } = {}) {
+  const apiKey = opts.apiKey || Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) throw new Error("OpenAI API key not configured. Add one in the AI Settings → Connection tab.");
   const body: any = {
     model: normalizeModel(model),
     messages,
@@ -51,7 +58,7 @@ async function callAI(model: string, messages: any[], opts: { temperature?: numb
   if (!r.ok) {
     const t = await r.text();
     if (r.status === 429) throw new Error("OpenAI rate limited (429). Try again later.");
-    if (r.status === 401) throw new Error("Invalid OpenAI API key (401). Check OPENAI_API_KEY.");
+    if (r.status === 401) throw new Error("Invalid OpenAI API key (401). Update it in AI Settings → Connection.");
     if (r.status === 402 || /insufficient_quota|billing/i.test(t)) throw new Error("OpenAI quota exhausted. Add credits to your OpenAI account.");
     throw new Error(`OpenAI error ${r.status}: ${t}`);
   }
