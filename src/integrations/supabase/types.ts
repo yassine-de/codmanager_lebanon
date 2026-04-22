@@ -1548,6 +1548,104 @@ export type Database = {
           },
         ]
       }
+      whatsapp_automation_runs: {
+        Row: {
+          automation_id: string
+          customer_phone: string | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          order_id: string | null
+          started_at: string
+          status: string
+          steps_log: Json
+          trigger_payload: Json
+        }
+        Insert: {
+          automation_id: string
+          customer_phone?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          order_id?: string | null
+          started_at?: string
+          status?: string
+          steps_log?: Json
+          trigger_payload?: Json
+        }
+        Update: {
+          automation_id?: string
+          customer_phone?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          order_id?: string | null
+          started_at?: string
+          status?: string
+          steps_log?: Json
+          trigger_payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_automation_runs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_automations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          edges: Json
+          id: string
+          last_run_at: string | null
+          name: string
+          nodes: Json
+          runs_count: number
+          status: string
+          success_count: number
+          trigger_config: Json
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          edges?: Json
+          id?: string
+          last_run_at?: string | null
+          name?: string
+          nodes?: Json
+          runs_count?: number
+          status?: string
+          success_count?: number
+          trigger_config?: Json
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          edges?: Json
+          id?: string
+          last_run_at?: string | null
+          name?: string
+          nodes?: Json
+          runs_count?: number
+          status?: string
+          success_count?: number
+          trigger_config?: Json
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       whatsapp_conversations: {
         Row: {
           created_at: string
