@@ -18,7 +18,18 @@ import {
   ArrowDownUp,
   FileText,
   Loader2,
+  Smile,
+  Camera,
+  Paperclip,
+  Mic,
+  Sparkles,
+  MessageSquare,
+  Square,
+  Download,
+  X,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 import { toast } from "sonner";
 import {
   format,
