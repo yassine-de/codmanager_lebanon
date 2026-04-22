@@ -7,7 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/SearchableSelect";
+import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { type Product } from "@/lib/products-data";
 import { CreateProductModal } from "@/components/CreateProductModal";
 import { EditProductModal } from "@/components/EditProductModal";
@@ -180,6 +183,30 @@ export default function Products() {
   const [showFilters, setShowFilters] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [waConfirm, setWaConfirm] = useState<{ id: string; name: string; nextValue: boolean } | null>(null);
+  const [waSaving, setWaSaving] = useState(false);
+
+  const handleWhatsappToggle = useCallback(async () => {
+    if (!waConfirm) return;
+    setWaSaving(true);
+    const { error } = await supabase
+      .from("products")
+      .update({ whatsapp_confirmation_enabled: waConfirm.nextValue, updated_at: new Date().toISOString() })
+      .eq("id", waConfirm.id);
+    setWaSaving(false);
+    if (error) {
+      toast.error("Failed to update WhatsApp setting");
+      setWaConfirm(null);
+      return;
+    }
+    toast.success(
+      waConfirm.nextValue
+        ? "WhatsApp confirmation enabled for this product"
+        : "WhatsApp confirmation disabled for this product"
+    );
+    setWaConfirm(null);
+    queryClient.invalidateQueries({ queryKey: ["db-products"] });
+  }, [waConfirm, queryClient]);
 
   // Filters
   const [filterSeller, setFilterSeller] = useState("all");
@@ -481,13 +508,24 @@ export default function Products() {
                           </span>
                         </td>
                         <td className="py-2 px-3 text-center">
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-                            (product as any).whatsappEnabled
-                              ? "bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)] border-[hsl(155,50%,42%)]/20"
-                              : "bg-muted text-muted-foreground border-border"
-                          }`}>
-                            {(product as any).whatsappEnabled ? "Enabled" : "Disabled"}
-                          </span>
+                          {isAdmin ? (
+                            <div className="flex items-center justify-center gap-2">
+                              <Switch
+                                checked={!!(product as any).whatsappEnabled}
+                                onCheckedChange={(checked) =>
+                                  setWaConfirm({ id: product.id, name: product.name, nextValue: checked })
+                                }
+                                aria-label="Toggle WhatsApp confirmation"
+                              />
+                              <span className={`text-[10px] font-medium ${
+                                (product as any).whatsappEnabled ? "text-[hsl(155,50%,42%)]" : "text-muted-foreground"
+                              }`}>
+                                {(product as any).whatsappEnabled ? "ON" : "OFF"}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="py-2 px-3 text-right tabular-nums text-xs font-medium">
                           <div>{product.price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} $</div>
@@ -667,6 +705,31 @@ export default function Products() {
         {/* Modals */}
         <CreateProductModal open={createOpen} onOpenChange={setCreateOpen} onCreate={handleCreate} />
         <EditProductModal product={editProduct} open={!!editProduct} onOpenChange={(v) => { if (!v) setEditProduct(null); }} onSave={handleEdit} />
+
+        <AlertDialog open={!!waConfirm} onOpenChange={(v) => { if (!v && !waSaving) setWaConfirm(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {waConfirm?.nextValue ? "Enable WhatsApp Confirmation?" : "Disable WhatsApp Confirmation?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {waConfirm?.nextValue
+                  ? "Are you sure you want to enable WhatsApp confirmation for this product? All new orders for this product will go through WhatsApp automation first."
+                  : "Are you sure you want to disable WhatsApp confirmation for this product? New orders for this product will go directly to agents."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={waSaving}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => { e.preventDefault(); handleWhatsappToggle(); }}
+                disabled={waSaving}
+                className={waConfirm?.nextValue ? "" : "bg-destructive text-destructive-foreground hover:bg-destructive/90"}
+              >
+                {waSaving ? "Saving..." : "Confirm"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </TooltipProvider>
   );
