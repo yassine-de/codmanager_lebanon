@@ -697,6 +697,7 @@ export default function Orders() {
                 className="w-full"
               />
             </div>
+            )}
             {/* Upsell */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Upsell</label>
