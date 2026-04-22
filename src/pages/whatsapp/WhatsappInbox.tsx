@@ -750,7 +750,34 @@ export default function WhatsappInbox() {
                 </div>
 
                 {tab === "reply" ? (
-                  <div className="flex gap-2">
+                  <div className="space-y-2">
+                    {/* AI suggestions chips */}
+                    {aiSuggestions.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 p-2 rounded-md bg-violet-500/5 border border-violet-500/20">
+                        <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-violet-500 w-full">
+                          <Sparkles className="h-3 w-3" /> AI suggestions
+                          <button
+                            onClick={() => setAiSuggestions([])}
+                            className="ml-auto opacity-70 hover:opacity-100"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                        {aiSuggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              setDraft(s);
+                              setAiSuggestions([]);
+                            }}
+                            className="text-xs px-2.5 py-1.5 rounded-md bg-card border border-border hover:bg-muted transition-colors text-left max-w-full"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <Textarea
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
@@ -769,27 +796,186 @@ export default function WhatsappInbox() {
                         }
                       }}
                     />
-                    {windowExpired ? (
+
+                    {/* Toolbar */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {/* Emoji */}
+                      <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                            disabled={windowExpired}
+                            title="Emoji"
+                          >
+                            <Smile className="h-5 w-5" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0 border-none w-auto" side="top" align="start">
+                          <EmojiPicker
+                            onEmojiClick={(e) => {
+                              insertAtCursor(e.emoji);
+                              setEmojiOpen(false);
+                            }}
+                            theme={Theme.AUTO}
+                            emojiStyle={EmojiStyle.NATIVE}
+                            width={320}
+                            height={380}
+                            searchDisabled={false}
+                            skinTonesDisabled
+                            previewConfig={{ showPreview: false }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+
+                      {/* Image */}
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadAndSend(f, "image");
+                          e.target.value = "";
+                        }}
+                      />
                       <Button
-                        onClick={() => setTplOpen(true)}
-                        className="shrink-0 self-end bg-emerald-600 hover:bg-emerald-700 text-white"
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                        disabled={windowExpired || uploadingMedia}
+                        title="Send image"
+                        onClick={() => imageInputRef.current?.click()}
                       >
-                        <FileText className="h-4 w-4 mr-1" /> Template
+                        <Camera className="h-5 w-5" />
                       </Button>
-                    ) : (
+
+                      {/* Document */}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadAndSend(f, "document");
+                          e.target.value = "";
+                        }}
+                      />
                       <Button
-                        onClick={sendReply}
-                        disabled={sending || !draft.trim()}
-                        className="shrink-0 self-end"
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                        disabled={windowExpired || uploadingMedia}
+                        title="Attach file"
+                        onClick={() => fileInputRef.current?.click()}
                       >
-                        {sending ? (
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4 mr-1" />
+                        <Paperclip className="h-5 w-5" />
+                      </Button>
+
+                      {/* Voice */}
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant={recording ? "destructive" : "ghost"}
+                        className={cn(
+                          "h-9 w-9",
+                          !recording && "text-muted-foreground hover:text-foreground",
+                          recording && "animate-pulse",
                         )}
-                        Send
+                        disabled={windowExpired || uploadingMedia}
+                        title={recording ? "Stop recording" : "Record voice"}
+                        onClick={() => (recording ? stopRecording() : startRecording())}
+                      >
+                        {recording ? <Square className="h-4 w-4 fill-current" /> : <Mic className="h-5 w-5" />}
                       </Button>
-                    )}
+
+                      {/* AI suggest */}
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 text-violet-500 hover:text-violet-600 hover:bg-violet-500/10"
+                        disabled={aiLoading || messages.length === 0}
+                        title="AI suggestions"
+                        onClick={fetchAiSuggestions}
+                      >
+                        {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+                      </Button>
+
+                      {/* Template */}
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                        title="Send template"
+                        onClick={() => setTplOpen(true)}
+                      >
+                        <FileText className="h-5 w-5" />
+                      </Button>
+
+                      {/* Quick replies */}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                            disabled={windowExpired}
+                            title="Quick replies"
+                          >
+                            <MessageSquare className="h-5 w-5" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72 p-2" side="top" align="start">
+                          <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground px-2 py-1">
+                            Quick Replies
+                          </div>
+                          <div className="space-y-0.5">
+                            {quickReplies.map((q, i) => (
+                              <button
+                                key={i}
+                                onClick={() => setDraft(q)}
+                                className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors"
+                              >
+                                {q}
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+
+                      <div className="flex-1" />
+
+                      {windowExpired ? (
+                        <Button
+                          onClick={() => setTplOpen(true)}
+                          className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          <FileText className="h-4 w-4 mr-1" /> Template
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={sendReply}
+                          disabled={sending || uploadingMedia || !draft.trim()}
+                          className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          {sending || uploadingMedia ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4 mr-1" />
+                          )}
+                          Send
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="flex gap-2">
