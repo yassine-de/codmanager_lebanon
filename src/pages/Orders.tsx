@@ -104,7 +104,7 @@ const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean; admi
   { key: 'product', label: 'Product', defaultVisible: true },
   { key: 'amount', label: 'Amount', defaultVisible: true },
   { key: 'confirmationStatus', label: 'Confirmation', defaultVisible: true },
-  { key: 'channel', label: 'Channel', defaultVisible: true },
+  { key: 'channel', label: 'Channel', defaultVisible: true, adminOnly: true },
   { key: 'attempts', label: 'Attempts', defaultVisible: true },
   { key: 'deliveryStatus', label: 'Delivery', defaultVisible: true },
   { key: 'subStatus', label: 'Sub Status', defaultVisible: true, adminOnly: true },
@@ -838,7 +838,7 @@ export default function Orders() {
                 {isCol('product') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Product</th>}
                 {isCol('amount') && <th className="text-right py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Amount</th>}
                 {isCol('confirmationStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Confirmation</th>}
-                {isCol('channel') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Channel</th>}
+                {isAdmin && isCol('channel') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Channel</th>}
                 
                 {isCol('deliveryStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Delivery</th>}
                 {isAdmin && isCol('subStatus') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Sub Status</th>}
