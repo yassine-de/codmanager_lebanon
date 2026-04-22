@@ -479,7 +479,8 @@ export default function WhatsappTemplates() {
                         })()}
                       </div>
                       <div className="text-[11px] text-muted-foreground mt-1">
-                        Type <code className="bg-muted px-1 rounded">{`{{variable_name}}`}</code> to add dynamic content
+                        Type <code className="bg-muted px-1 rounded">@</code> to pick a variable, or write{" "}
+                        <code className="bg-muted px-1 rounded">{`{{variable_name}}`}</code> manually.
                       </div>
                     </div>
 
