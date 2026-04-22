@@ -26,18 +26,19 @@ const STATUS_MAP: Record<string, string> = {
   "address closed": "shipped",
   "arrived at courier facility": "shipped",
   "booked": "shipped",
-  "customer not answering": "shipped",
   "customer not available": "shipped",
   "hold on customer's request": "shipped",
   "hold on customers request": "shipped", // tolerate missing apostrophe
   "in transit": "shipped",
-  "incomplete address": "shipped",
   "out for delivery": "shipped",
   "pickup ready": "shipped",
-  // Terminal / outcome statuses
+  // Failed attempt group → failed_attempt (driver tried but couldn't deliver)
   "failed attempt": "failed_attempt",
+  "incomplete address": "failed_attempt",
+  "refused to accept": "failed_attempt",
+  "customer not answering": "failed_attempt",
+  // Terminal / outcome statuses
   "ready for return": "ready_for_return",
-  "refused to accept": "rejected",
   "return to shipper": "return",
   "return": "return",
 };
