@@ -78,8 +78,8 @@ function colorFor(seed: string) {
 }
 
 export default function WhatsappInbox() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { authUser } = useAuth();
+  const isAdmin = authUser?.role === "admin";
 
   const qc = useQueryClient();
   const [selected, setSelected] = useState<string | null>(null);
