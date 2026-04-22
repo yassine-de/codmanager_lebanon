@@ -90,9 +90,20 @@ export default function WhatsappSettings() {
       body: { mode: "connection" },
     });
     setBusy(false);
-    if (error) toast.error(error.message);
-    else if (data?.ok) toast.success("Connection OK");
-    else toast.error(data?.error ?? "Failed");
+    if (error) {
+      toast.error(error.message);
+      setTestResult(null);
+      return;
+    }
+    if (data?.checks) {
+      setTestResult({ ok: !!data.ok, checks: data.checks, duration_ms: data.duration_ms });
+      if (data.ok) toast.success("Connection OK");
+      else toast.error("Connection failed");
+    } else if (data?.ok) {
+      toast.success("Connection OK");
+    } else {
+      toast.error(data?.error ?? "Failed");
+    }
   };
 
   const sendTest = async () => {
