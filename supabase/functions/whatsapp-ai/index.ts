@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
       const result = await callAI(settings.model, [
         { role: "system", content: "Analyze the user's message. Return ONLY via the tool." },
         { role: "user", content: userText },
-      ], { tools, tool_choice: { type: "function", function: { name: "analyze_message" } }, temperature: 0.2, max_tokens: 200 });
+      ], { tools, tool_choice: { type: "function", function: { name: "analyze_message" } }, temperature: 0.2, max_tokens: 200, apiKey });
       const args = JSON.parse(result.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments || "{}");
       return new Response(JSON.stringify({ ok: true, analysis: args }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
