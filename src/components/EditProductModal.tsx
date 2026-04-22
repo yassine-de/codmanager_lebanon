@@ -33,6 +33,7 @@ interface EditProductModalProps {
 export function EditProductModal({ product, open, onOpenChange, onSave }: EditProductModalProps) {
   const { authUser } = useAuth();
   const isSeller = authUser?.role === "seller";
+  const isAdmin = authUser?.role === "admin";
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [seller, setSeller] = useState("");
@@ -50,9 +51,27 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [skuCopied, setSkuCopied] = useState(false);
   const [prevId, setPrevId] = useState<string | null>(null);
+  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
+  const [pendingWhatsappValue, setPendingWhatsappValue] = useState<boolean | null>(null);
+  const [whatsappSaving, setWhatsappSaving] = useState(false);
 
   // Check if this is a DB product (UUID format)
   const isDbProduct = product ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id) : false;
+
+  // Fetch current whatsapp_confirmation_enabled value when opening a DB product (admin only)
+  useEffect(() => {
+    if (!open || !product || !isDbProduct || !isAdmin) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("products")
+        .select("whatsapp_confirmation_enabled")
+        .eq("id", product.id)
+        .maybeSingle();
+      if (!cancelled) setWhatsappEnabled(!!data?.whatsapp_confirmation_enabled);
+    })();
+    return () => { cancelled = true; };
+  }, [open, product?.id, isDbProduct, isAdmin]);
 
   const dbUpdateMutation = useMutation({
     mutationFn: async () => {
