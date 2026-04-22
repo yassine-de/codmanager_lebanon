@@ -22,8 +22,9 @@ import { toast } from "sonner";
 export const TRIGGERS = [
   {
     value: "new_order",
-    label: "New Order",
-    description: "When a new order is created",
+    label: "New Order (WhatsApp)",
+    description:
+      "Fires only for new orders whose product has WhatsApp confirmation enabled. Other orders are ignored.",
     icon: ShoppingBag,
     group: "Orders",
   },
