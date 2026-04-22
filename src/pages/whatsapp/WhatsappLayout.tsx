@@ -1,12 +1,13 @@
 import { Outlet, useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
-import { LayoutDashboard, Inbox, CheckCircle2, FileText, Settings as SettingsIcon, Sparkles } from "lucide-react";
+import { LayoutDashboard, Inbox, CheckCircle2, FileText, Settings as SettingsIcon, Sparkles, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
   { to: "/whatsapp", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/whatsapp/inbox", label: "Inbox", icon: Inbox },
   { to: "/whatsapp/confirmations", label: "Confirmations", icon: CheckCircle2 },
+  { to: "/whatsapp/automations", label: "Automations", icon: Zap },
   { to: "/whatsapp/templates", label: "Templates", icon: FileText },
   { to: "/whatsapp/ai", label: "AI", icon: Sparkles },
   { to: "/whatsapp/settings", label: "Settings", icon: SettingsIcon },

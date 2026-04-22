@@ -44,6 +44,8 @@ import WhatsappConfirmations from "./pages/whatsapp/WhatsappConfirmations";
 import WhatsappTemplates from "./pages/whatsapp/WhatsappTemplates";
 import WhatsappAI from "./pages/whatsapp/WhatsappAI";
 import WhatsappSettings from "./pages/whatsapp/WhatsappSettings";
+import WhatsappAutomations from "./pages/whatsapp/WhatsappAutomations";
+import WhatsappAutomationBuilder from "./pages/whatsapp/WhatsappAutomationBuilder";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -171,10 +173,12 @@ function AppRoutes() {
           <Route index element={<WhatsappOverview />} />
           <Route path="inbox" element={<WhatsappInbox />} />
           <Route path="confirmations" element={<WhatsappConfirmations />} />
+          <Route path="automations" element={<WhatsappAutomations />} />
           <Route path="templates" element={<WhatsappTemplates />} />
           <Route path="ai" element={<WhatsappAI />} />
           <Route path="settings" element={<WhatsappSettings />} />
         </Route>
+        <Route path="/whatsapp/automations/:id" element={<ProtectedRoute permission="access_to_settings"><WhatsappAutomationBuilder /></ProtectedRoute>} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
