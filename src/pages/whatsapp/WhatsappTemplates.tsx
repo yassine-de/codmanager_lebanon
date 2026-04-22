@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,19 @@ function renderPreview(text: string) {
   );
 }
 
+const VAR_SUGGESTIONS = [
+  { name: "customer_name", label: "Customer name" },
+  { name: "order_id", label: "Order ID" },
+  { name: "product_name", label: "Product name" },
+  { name: "price", label: "Price" },
+  { name: "quantity", label: "Quantity" },
+  { name: "city", label: "City" },
+  { name: "address", label: "Address" },
+  { name: "phone", label: "Phone" },
+  { name: "tracking_number", label: "Tracking number" },
+  { name: "store_name", label: "Store name" },
+];
+
 export default function WhatsappTemplates() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -88,6 +101,15 @@ export default function WhatsappTemplates() {
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [previewTpl, setPreviewTpl] = useState<any | null>(null);
+
+  // @ mention autocomplete state for body textarea
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const [mention, setMention] = useState<{
+    open: boolean;
+    query: string;
+    start: number;
+    activeIdx: number;
+  }>({ open: false, query: "", start: -1, activeIdx: 0 });
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["wts-templates"],
@@ -344,15 +366,121 @@ export default function WhatsappTemplates() {
                         <Label>Message *</Label>
                         <span className="text-[10px] text-muted-foreground">{(form.body || "").length} / 1024</span>
                       </div>
-                      <Textarea
-                        rows={6}
-                        value={form.body}
-                        onChange={(e) => set("body", e.target.value)}
-                        placeholder="Type your message here. Use {{customer_name}}, {{order_id}}, etc."
-                        maxLength={1024}
-                      />
+                      <div className="relative">
+                        <Textarea
+                          ref={bodyRef}
+                          rows={6}
+                          value={form.body}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const caret = e.target.selectionStart ?? val.length;
+                            set("body", val);
+                            // Detect "@word" being typed before caret
+                            const before = val.slice(0, caret);
+                            const m = before.match(/(?:^|[\s\n.,;:!?(])@([a-zA-Z0-9_]*)$/);
+                            if (m) {
+                              setMention({
+                                open: true,
+                                query: m[1].toLowerCase(),
+                                start: caret - m[1].length - 1, // position of '@'
+                                activeIdx: 0,
+                              });
+                            } else {
+                              setMention((p) => ({ ...p, open: false }));
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (!mention.open) return;
+                            const filtered = VAR_SUGGESTIONS.filter((v) =>
+                              v.name.toLowerCase().includes(mention.query)
+                            );
+                            if (e.key === "ArrowDown") {
+                              e.preventDefault();
+                              setMention((p) => ({
+                                ...p,
+                                activeIdx: Math.min(p.activeIdx + 1, filtered.length - 1),
+                              }));
+                            } else if (e.key === "ArrowUp") {
+                              e.preventDefault();
+                              setMention((p) => ({ ...p, activeIdx: Math.max(p.activeIdx - 1, 0) }));
+                            } else if (e.key === "Enter" || e.key === "Tab") {
+                              if (filtered.length) {
+                                e.preventDefault();
+                                const v = filtered[mention.activeIdx] ?? filtered[0];
+                                const before = form.body.slice(0, mention.start);
+                                const after = form.body.slice(
+                                  (bodyRef.current?.selectionStart ?? mention.start) || mention.start
+                                );
+                                const inserted = `{{${v.name}}}`;
+                                const next = before + inserted + after;
+                                set("body", next);
+                                setMention({ open: false, query: "", start: -1, activeIdx: 0 });
+                                requestAnimationFrame(() => {
+                                  const pos = before.length + inserted.length;
+                                  bodyRef.current?.focus();
+                                  bodyRef.current?.setSelectionRange(pos, pos);
+                                });
+                              }
+                            } else if (e.key === "Escape") {
+                              setMention((p) => ({ ...p, open: false }));
+                            }
+                          }}
+                          onBlur={() => setTimeout(() => setMention((p) => ({ ...p, open: false })), 150)}
+                          placeholder="Type your message here. Type @ to insert variables (customer_name, order_id…)"
+                          maxLength={1024}
+                        />
+                        {mention.open && (() => {
+                          const filtered = VAR_SUGGESTIONS.filter((v) =>
+                            v.name.toLowerCase().includes(mention.query)
+                          );
+                          if (!filtered.length) return null;
+                          return (
+                            <div className="absolute z-50 mt-1 w-64 rounded-md border bg-popover text-popover-foreground shadow-lg overflow-hidden">
+                              <div className="px-2 py-1.5 text-[10px] uppercase tracking-wide text-muted-foreground border-b bg-muted/40">
+                                Insert variable
+                              </div>
+                              <div className="max-h-56 overflow-y-auto">
+                                {filtered.map((v, i) => (
+                                  <button
+                                    key={v.name}
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      const before = form.body.slice(0, mention.start);
+                                      const after = form.body.slice(
+                                        (bodyRef.current?.selectionStart ?? mention.start) || mention.start
+                                      );
+                                      const inserted = `{{${v.name}}}`;
+                                      const next = before + inserted + after;
+                                      set("body", next);
+                                      setMention({ open: false, query: "", start: -1, activeIdx: 0 });
+                                      requestAnimationFrame(() => {
+                                        const pos = before.length + inserted.length;
+                                        bodyRef.current?.focus();
+                                        bodyRef.current?.setSelectionRange(pos, pos);
+                                      });
+                                    }}
+                                    onMouseEnter={() =>
+                                      setMention((p) => ({ ...p, activeIdx: i }))
+                                    }
+                                    className={`w-full text-left px-2.5 py-1.5 text-xs flex items-center justify-between gap-2 ${
+                                      i === mention.activeIdx ? "bg-accent text-accent-foreground" : ""
+                                    }`}
+                                  >
+                                    <span className="font-medium">{v.label}</span>
+                                    <code className="text-[10px] text-muted-foreground">
+                                      {`{{${v.name}}}`}
+                                    </code>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
                       <div className="text-[11px] text-muted-foreground mt-1">
-                        Type <code className="bg-muted px-1 rounded">{`{{variable_name}}`}</code> to add dynamic content
+                        Type <code className="bg-muted px-1 rounded">@</code> to pick a variable, or write{" "}
+                        <code className="bg-muted px-1 rounded">{`{{variable_name}}`}</code> manually.
                       </div>
                     </div>
 
