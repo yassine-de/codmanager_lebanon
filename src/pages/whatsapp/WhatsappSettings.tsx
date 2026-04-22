@@ -6,8 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Save, Activity, Send } from "lucide-react";
+import { Save, Activity, Send, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+type Check = { name: string; ok: boolean; detail?: string };
+type TestResult = { ok: boolean; checks: Check[]; duration_ms?: number } | null;
 
 export default function WhatsappSettings() {
   const qc = useQueryClient();
