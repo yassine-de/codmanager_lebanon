@@ -16,7 +16,9 @@ interface SendBody {
   conversation_id?: string;
   template_id?: string;
   body?: string;
-  mode?: "template" | "text" | "order";
+  mode?: "template" | "text" | "order" | "image" | "document" | "audio";
+  media_url?: string;
+  media_filename?: string;
 }
 
 function render(template: string, vars: Record<string, string | number | null | undefined>) {
@@ -125,38 +127,23 @@ Deno.serve(async (req) => {
         type: "text",
         text: { body: bodyText },
       };
-    } else if (mode === "template") {
-      if (!body.template_id) throw new Error("template_id required");
-      const { data: tpl } = await admin.from("whatsapp_templates").select("*").eq("id", body.template_id).maybeSingle();
-      if (!tpl) throw new Error("Template not found");
-      bodyText = render(tpl.body, {
-        customer_name: order?.customer_name,
-        product_name: order?.product_name,
-        price: order?.total_amount,
-        city: order?.customer_city,
-        address: order?.customer_address,
-        order_id: order?.order_id,
-      });
-      // Use Meta approved template by name if provided, else fallback to text body
-      if (tpl.meta_template_name) {
-        payload = {
-          messaging_product: "whatsapp",
-          to,
-          type: "template",
-          template: {
-            name: tpl.meta_template_name,
-            language: { code: tpl.language || "en" },
-          },
-        };
-      } else {
-        payload = {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to,
-          type: "text",
-          text: { body: bodyText },
-        };
+    } else if (mode === "image" || mode === "document" || mode === "audio") {
+      if (!body.media_url) throw new Error("media_url required");
+      const mediaObj: any = { link: body.media_url };
+      if (mode === "image" && bodyText) mediaObj.caption = bodyText;
+      if (mode === "document") {
+        if (bodyText) mediaObj.caption = bodyText;
+        if (body.media_filename) mediaObj.filename = body.media_filename;
       }
+      payload = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: mode,
+        [mode]: mediaObj,
+      };
+      if (!bodyText) bodyText = body.media_filename || `[${mode}]`;
+    }
     } else {
       // order: legacy interactive confirmation buttons
       if (!order) throw new Error("Order required for order mode");
@@ -220,7 +207,7 @@ Deno.serve(async (req) => {
       conversation_id: conv!.id,
       order_id: order?.order_id ?? null,
       direction: "out",
-      message_type: mode === "template" ? "template" : (mode === "text" ? "text" : "interactive"),
+      message_type: ["template","text","image","document","audio"].includes(mode) ? mode : "interactive",
       body: bodyText,
       payload,
       meta_message_id: metaMsgId,

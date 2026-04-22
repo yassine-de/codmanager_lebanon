@@ -18,7 +18,18 @@ import {
   ArrowDownUp,
   FileText,
   Loader2,
+  Smile,
+  Camera,
+  Paperclip,
+  Mic,
+  Sparkles,
+  MessageSquare,
+  Square,
+  Download,
+  X,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 import { toast } from "sonner";
 import {
   format,
@@ -108,6 +119,15 @@ export default function WhatsappInbox() {
   const [sortDesc, setSortDesc] = useState(true);
   const [sending, setSending] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [recording, setRecording] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   const { data: convos = [], isLoading } = useQuery<Conv[]>({
@@ -300,6 +320,104 @@ export default function WhatsappInbox() {
     }
     setNoteDraft("");
     toast.success("Note saved");
+  };
+
+  // Quick reply snippets
+  const quickReplies = [
+    "Salam, comment puis-je vous aider ?",
+    "Merci pour votre commande ! 🙏",
+    "Pouvez-vous confirmer votre adresse ?",
+    "Votre commande sera livrée bientôt.",
+    "Je vous remercie pour votre patience.",
+  ];
+
+  const insertAtCursor = (text: string) => {
+    setDraft((d) => (d ? d + text : text));
+  };
+
+  const uploadAndSend = async (file: File, mode: "image" | "document" | "audio") => {
+    if (!selected || !conv) return;
+    if (windowExpired) {
+      toast.error("24h window expired — use a template");
+      return;
+    }
+    setUploadingMedia(true);
+    try {
+      const ext = file.name.split(".").pop() || "bin";
+      const path = `${conv.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("whatsapp-media")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("whatsapp-media").getPublicUrl(path);
+      const mediaUrl = pub.publicUrl;
+      const { data, error } = await supabase.functions.invoke("whatsapp-send", {
+        body: {
+          mode,
+          conversation_id: selected,
+          order_id: conv.order_id ?? undefined,
+          media_url: mediaUrl,
+          media_filename: file.name,
+          body: draft.trim() || undefined,
+        },
+      });
+      if (error || !data?.ok) throw new Error(error?.message || data?.error || "Send failed");
+      setDraft("");
+      toast.success(`${mode} sent`);
+    } catch (e: any) {
+      toast.error(e?.message || "Upload failed");
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      recordedChunksRef.current = [];
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(recordedChunksRef.current, { type: "audio/ogg" });
+        const file = new File([blob], `voice-${Date.now()}.ogg`, { type: "audio/ogg" });
+        await uploadAndSend(file, "audio");
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setRecording(true);
+    } catch (e: any) {
+      toast.error("Microphone access denied");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  };
+
+  const fetchAiSuggestions = async () => {
+    if (!selected) return;
+    setAiLoading(true);
+    setAiSuggestions([]);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-ai", {
+        body: { mode: "suggest", conversation_id: selected },
+      });
+      if (error) throw error;
+      const sugg = (data?.suggestions as string[]) || [];
+      if (sugg.length === 0) {
+        toast.error("No AI suggestions available");
+        return;
+      }
+      setAiSuggestions(sugg);
+    } catch (e: any) {
+      toast.error(e?.message || "AI suggestion failed");
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   if (!isAdmin) return <Navigate to="/" replace />;
@@ -556,9 +674,55 @@ export default function WhatsappInbox() {
                                 <FileText className="h-3 w-3" /> Template
                               </div>
                             )}
-                            <div className="whitespace-pre-wrap break-words">
-                              {m.body || <em className="opacity-70">[{m.message_type}]</em>}
-                            </div>
+                            {(() => {
+                              const mediaUrl =
+                                m.payload?.image?.link ||
+                                m.payload?.document?.link ||
+                                m.payload?.audio?.link ||
+                                m.payload?.image?.url ||
+                                m.payload?.document?.url ||
+                                m.payload?.audio?.url ||
+                                null;
+                              const mediaName =
+                                m.payload?.document?.filename || "file";
+                              if (m.message_type === "image" && mediaUrl) {
+                                return (
+                                  <a href={mediaUrl} target="_blank" rel="noreferrer">
+                                    <img
+                                      src={mediaUrl}
+                                      alt="attachment"
+                                      className="rounded-lg max-w-full max-h-64 object-cover mb-1"
+                                    />
+                                    {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
+                                  </a>
+                                );
+                              }
+                              if (m.message_type === "audio" && mediaUrl) {
+                                return <audio controls src={mediaUrl} className="max-w-full" />;
+                              }
+                              if (m.message_type === "document" && mediaUrl) {
+                                return (
+                                  <a
+                                    href={mediaUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={cn(
+                                      "flex items-center gap-2 px-2 py-1.5 rounded-md",
+                                      isOut ? "bg-white/10" : "bg-muted",
+                                    )}
+                                  >
+                                    <FileText className="h-4 w-4 shrink-0" />
+                                    <span className="text-xs truncate flex-1">{mediaName}</span>
+                                    <Download className="h-3.5 w-3.5 shrink-0" />
+                                  </a>
+                                );
+                              }
+                              return (
+                                <div className="whitespace-pre-wrap break-words">
+                                  {m.body || <em className="opacity-70">[{m.message_type}]</em>}
+                                </div>
+                              );
+                            })()}
                             <div
                               className={cn(
                                 "text-[10px] mt-1 flex items-center gap-1",
@@ -632,7 +796,34 @@ export default function WhatsappInbox() {
                 </div>
 
                 {tab === "reply" ? (
-                  <div className="flex gap-2">
+                  <div className="space-y-2">
+                    {/* AI suggestions chips */}
+                    {aiSuggestions.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 p-2 rounded-md bg-violet-500/5 border border-violet-500/20">
+                        <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-violet-500 w-full">
+                          <Sparkles className="h-3 w-3" /> AI suggestions
+                          <button
+                            onClick={() => setAiSuggestions([])}
+                            className="ml-auto opacity-70 hover:opacity-100"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                        {aiSuggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              setDraft(s);
+                              setAiSuggestions([]);
+                            }}
+                            className="text-xs px-2.5 py-1.5 rounded-md bg-card border border-border hover:bg-muted transition-colors text-left max-w-full"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <Textarea
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
@@ -651,27 +842,186 @@ export default function WhatsappInbox() {
                         }
                       }}
                     />
-                    {windowExpired ? (
+
+                    {/* Toolbar */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {/* Emoji */}
+                      <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                            disabled={windowExpired}
+                            title="Emoji"
+                          >
+                            <Smile className="h-5 w-5" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0 border-none w-auto" side="top" align="start">
+                          <EmojiPicker
+                            onEmojiClick={(e) => {
+                              insertAtCursor(e.emoji);
+                              setEmojiOpen(false);
+                            }}
+                            theme={Theme.AUTO}
+                            emojiStyle={EmojiStyle.NATIVE}
+                            width={320}
+                            height={380}
+                            searchDisabled={false}
+                            skinTonesDisabled
+                            previewConfig={{ showPreview: false }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+
+                      {/* Image */}
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadAndSend(f, "image");
+                          e.target.value = "";
+                        }}
+                      />
                       <Button
-                        onClick={() => setTplOpen(true)}
-                        className="shrink-0 self-end bg-emerald-600 hover:bg-emerald-700 text-white"
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                        disabled={windowExpired || uploadingMedia}
+                        title="Send image"
+                        onClick={() => imageInputRef.current?.click()}
                       >
-                        <FileText className="h-4 w-4 mr-1" /> Template
+                        <Camera className="h-5 w-5" />
                       </Button>
-                    ) : (
+
+                      {/* Document */}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadAndSend(f, "document");
+                          e.target.value = "";
+                        }}
+                      />
                       <Button
-                        onClick={sendReply}
-                        disabled={sending || !draft.trim()}
-                        className="shrink-0 self-end"
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                        disabled={windowExpired || uploadingMedia}
+                        title="Attach file"
+                        onClick={() => fileInputRef.current?.click()}
                       >
-                        {sending ? (
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4 mr-1" />
+                        <Paperclip className="h-5 w-5" />
+                      </Button>
+
+                      {/* Voice */}
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant={recording ? "destructive" : "ghost"}
+                        className={cn(
+                          "h-9 w-9",
+                          !recording && "text-muted-foreground hover:text-foreground",
+                          recording && "animate-pulse",
                         )}
-                        Send
+                        disabled={windowExpired || uploadingMedia}
+                        title={recording ? "Stop recording" : "Record voice"}
+                        onClick={() => (recording ? stopRecording() : startRecording())}
+                      >
+                        {recording ? <Square className="h-4 w-4 fill-current" /> : <Mic className="h-5 w-5" />}
                       </Button>
-                    )}
+
+                      {/* AI suggest */}
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 text-violet-500 hover:text-violet-600 hover:bg-violet-500/10"
+                        disabled={aiLoading || messages.length === 0}
+                        title="AI suggestions"
+                        onClick={fetchAiSuggestions}
+                      >
+                        {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+                      </Button>
+
+                      {/* Template */}
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                        title="Send template"
+                        onClick={() => setTplOpen(true)}
+                      >
+                        <FileText className="h-5 w-5" />
+                      </Button>
+
+                      {/* Quick replies */}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                            disabled={windowExpired}
+                            title="Quick replies"
+                          >
+                            <MessageSquare className="h-5 w-5" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72 p-2" side="top" align="start">
+                          <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground px-2 py-1">
+                            Quick Replies
+                          </div>
+                          <div className="space-y-0.5">
+                            {quickReplies.map((q, i) => (
+                              <button
+                                key={i}
+                                onClick={() => setDraft(q)}
+                                className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors"
+                              >
+                                {q}
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+
+                      <div className="flex-1" />
+
+                      {windowExpired ? (
+                        <Button
+                          onClick={() => setTplOpen(true)}
+                          className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          <FileText className="h-4 w-4 mr-1" /> Template
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={sendReply}
+                          disabled={sending || uploadingMedia || !draft.trim()}
+                          className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          {sending || uploadingMedia ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4 mr-1" />
+                          )}
+                          Send
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="flex gap-2">
