@@ -87,6 +87,7 @@ export default function WhatsappTemplates() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [previewTpl, setPreviewTpl] = useState<any | null>(null);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["wts-templates"],
