@@ -61,7 +61,9 @@ const whatsappSubItems = [
   { title: "Overview", url: "/whatsapp", icon: LayoutDashboard, end: true },
   { title: "Inbox", url: "/whatsapp/inbox", icon: Inbox },
   { title: "Confirmations", url: "/whatsapp/confirmations", icon: CheckCircle2 },
+  { title: "Automations", url: "/whatsapp/automations", icon: Zap },
   { title: "Templates", url: "/whatsapp/templates", icon: FileText },
+  { title: "AI", url: "/whatsapp/ai", icon: Sparkles },
   { title: "Settings", url: "/whatsapp/settings", icon: Settings },
 ];
 
