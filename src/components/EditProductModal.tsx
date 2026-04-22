@@ -294,6 +294,44 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
               </div>
             </div>
 
+            {/* WhatsApp Confirmation (Admin only, DB products only) */}
+            {isAdmin && isDbProduct && (
+              <div>
+                <h3 className={sectionTitle}>
+                  <span className="flex items-center gap-1.5">
+                    <MessageCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                    WhatsApp Confirmation
+                  </span>
+                </h3>
+                <div className="flex items-start justify-between gap-4 rounded-lg border bg-muted/20 p-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium">Enable WhatsApp Confirmation</Label>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px] h-5",
+                          whatsappEnabled
+                            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "border-muted-foreground/30 bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {whatsappEnabled ? "WhatsApp Enabled" : "Agent Confirmation"}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      If enabled, all new orders for this product will go through WhatsApp confirmation before reaching agents.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={whatsappEnabled}
+                    disabled={whatsappSaving}
+                    onCheckedChange={(v) => setPendingWhatsappValue(v)}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Pricing & Stock */}
             <div>
               <h3 className={sectionTitle}>Pricing & Stock</h3>
