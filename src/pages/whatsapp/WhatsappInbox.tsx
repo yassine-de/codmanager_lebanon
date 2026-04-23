@@ -43,7 +43,7 @@ import {
   isYesterday,
 } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { SendTemplateModal } from "@/components/whatsapp/SendTemplateModal";
 
@@ -140,6 +140,7 @@ export default function WhatsappInbox() {
   const isAdmin = authUser?.role === "admin";
 
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "unread">("all");
@@ -1272,7 +1273,10 @@ export default function WhatsappInbox() {
                     variant="ghost"
                     size="sm"
                     className="h-7 text-xs"
-                    onClick={() => window.open(`/orders/${order.order_id}`, "_blank")}
+                    onClick={() => {
+                      setOrderInfoOpen(false);
+                      navigate(`/orders/${order.order_id}`);
+                    }}
                   >
                     <ExternalLink className="h-3 w-3 mr-1" /> Open
                   </Button>
