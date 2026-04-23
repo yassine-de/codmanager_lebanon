@@ -592,6 +592,11 @@ function NodeBranch({
   const selected = selectedId === nodeId;
 
   const isCondition = node.type === "condition";
+  const templateButtons: any[] =
+    node.type === "send_template" && Array.isArray(node.data.template_buttons)
+      ? node.data.template_buttons
+      : [];
+  const hasTemplateButtons = templateButtons.length > 0;
 
   return (
     <div className="flex flex-col items-center">
@@ -655,6 +660,46 @@ function NodeBranch({
                       onClick={() => onAddBelow(nodeId, handle)}
                     >
                       <Plus className="h-3 w-3 mr-1" /> Add
+                    </Button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : hasTemplateButtons ? (
+        <div className="flex gap-6 mt-4 items-start flex-wrap justify-center">
+          {templateButtons.map((b: any, i: number) => {
+            const handle = `btn:${i}`;
+            const child = children.find((c) => c.handle === handle);
+            return (
+              <div key={handle} className="flex flex-col items-center min-w-[120px]">
+                <Badge
+                  variant="outline"
+                  className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 max-w-[140px] truncate"
+                  title={b.text || `Button ${i + 1}`}
+                >
+                  {b.text || `Button ${i + 1}`}
+                </Badge>
+                {child ? (
+                  <NodeBranch
+                    nodeId={child.target}
+                    nodes={nodes}
+                    childrenMap={childrenMap}
+                    selectedId={selectedId}
+                    onSelect={onSelect}
+                    onAddBelow={onAddBelow}
+                    onDelete={onDelete}
+                  />
+                ) : (
+                  <>
+                    <ConnectorLine />
+                    <Button
+                      size="icon" variant="outline"
+                      className="mt-2 h-7 w-7 rounded-full border-dashed"
+                      onClick={() => onAddBelow(nodeId, handle)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
                     </Button>
                   </>
                 )}
