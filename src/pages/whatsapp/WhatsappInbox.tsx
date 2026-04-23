@@ -43,7 +43,7 @@ import {
   isYesterday,
 } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { SendTemplateModal } from "@/components/whatsapp/SendTemplateModal";
 
