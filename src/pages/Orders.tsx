@@ -507,7 +507,11 @@ export default function Orders() {
         if (f.product !== 'all' && !o.products.some(p => p.name === f.product)) return false;
         if (f.seller !== 'all' && o.seller !== f.seller) return false;
         if (f.agent !== 'all' && o.agentName !== f.agent) return false;
-        if (f.confirmation !== 'all' && o.confirmationStatus !== f.confirmation) return false;
+        if (f.confirmation !== 'all') {
+          // For sellers, "new" filter also matches new_wts (WhatsApp pipeline is hidden as plain New)
+          const effective = (!isAdmin && o.confirmationStatus === 'new_wts') ? 'new' : o.confirmationStatus;
+          if (effective !== f.confirmation) return false;
+        }
         if (f.delivery !== 'all' && o.deliveryStatus !== f.delivery) return false;
         if (f.subStatus !== 'all' && (o.orioShippingStatus || '') !== f.subStatus) return false;
         if (f.channel !== 'all' && (o.confirmationChannel || 'agent') !== f.channel) return false;
