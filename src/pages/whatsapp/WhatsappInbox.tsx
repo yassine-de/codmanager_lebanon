@@ -1273,7 +1273,10 @@ export default function WhatsappInbox() {
                     variant="ghost"
                     size="sm"
                     className="h-7 text-xs"
-                    onClick={() => window.open(`/orders/${order.order_id}`, "_blank")}
+                    onClick={() => {
+                      setOrderInfoOpen(false);
+                      navigate(`/orders/${order.order_id}`);
+                    }}
                   >
                     <ExternalLink className="h-3 w-3 mr-1" /> Open
                   </Button>
