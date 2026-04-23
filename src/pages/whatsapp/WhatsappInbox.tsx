@@ -486,7 +486,7 @@ export default function WhatsappInbox() {
 
   return (
     <>
-      <div className="grid grid-cols-12 gap-0 h-[calc(100vh-220px)] min-h-[560px] rounded-xl border border-border overflow-hidden bg-card">
+      <div className="grid grid-cols-12 gap-0 h-[calc(100vh-220px)] min-h-[480px] rounded-xl border border-border overflow-hidden bg-card">
         {/* LEFT PANEL */}
         <aside className="col-span-12 md:col-span-4 lg:col-span-3 border-r border-border flex flex-col bg-background/40">
           <div className="px-4 h-12 border-b border-border flex items-center justify-between gap-2">
@@ -599,7 +599,7 @@ export default function WhatsappInbox() {
         </aside>
 
         {/* RIGHT PANEL */}
-        <section className="col-span-12 md:col-span-8 lg:col-span-9 flex flex-col bg-background/20">
+        <section className="col-span-12 md:col-span-8 lg:col-span-9 flex min-h-0 flex-col bg-background/20">
           {!conv ? (
             <div className="flex-1 grid place-items-center text-sm text-muted-foreground">
               Select a conversation to view the order and chat.
@@ -712,7 +712,7 @@ export default function WhatsappInbox() {
               {/* Messages */}
               <div
                 ref={scrollerRef}
-                className="flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth bg-[radial-gradient(circle_at_1px_1px,_hsl(var(--muted-foreground)/0.06)_1px,_transparent_0)] [background-size:16px_16px]"
+                className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth bg-[radial-gradient(circle_at_1px_1px,_hsl(var(--muted-foreground)/0.06)_1px,_transparent_0)] [background-size:16px_16px]"
               >
                 {grouped.map((g) => (
                   <div key={g.key} className="space-y-3">
@@ -905,7 +905,7 @@ export default function WhatsappInbox() {
               )}
 
               {/* Tabs + input */}
-              <div className="border-t border-border p-3 bg-card">
+              <div className="shrink-0 border-t border-border p-3 bg-card">
                 <div className="flex items-center gap-2 mb-3">
                   <button
                     onClick={() => setTab("reply")}
