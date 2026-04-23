@@ -184,6 +184,26 @@ export default function WhatsappInbox() {
     enabled: !!selected,
   });
 
+  // Load templates so we can render the buttons (quick replies / URL / phone) below template messages
+  const { data: templates = [] } = useQuery<any[]>({
+    queryKey: ["wts-templates-buttons"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("whatsapp_templates")
+        .select("id, name, meta_template_name, buttons");
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const templateButtonsById = useMemo(() => {
+    const m = new Map<string, any[]>();
+    for (const t of templates) {
+      if (Array.isArray(t.buttons)) m.set(t.id, t.buttons);
+    }
+    return m;
+  }, [templates]);
+
   const conv = useMemo(() => convos.find((c) => c.id === selected) || null, [convos, selected]);
 
   const { data: order } = useQuery({
