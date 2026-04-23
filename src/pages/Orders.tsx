@@ -40,6 +40,18 @@ const confirmationConfig: Record<ConfirmationStatus, { label: string; cls: strin
   double: { label: 'Double', cls: 'bg-[hsl(270,50%,55%)]/12 text-[hsl(270,50%,55%)] border-[hsl(270,50%,55%)]/20' },
 };
 
+/* WhatsApp confirmation sub-status (shown when channel === 'whatsapp') */
+const whatsappStatusConfig: Record<string, { label: string; cls: string }> = {
+  pending:                { label: 'WTS · Open',          cls: 'bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)] border-[hsl(155,50%,42%)]/20' },
+  sent:                   { label: 'WTS · Awaiting Reply', cls: 'bg-[hsl(38,90%,55%)]/12 text-[hsl(38,90%,55%)] border-[hsl(38,90%,55%)]/20' },
+  awaiting_reply:         { label: 'WTS · Awaiting Reply', cls: 'bg-[hsl(38,90%,55%)]/12 text-[hsl(38,90%,55%)] border-[hsl(38,90%,55%)]/20' },
+  confirmed:              { label: 'WTS · Confirmed',     cls: 'bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)] border-[hsl(155,50%,42%)]/20' },
+  canceled:               { label: 'WTS · Canceled',      cls: 'bg-[hsl(0,65%,52%)]/12 text-[hsl(0,65%,52%)] border-[hsl(0,65%,52%)]/20' },
+  cancelled:              { label: 'WTS · Canceled',      cls: 'bg-[hsl(0,65%,52%)]/12 text-[hsl(0,65%,52%)] border-[hsl(0,65%,52%)]/20' },
+  more_info:              { label: 'WTS · Sent to Agent', cls: 'bg-[hsl(270,50%,55%)]/12 text-[hsl(270,50%,55%)] border-[hsl(270,50%,55%)]/20' },
+  manual_review_needed:   { label: 'WTS · Needs Review',  cls: 'bg-[hsl(200,65%,50%)]/12 text-[hsl(200,65%,50%)] border-[hsl(200,65%,50%)]/20' },
+};
+
 const deliveryConfig: Record<DeliveryStatus, { label: string; cls: string }> = {
   pending: { label: 'Pending', cls: 'bg-[hsl(30,6%,50%)]/12 text-[hsl(30,6%,50%)] border-[hsl(30,6%,50%)]/20' },
   booked: { label: 'Booked', cls: 'bg-[hsl(200,65%,50%)]/12 text-[hsl(200,65%,50%)] border-[hsl(200,65%,50%)]/20' },
@@ -354,6 +366,7 @@ export default function Orders() {
         orioOrderId: o.orio_order_id || null,
         orioShippingStatus: o.orio_shipping_status || null,
         confirmationChannel: o.confirmation_channel || 'agent',
+        whatsappStatus: o.whatsapp_status || null,
       }));
 
       setOrders(mapped);
@@ -890,7 +903,16 @@ export default function Orders() {
                   {isCol('phone') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{order.phone}</td>}
                   {isCol('product') && <td className="py-2.5 px-4 text-xs text-muted-foreground">{order.products.map(p => p.qty > 1 ? `${p.qty}x ${p.name}` : p.name).join(', ')}</td>}
                   {isCol('amount') && <td className="py-2.5 px-4 text-xs font-medium tabular-nums text-right">{order.total.toLocaleString()} PKR</td>}
-{isCol('confirmationStatus') && <td className="py-2.5 px-4"><StatusBadge {...confirmationConfig[order.confirmationStatus]} attemptCount={order.confirmationStatus === 'no_answer' ? order.attemptCount : undefined} /></td>}
+{isCol('confirmationStatus') && <td className="py-2.5 px-4">{(() => {
+                    const isWhatsapp = (order.confirmationChannel || 'agent') === 'whatsapp';
+                    const wts = order.whatsappStatus;
+                    // Show WTS sub-status while order is still 'new' on the WhatsApp channel
+                    if (isWhatsapp && order.confirmationStatus === 'new' && wts) {
+                      const cfg = whatsappStatusConfig[wts] || { label: `WTS · ${wts}`, cls: 'bg-muted text-muted-foreground border-border' };
+                      return <StatusBadge label={cfg.label} cls={cfg.cls} />;
+                    }
+                    return <StatusBadge {...confirmationConfig[order.confirmationStatus]} attemptCount={order.confirmationStatus === 'no_answer' ? order.attemptCount : undefined} />;
+                  })()}</td>}
                   {isAdmin && isCol('channel') && <td className="py-2.5 px-4">{(() => { const ch = order.confirmationChannel || 'agent'; const cfg = channelConfig[ch] || { label: ch, cls: 'bg-muted text-muted-foreground border-border' }; return <StatusBadge label={cfg.label} cls={cfg.cls} />; })()}</td>}
                   {isCol('deliveryStatus') && <td className="py-2.5 px-4"><StatusBadge {...deliveryConfig[order.deliveryStatus]} /></td>}
                   {isAdmin && isCol('subStatus') && (
