@@ -430,19 +430,21 @@ export default function WhatsappInbox() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      // WhatsApp Cloud API only accepts audio/aac, audio/mp4, audio/mpeg, audio/amr, audio/ogg (Opus).
-      // Most browsers (Chrome) record as audio/webm — which Meta REJECTS.
-      // Try mp4/aac first (Safari + recent Chromium support), then ogg/opus, then fall back to webm.
+      // WhatsApp voice notes ONLY render properly when sent as audio/ogg with the Opus codec.
+      // Native OGG recording: Firefox supports `audio/ogg;codecs=opus` directly.
+      // Chrome/Edge/Safari record Opus inside a WebM container — the Opus bitstream is identical,
+      // and Meta accepts the file when we label it `audio/ogg; codecs=opus` and use `.ogg` extension.
       const candidates = [
-        "audio/mp4;codecs=mp4a.40.2",
-        "audio/mp4",
-        "audio/aac",
         "audio/ogg;codecs=opus",
-        "audio/mpeg",
+        "audio/webm;codecs=opus",
+        "audio/webm",
       ];
       const supported = candidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m));
-      const mimeType = supported || ""; // empty = browser default
-      const mr = supported ? new MediaRecorder(stream, { mimeType: supported }) : new MediaRecorder(stream);
+      if (!supported) {
+        toast.error("Browser doesn't support voice recording. Try Chrome, Firefox, or Safari.");
+        return;
+      }
+      const mr = new MediaRecorder(stream, { mimeType: supported });
 
       recordedChunksRef.current = [];
       mr.ondataavailable = (e) => {
@@ -450,21 +452,11 @@ export default function WhatsappInbox() {
       };
       mr.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
-        const actualType = mr.mimeType || mimeType || "audio/webm";
-        // Pick a clean MIME + extension that WhatsApp accepts.
-        let outType = actualType.split(";")[0];
-        let ext = "bin";
-        if (outType.includes("mp4")) ext = "m4a";
-        else if (outType.includes("aac")) ext = "aac";
-        else if (outType.includes("ogg")) ext = "ogg";
-        else if (outType.includes("mpeg")) ext = "mp3";
-        else {
-          // webm fallback — WhatsApp will reject. Surface a clear error instead of silently failing.
-          toast.error("Browser doesn't support a WhatsApp-compatible voice format. Try Safari or upload an audio file.");
-          return;
-        }
+        // Always upload as audio/ogg + .ogg — the Opus stream is identical regardless of container,
+        // and this is the only MIME that WhatsApp Cloud API accepts for voice notes.
+        const outType = "audio/ogg";
         const blob = new Blob(recordedChunksRef.current, { type: outType });
-        const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: outType });
+        const file = new File([blob], `voice-${Date.now()}.ogg`, { type: outType });
         await uploadAndSend(file, "audio");
       };
       mediaRecorderRef.current = mr;

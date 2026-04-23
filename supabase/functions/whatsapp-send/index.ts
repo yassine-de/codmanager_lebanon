@@ -135,6 +135,8 @@ Deno.serve(async (req) => {
         if (bodyText) mediaObj.caption = bodyText;
         if (body.media_filename) mediaObj.filename = body.media_filename;
       }
+      // Render audio as a true WhatsApp voice note (push-to-play bubble) instead of a file attachment.
+      if (mode === "audio") mediaObj.voice = true;
       payload = {
         messaging_product: "whatsapp",
         recipient_type: "individual",
