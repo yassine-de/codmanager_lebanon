@@ -338,12 +338,94 @@ async function executeFlow(args: {
         await appendLog(runId, { type: "send_message", node_id: node.id });
         currentId = findNextNode(edges, node.id)?.target ?? null;
       } else if (node.type === "ai_step") {
-        await appendLog(runId, { type: "ai_step", node_id: node.id, prompt_len: (node.data?.prompt ?? "").length });
-        await admin
-          .from("whatsapp_automation_runs")
-          .update({ status: "waiting_reply", current_node_id: node.id })
-          .eq("id", runId);
-        return;
+        // Actually execute the AI: generate a reply with OpenAI and send it as text.
+        const customPrompt = String(node.data?.prompt ?? "").trim();
+        if (!normalizedPhone) throw new Error("Customer phone invalid");
+
+        // Load AI settings + key + history for context
+        const { data: aiSettings } = await admin
+          .from("whatsapp_ai_settings")
+          .select("*")
+          .eq("singleton", true)
+          .maybeSingle();
+        if (!aiSettings) throw new Error("AI settings missing");
+
+        const { data: keyRow } = await admin
+          .from("app_settings")
+          .select("value")
+          .eq("key", "openai_api_key")
+          .maybeSingle();
+        const apiKey = (keyRow?.value as string)?.trim() || Deno.env.get("OPENAI_API_KEY") || "";
+        if (!apiKey) throw new Error("OpenAI API key not configured (AI Settings → Connection).");
+
+        // Conversation history
+        let history: any[] = [];
+        if (conversation?.id) {
+          const { data: msgs } = await admin
+            .from("whatsapp_messages")
+            .select("direction,body,message_type,created_at")
+            .eq("conversation_id", conversation.id)
+            .order("created_at", { ascending: false })
+            .limit(15);
+          history = (msgs ?? []).reverse().map((m: any) => ({
+            role: m.direction === "in" ? "user" : "assistant",
+            content: m.body || `[${m.message_type}]`,
+          }));
+        }
+
+        // Build system prompt: node-level prompt overrides global if provided.
+        const orderCtx = order
+          ? `\n\nOrder context:\n- Order ID: ${order.order_id}\n- Customer: ${order.customer_name}\n- Product: ${order.product_name}\n- Quantity: ${order.quantity}\n- Total: ${order.total_amount} PKR\n- City: ${order.customer_city}\n- Address: ${order.customer_address ?? "(not provided)"}`
+          : "";
+        const baseSys = customPrompt || aiSettings.system_prompt || "You are a helpful WhatsApp sales assistant.";
+        const sysPrompt =
+          `${baseSys}\n\nBrand tone: ${aiSettings.brand_tone || "friendly"}.\nLanguage rules: ${aiSettings.language_rules || ""}\n\nKeep replies short (about ${aiSettings.response_lines ?? 3} line(s)). Do not invent facts.${orderCtx}`;
+
+        // Normalize model → OpenAI compatible
+        const rawModel = aiSettings.model || "gpt-4o-mini";
+        const model = rawModel.startsWith("openai/")
+          ? rawModel.replace("openai/", "")
+          : rawModel.includes("gemini")
+          ? "gpt-4o-mini"
+          : rawModel;
+
+        const aiResp = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "system", content: sysPrompt }, ...history],
+            temperature: aiSettings.temperature ?? 0.7,
+            max_tokens: aiSettings.max_tokens ?? 400,
+          }),
+        });
+        if (!aiResp.ok) {
+          const t = await aiResp.text();
+          throw new Error(`OpenAI ${aiResp.status}: ${t.slice(0, 200)}`);
+        }
+        const aiJson = await aiResp.json();
+        const reply: string = aiJson.choices?.[0]?.message?.content?.trim() || "";
+        if (!reply) throw new Error("AI returned empty reply");
+
+        await sendText({
+          body: reply,
+          to: normalizedPhone,
+          conversationId: conversation?.id ?? null,
+          orderId: order?.order_id ?? null,
+          runId,
+        });
+        await appendLog(runId, { type: "ai_step", node_id: node.id, reply_len: reply.length });
+
+        // Continue to next node (or pause to wait for customer reply if there's none)
+        const nextEdge = findNextNode(edges, node.id);
+        if (!nextEdge) {
+          await admin
+            .from("whatsapp_automation_runs")
+            .update({ status: "waiting_reply", current_node_id: node.id })
+            .eq("id", runId);
+          return;
+        }
+        currentId = nextEdge.target;
       } else if (node.type === "delay") {
         const minutes = Number(node.data?.minutes ?? 0);
         if (minutes > 0) {
