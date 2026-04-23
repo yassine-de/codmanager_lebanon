@@ -268,6 +268,55 @@ async function handleIncoming(value: any) {
       } else if (!order && outcome) {
         log("button outcome but no matched order", phone, outcome);
       }
+
+      // Resume any paused automation run waiting for this conversation's reply.
+      try {
+        const { data: pausedRun } = await admin
+          .from("whatsapp_automation_runs")
+          .select("id, current_node_id, automation_id")
+          .eq("conversation_id", conv.id)
+          .eq("status", "waiting_reply")
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (pausedRun) {
+          // Determine the button index by matching the clicked button text against
+          // the template_buttons stored on the current node.
+          let buttonIndex: number | undefined;
+          if (messageType === "button_reply") {
+            const { data: autoRow } = await admin
+              .from("whatsapp_automations")
+              .select("nodes")
+              .eq("id", pausedRun.automation_id)
+              .maybeSingle();
+            const nodes = (autoRow?.nodes as any[]) ?? [];
+            const node = nodes.find((n: any) => n.id === pausedRun.current_node_id);
+            const buttons: any[] = Array.isArray(node?.data?.template_buttons)
+              ? node.data.template_buttons
+              : [];
+            const idx = buttons.findIndex(
+              (b) => String(b?.text ?? "").trim().toLowerCase() === bodyText.trim().toLowerCase(),
+            );
+            if (idx >= 0) buttonIndex = idx;
+          }
+
+          // Fire-and-forget invocation of the runner
+          const projectUrl = Deno.env.get("SUPABASE_URL")!;
+          const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+          fetch(`${projectUrl}/functions/v1/whatsapp-automation-runner`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${anonKey}` },
+            body: JSON.stringify({
+              resume: true,
+              run_id: pausedRun.id,
+              ...(buttonIndex !== undefined ? { button_index: buttonIndex } : { reply_text: bodyText }),
+            }),
+          }).catch((e) => errLog("runner resume invoke failed", e));
+        }
+      } catch (e) {
+        errLog("automation resume lookup failed", (e as Error).message);
+      }
     } catch (e) {
       errLog("message handling error", (e as Error).message);
       // continue with next message
