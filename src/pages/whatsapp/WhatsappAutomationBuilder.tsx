@@ -717,7 +717,7 @@ function NodeInspector({
     queryFn: async () => {
       const { data } = await supabase
         .from("whatsapp_templates")
-        .select("id, name, body, language")
+        .select("id, name, body, language, buttons")
         .eq("active", true);
       return data ?? [];
     },
