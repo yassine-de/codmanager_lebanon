@@ -1551,39 +1551,51 @@ export type Database = {
       whatsapp_automation_runs: {
         Row: {
           automation_id: string
+          conversation_id: string | null
+          current_node_id: string | null
           customer_phone: string | null
           error_message: string | null
           finished_at: string | null
           id: string
           order_id: string | null
           started_at: string
+          state: Json
           status: string
           steps_log: Json
           trigger_payload: Json
+          wait_until: string | null
         }
         Insert: {
           automation_id: string
+          conversation_id?: string | null
+          current_node_id?: string | null
           customer_phone?: string | null
           error_message?: string | null
           finished_at?: string | null
           id?: string
           order_id?: string | null
           started_at?: string
+          state?: Json
           status?: string
           steps_log?: Json
           trigger_payload?: Json
+          wait_until?: string | null
         }
         Update: {
           automation_id?: string
+          conversation_id?: string | null
+          current_node_id?: string | null
           customer_phone?: string | null
           error_message?: string | null
           finished_at?: string | null
           id?: string
           order_id?: string | null
           started_at?: string
+          state?: Json
           status?: string
           steps_log?: Json
           trigger_payload?: Json
+          wait_until?: string | null
         }
         Relationships: [
           {
