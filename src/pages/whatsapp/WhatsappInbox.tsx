@@ -652,12 +652,12 @@ export default function WhatsappInbox() {
                       title={windowExpired ? "24h window expired" : "Window open"}
                     />
                   </div>
-                  {/* Row 2: phone + order */}
-                  <div className="text-[11px] text-muted-foreground truncate flex items-center gap-1.5">
+                  {/* Row 2: phone + order + status pills */}
+                  <div className="text-[11px] text-muted-foreground truncate flex items-center gap-1.5 flex-wrap">
                     <span className="shrink-0">{conv.customer_phone}</span>
                     {order && (
                       <>
-                        <span className="shrink-0">•</span>
+                        <span className="shrink-0 opacity-50">•</span>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -674,8 +674,40 @@ export default function WhatsappInbox() {
                         >
                           #{order.order_id}
                         </button>
-                        <span className="shrink-0 hidden sm:inline">•</span>
-                        <span className="truncate hidden sm:inline">{order.product_name}</span>
+                        {/* Status pills — compact, color-coded */}
+                        {order.confirmation_status && (
+                          <span
+                            className={cn(
+                              "shrink-0 inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-medium leading-none capitalize",
+                              confirmationStatusCls(order.confirmation_status),
+                            )}
+                            title={`Confirmation: ${order.confirmation_status.replace(/_/g, " ")}`}
+                          >
+                            <span className="h-1 w-1 rounded-full bg-current opacity-70" />
+                            {order.confirmation_status.replace(/_/g, " ")}
+                          </span>
+                        )}
+                        {order.delivery_status && (
+                          <span
+                            className={cn(
+                              "hidden md:inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-medium leading-none capitalize",
+                              deliveryStatusCls(order.delivery_status),
+                            )}
+                            title={`Delivery: ${order.delivery_status.replace(/_/g, " ")}`}
+                          >
+                            <span className="h-1 w-1 rounded-full bg-current opacity-70" />
+                            {order.delivery_status.replace(/_/g, " ")}
+                          </span>
+                        )}
+                        {order.shipping_status && (
+                          <span
+                            className="hidden lg:inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-muted/50 text-muted-foreground px-1.5 py-px text-[10px] font-medium leading-none capitalize"
+                            title={`Shipping: ${order.shipping_status.replace(/_/g, " ")}`}
+                          >
+                            <span className="h-1 w-1 rounded-full bg-current opacity-70" />
+                            {order.shipping_status.replace(/_/g, " ")}
+                          </span>
+                        )}
                       </>
                     )}
                   </div>
