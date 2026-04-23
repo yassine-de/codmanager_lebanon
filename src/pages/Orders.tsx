@@ -903,7 +903,16 @@ export default function Orders() {
                   {isCol('phone') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{order.phone}</td>}
                   {isCol('product') && <td className="py-2.5 px-4 text-xs text-muted-foreground">{order.products.map(p => p.qty > 1 ? `${p.qty}x ${p.name}` : p.name).join(', ')}</td>}
                   {isCol('amount') && <td className="py-2.5 px-4 text-xs font-medium tabular-nums text-right">{order.total.toLocaleString()} PKR</td>}
-{isCol('confirmationStatus') && <td className="py-2.5 px-4"><StatusBadge {...confirmationConfig[order.confirmationStatus]} attemptCount={order.confirmationStatus === 'no_answer' ? order.attemptCount : undefined} /></td>}
+{isCol('confirmationStatus') && <td className="py-2.5 px-4">{(() => {
+                    const isWhatsapp = (order.confirmationChannel || 'agent') === 'whatsapp';
+                    const wts = order.whatsappStatus;
+                    // Show WTS sub-status while order is still 'new' on the WhatsApp channel
+                    if (isWhatsapp && order.confirmationStatus === 'new' && wts) {
+                      const cfg = whatsappStatusConfig[wts] || { label: `WTS · ${wts}`, cls: 'bg-muted text-muted-foreground border-border' };
+                      return <StatusBadge label={cfg.label} cls={cfg.cls} />;
+                    }
+                    return <StatusBadge {...confirmationConfig[order.confirmationStatus]} attemptCount={order.confirmationStatus === 'no_answer' ? order.attemptCount : undefined} />;
+                  })()}</td>}
                   {isAdmin && isCol('channel') && <td className="py-2.5 px-4">{(() => { const ch = order.confirmationChannel || 'agent'; const cfg = channelConfig[ch] || { label: ch, cls: 'bg-muted text-muted-foreground border-border' }; return <StatusBadge label={cfg.label} cls={cfg.cls} />; })()}</td>}
                   {isCol('deliveryStatus') && <td className="py-2.5 px-4"><StatusBadge {...deliveryConfig[order.deliveryStatus]} /></td>}
                   {isAdmin && isCol('subStatus') && (
