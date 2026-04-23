@@ -422,9 +422,10 @@ async function startNewRuns(triggerType: string, orderId: string) {
     return { started: 0 };
   }
 
-  // Check if order requires WhatsApp validation
-  if (triggerType === "new_order" && order.whatsapp_validated !== true) {
-    log("order not validated via whatsapp yet, skipping automation", orderId);
+  // For new_order trigger, only run if the order is routed to WhatsApp
+  // (gating trigger sets confirmation_channel='whatsapp' when product has whatsapp_confirmation_enabled=true)
+  if (triggerType === "new_order" && order.confirmation_channel !== "whatsapp") {
+    log("order not routed to whatsapp channel, skipping automation", orderId, order.confirmation_channel);
     return { started: 0 };
   }
 
