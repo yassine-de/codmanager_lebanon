@@ -383,7 +383,7 @@ async function executeFlow(args: {
           finished_at: new Date().toISOString(),
         })
         .eq("id", runId);
-      await admin.rpc("noop").catch(() => {});
+      
       return;
     }
   }
