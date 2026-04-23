@@ -678,6 +678,7 @@ export default function WhatsappInbox() {
                       </>
                     )}
                   </div>
+                  </div>
                 </div>
 
                 {/* Quick actions — icon-only on small, full on lg */}
