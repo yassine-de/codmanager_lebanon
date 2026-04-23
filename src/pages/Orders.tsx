@@ -907,9 +907,9 @@ export default function Orders() {
 {isCol('confirmationStatus') && <td className="py-2.5 px-4">{(() => {
                     const isWhatsapp = (order.confirmationChannel || 'agent') === 'whatsapp';
                     const wts = order.whatsappStatus;
-                    // Show WTS sub-status while order is still 'new' on the WhatsApp channel
-                    if (isWhatsapp && order.confirmationStatus === 'new' && wts) {
-                      const cfg = whatsappStatusConfig[wts] || { label: `WTS · ${wts}`, cls: 'bg-muted text-muted-foreground border-border' };
+                    // Show WTS sub-status while order is in WhatsApp pipeline (new_wts)
+                    if (isWhatsapp && order.confirmationStatus === 'new_wts' && wts) {
+                      const cfg = whatsappStatusConfig[wts] || { label: `New WTS · ${wts}`, cls: 'bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)] border-[hsl(155,50%,42%)]/20' };
                       return <StatusBadge label={cfg.label} cls={cfg.cls} />;
                     }
                     return <StatusBadge {...confirmationConfig[order.confirmationStatus]} attemptCount={order.confirmationStatus === 'no_answer' ? order.attemptCount : undefined} />;
