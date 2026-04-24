@@ -3,7 +3,7 @@
 // POST: incoming messages / button replies / status updates.
 // Foundation of the WhatsApp automation system: stores messages, links them to
 // conversations and orders, and triggers CRM logic for button actions.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -397,17 +397,22 @@ async function handleIncoming(value: any) {
       // Trigger when:
       //  - this is a free-text message (not a button outcome), AND
       //  - either no automation run was resumed, OR the order still needs
-      //    info (e.g. incomplete delivery address) — meaning the customer's
-      //    reply went into a now-finished automation step but no further
-      //    automation node will reply, so the AI must take over.
+      //    info (incomplete address) OR is not yet confirmed — meaning the
+      //    customer's reply went into a now-finished automation step but no
+      //    further automation node will reply, so the AI must take over.
+      // This also covers orders that were auto-switched to the agent queue
+      // (status=new, channel=agent) — the AI keeps replying in parallel and
+      // can still auto-confirm if the customer eventually provides the info.
       const addressIncomplete =
         !!order && (!order.customer_address || String(order.customer_address).trim().length < 10);
+      const orderNotConfirmed =
+        !!order && order.confirmation_status !== "confirmed" && order.confirmation_status !== "canceled";
       const aiDisabledForConv = conv?.ai_enabled === false;
       const shouldContinueWithAI =
         m.type === "text" &&
         !outcome &&
         !aiDisabledForConv &&
-        (!resumedRun || addressIncomplete);
+        (!resumedRun || addressIncomplete || orderNotConfirmed);
 
       if (aiDisabledForConv) {
         log("ai-continue: disabled for conversation", conv?.id);
