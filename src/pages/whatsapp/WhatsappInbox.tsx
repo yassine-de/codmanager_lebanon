@@ -57,6 +57,7 @@ type Conv = {
   status: string;
   last_message_at: string | null;
   last_reply_at: string | null;
+  last_read_at: string | null;
   updated_at: string;
   ai_enabled?: boolean;
 };
