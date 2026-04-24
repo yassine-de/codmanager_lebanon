@@ -1660,6 +1660,7 @@ export type Database = {
       }
       whatsapp_conversations: {
         Row: {
+          ai_enabled: boolean
           created_at: string
           customer_name: string | null
           customer_phone: string
@@ -1672,6 +1673,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_enabled?: boolean
           created_at?: string
           customer_name?: string | null
           customer_phone: string
@@ -1684,6 +1686,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_enabled?: boolean
           created_at?: string
           customer_name?: string | null
           customer_phone?: string
