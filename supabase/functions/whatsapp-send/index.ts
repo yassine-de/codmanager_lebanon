@@ -105,8 +105,10 @@ Deno.serve(async (req) => {
       const { data: c } = await admin.from("whatsapp_conversations").select("*").eq("order_id", body.order_id).maybeSingle();
       conv = c;
 
-      // If no conversation yet for this order, reuse the latest one for this phone
-      // (across normalized variants) so a repeat customer keeps a single thread.
+      // If no conversation yet for this order, look for a prior conversation from
+      // this phone — but ONLY reuse it if its linked order is for the SAME product.
+      // Different product on the same phone → start a fresh thread so the AI
+      // doesn't mix products in the same conversation.
       if (!conv && order.customer_phone) {
         const digits = order.customer_phone.replace(/\D/g, "");
         const withPlus = digits ? `+${digits}` : "";
@@ -114,24 +116,49 @@ Deno.serve(async (req) => {
         const variants = Array.from(
           new Set([order.customer_phone, digits, withPlus, localZero].filter(Boolean)),
         );
-        const { data: byPhone } = await admin
+        const { data: candidates } = await admin
           .from("whatsapp_conversations")
           .select("*")
           .in("customer_phone", variants)
           .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (byPhone) {
-          await admin
-            .from("whatsapp_conversations")
-            .update({
-              order_id: order.order_id,
-              customer_name: order.customer_name ?? byPhone.customer_name,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", byPhone.id);
-          conv = { ...byPhone, order_id: order.order_id };
+          .limit(10);
+
+        const list = candidates ?? [];
+        for (const cand of list) {
+          if (!cand.order_id) {
+            // Unlinked thread — safe to claim for this order.
+            await admin
+              .from("whatsapp_conversations")
+              .update({
+                order_id: order.order_id,
+                customer_name: order.customer_name ?? cand.customer_name,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", cand.id);
+            conv = { ...cand, order_id: order.order_id };
+            break;
+          }
+          const { data: prevOrder } = await admin
+            .from("orders")
+            .select("product_name")
+            .eq("order_id", cand.order_id)
+            .maybeSingle();
+          if (prevOrder?.product_name && order.product_name &&
+              prevOrder.product_name.trim().toLowerCase() === order.product_name.trim().toLowerCase()) {
+            await admin
+              .from("whatsapp_conversations")
+              .update({
+                order_id: order.order_id,
+                customer_name: order.customer_name ?? cand.customer_name,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", cand.id);
+            conv = { ...cand, order_id: order.order_id };
+            break;
+          }
         }
+        // If no same-product match was found, conv stays null → a fresh
+        // conversation will be created below.
       }
     } else {
       throw new Error("conversation_id or order_id required");
