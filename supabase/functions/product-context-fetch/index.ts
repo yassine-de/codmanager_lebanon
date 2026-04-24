@@ -112,9 +112,20 @@ Deno.serve(async (req) => {
 
     const fcJson: any = await fcRes.json().catch(() => ({}));
     if (!fcRes.ok) {
-      errLog("firecrawl failed", fcRes.status, fcJson);
+      errLog("firecrawl failed", fcRes.status, {
+        details: fcJson?.error || null,
+        keyFingerprint: redactSecret(FIRECRAWL_API_KEY),
+        keyLength: FIRECRAWL_API_KEY.length,
+      });
+
+      const isUnauthorized = fcRes.status === 401;
       return new Response(
-        JSON.stringify({ error: `firecrawl error ${fcRes.status}`, details: fcJson?.error || null }),
+        JSON.stringify({
+          error: isUnauthorized ? "Firecrawl authentication failed" : `firecrawl error ${fcRes.status}`,
+          details: isUnauthorized
+            ? "The Firecrawl API key configured in Lovable Cloud is invalid or expired. Update FIRECRAWL_API_KEY and redeploy the function."
+            : fcJson?.error || null,
+        }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
