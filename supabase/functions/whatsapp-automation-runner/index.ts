@@ -412,9 +412,15 @@ async function executeFlow(args: {
         const orderCtx = order
           ? `\n\nOrder context:\n- Order ID: ${order.order_id}\n- Customer: ${order.customer_name}\n- Product: ${order.product_name}\n- Quantity: ${order.quantity}\n- Total: ${order.total_amount} PKR\n- City: ${order.customer_city}\n- Address: ${order.customer_address ?? "(not provided)"}`
           : "";
+        // Address-completion rule: if the address is missing or clearly incomplete
+        // (no street / house / area), the AI MUST keep the conversation going and
+        // politely ask for the missing pieces before moving on.
+        const addressRule = order && (!order.customer_address || String(order.customer_address).trim().length < 10)
+          ? `\n\nIMPORTANT: The customer's delivery address is missing or incomplete. Do NOT close the conversation. Politely ask for the full address (house/flat number, street, area/landmark, and city) in the customer's language. Keep asking in follow-ups until you receive a complete, deliverable address.`
+          : "";
         const baseSys = customPrompt || aiSettings.system_prompt || "You are a helpful WhatsApp sales assistant.";
         const sysPrompt =
-          `${baseSys}\n\nBrand tone: ${aiSettings.brand_tone || "friendly"}.\nLanguage rules: ${aiSettings.language_rules || ""}\n\nKeep replies short (about ${aiSettings.response_lines ?? 3} line(s)). Do not invent facts.${orderCtx}`;
+          `${baseSys}\n\nBrand tone: ${aiSettings.brand_tone || "friendly"}.\nLanguage rules: ${aiSettings.language_rules || ""}\n\nKeep replies short (about ${aiSettings.response_lines ?? 3} line(s)). Do not invent facts.${orderCtx}${addressRule}`;
 
         // Normalize model → OpenAI compatible
         const rawModel = aiSettings.model || "gpt-4o-mini";
