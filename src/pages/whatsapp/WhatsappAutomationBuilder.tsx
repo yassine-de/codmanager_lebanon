@@ -821,24 +821,7 @@ function NodeInspector({
         )}
 
         {node.type === "ai_step" && (
-          <>
-            <div className="space-y-2">
-              <Label className="text-xs">AI Instructions</Label>
-              <Textarea
-                rows={5}
-                value={node.data.prompt ?? ""}
-                onChange={(e) => onChange({ prompt: e.target.value })}
-                placeholder="What should the AI do here?"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Max tokens</Label>
-              <Input
-                type="number" value={node.data.max_tokens ?? 200}
-                onChange={(e) => onChange({ max_tokens: Number(e.target.value) })}
-              />
-            </div>
-          </>
+          <AiStepInspector node={node} onChange={onChange} />
         )}
 
         {node.type === "condition" && (
