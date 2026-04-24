@@ -30,6 +30,8 @@ import {
   Reply,
   ExternalLink,
   Phone,
+  Bot,
+  BotOff,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -56,6 +58,7 @@ type Conv = {
   last_message_at: string | null;
   last_reply_at: string | null;
   updated_at: string;
+  ai_enabled?: boolean;
 };
 
 type Msg = {
@@ -327,6 +330,22 @@ export default function WhatsappInbox() {
         ? "Order canceled"
         : "Template resent",
     );
+  };
+
+  const aiEnabled = conv?.ai_enabled !== false;
+  const toggleAi = async () => {
+    if (!selected || !conv) return;
+    const next = !aiEnabled;
+    const { error } = await supabase
+      .from("whatsapp_conversations")
+      .update({ ai_enabled: next })
+      .eq("id", selected);
+    if (error) {
+      toast.error(error.message || "Failed to update AI status");
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["wts-convos"] });
+    toast.success(next ? "AI auto-reply enabled" : "AI stopped for this conversation");
   };
 
   const sendReply = async () => {
@@ -735,6 +754,24 @@ export default function WhatsappInbox() {
                   </div>
                   </div>
                 </div>
+
+                {/* AI auto-reply toggle */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleAi}
+                  className={cn(
+                    "h-8 shrink-0 gap-1.5 rounded-full px-3 text-xs font-medium",
+                    aiEnabled
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:text-emerald-400"
+                      : "border-rose-500/30 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 hover:text-rose-700 dark:text-rose-400",
+                  )}
+                  title={aiEnabled ? "AI is replying — click to stop" : "AI is stopped — click to enable"}
+                >
+                  {aiEnabled ? <Bot className="h-3.5 w-3.5" /> : <BotOff className="h-3.5 w-3.5" />}
+                  <span className="hidden md:inline">{aiEnabled ? "AI On" : "AI Off"}</span>
+                </Button>
 
                 {/* Status indicators — display-only, not actionable */}
                 {order && (
