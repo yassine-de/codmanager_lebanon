@@ -645,6 +645,7 @@ Rules:
     city: matchedCity,
     addr_len: parsed.full_address.length,
   });
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
