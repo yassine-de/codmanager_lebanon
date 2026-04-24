@@ -157,13 +157,78 @@ async function applyOutcome(
     updates.note = `${order.note ? order.note + "\n" : ""}Canceled in WhatsApp`;
   }
 
+  // Snapshot fields we care about BEFORE update so we can write history deltas
+  const trackedFields = [
+    "confirmation_status",
+    "delivery_status",
+    "shipping_status",
+    "agent_id",
+    "note",
+  ];
+  const before: Record<string, any> = {};
+  for (const f of trackedFields) before[f] = order[f] ?? null;
+
   const { error } = await admin
     .from("orders")
     .update(updates)
     .eq("order_id", order.order_id);
-  if (error) errLog("order update failed", order.order_id, error);
-  else log("order updated", order.order_id, "→", outcome);
+  if (error) {
+    errLog("order update failed", order.order_id, error);
+    return;
+  }
+  log("order updated", order.order_id, "→", outcome);
+
+  await logOrderHistory({
+    orderId: order.order_id,
+    actionType: outcome === "confirmed" ? "whatsapp_confirm" : (outcome === "canceled" ? "whatsapp_cancel" : "whatsapp_more_info"),
+    role: "whatsapp",
+    before,
+    after: updates,
+    fields: trackedFields,
+  });
 }
+
+// ---------------------------------------------------------------------------
+// Order history helper — write deltas to order_history using a sentinel UUID
+// for non-user actors (whatsapp / ai / system).
+// ---------------------------------------------------------------------------
+const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000";
+
+async function logOrderHistory(args: {
+  orderId: string;
+  actionType: string;          // e.g. "ai_confirm", "whatsapp_confirm"
+  role: "ai" | "whatsapp" | "system";
+  before: Record<string, any>;
+  after: Record<string, any>;
+  fields: string[];
+}) {
+  try {
+    const groupId = crypto.randomUUID();
+    const rows: any[] = [];
+    for (const f of args.fields) {
+      if (!(f in args.after)) continue;
+      const oldV = args.before[f];
+      const newV = args.after[f];
+      if (String(oldV ?? "") === String(newV ?? "")) continue;
+      rows.push({
+        order_id: args.orderId,
+        changed_by: SYSTEM_USER_ID,
+        changed_by_role: args.role,
+        action_type: args.actionType,
+        field_changed: f,
+        old_value: oldV != null ? String(oldV) : null,
+        new_value: newV != null ? String(newV) : null,
+        group_id: groupId,
+      });
+    }
+    if (rows.length === 0) return;
+    const { error } = await admin.from("order_history").insert(rows);
+    if (error) errLog("order_history insert failed", error.message);
+  } catch (e) {
+    errLog("logOrderHistory exception", (e as Error).message);
+  }
+}
+
 
 async function handleIncoming(value: any) {
   const messages: any[] = value?.messages ?? [];
@@ -645,6 +710,17 @@ Rules:
     updates.shipping_status = "Booked";
   }
 
+  // Snapshot before update for history
+  const trackedFields = [
+    "confirmation_status",
+    "customer_address",
+    "customer_city",
+    "delivery_status",
+    "shipping_status",
+  ];
+  const before: Record<string, any> = {};
+  for (const f of trackedFields) before[f] = order[f] ?? null;
+
   const { error: updErr } = await admin
     .from("orders")
     .update(updates)
@@ -658,6 +734,15 @@ Rules:
     .from("whatsapp_conversations")
     .update({ status: "confirmed", outcome: "confirmed", updated_at: new Date().toISOString() })
     .eq("id", conv.id);
+
+  await logOrderHistory({
+    orderId: order.order_id,
+    actionType: "ai_confirm",
+    role: "ai",
+    before,
+    after: updates,
+    fields: trackedFields,
+  });
 
   log("address-extract: auto-confirmed", {
     order: order.order_id,

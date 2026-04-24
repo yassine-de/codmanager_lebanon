@@ -4,7 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowRightLeft, UserCheck, PlusCircle, PhoneOff, CalendarClock, XCircle, DollarSign, RotateCcw, Pencil, ChevronDown } from "lucide-react";
+import { Loader2, ArrowRightLeft, UserCheck, PlusCircle, PhoneOff, CalendarClock, XCircle, DollarSign, RotateCcw, Pencil, ChevronDown, MessageCircle, Sparkles } from "lucide-react";
 
 interface HistoryEntry {
   id: string;
@@ -61,6 +61,10 @@ function getActionIcon(actionType: string) {
     case "postpone": return CalendarClock;
     case "pricing": return DollarSign;
     case "edit": return Pencil;
+    case "ai_confirm": return Sparkles;
+    case "whatsapp_confirm":
+    case "whatsapp_cancel":
+    case "whatsapp_more_info": return MessageCircle;
     default: return PlusCircle;
   }
 }
@@ -69,17 +73,51 @@ function getActionColor(actionType: string) {
   switch (actionType) {
     case "status_change": return "text-info bg-info/10";
     case "retry": return "text-blue-500 bg-blue-500/10";
-    case "cancel": return "text-destructive bg-destructive/10";
+    case "cancel":
+    case "whatsapp_cancel": return "text-destructive bg-destructive/10";
     case "postpone": return "text-amber-500 bg-amber-500/10";
     case "pricing": return "text-emerald-500 bg-emerald-500/10";
     case "edit": return "text-warning bg-warning/10";
+    case "ai_confirm": return "text-purple-500 bg-purple-500/10";
+    case "whatsapp_confirm": return "text-emerald-500 bg-emerald-500/10";
+    case "whatsapp_more_info": return "text-blue-500 bg-blue-500/10";
     default: return "text-muted-foreground bg-muted";
+  }
+}
+
+function getActor(group: GroupedEntry): string {
+  switch (group.changed_by_role) {
+    case "admin": return "Admin";
+    case "agent": return "Agent";
+    case "ai": return "AI Assistant";
+    case "whatsapp": return "WhatsApp";
+    case "system": return "System";
+    default: return group.changed_by_role || "User";
   }
 }
 
 function buildReadableMessage(group: GroupedEntry): string {
   const { action_type, entries, attempt_number } = group;
-  const actor = group.changed_by_role === "admin" ? "Admin" : "Agent";
+  const actor = getActor(group);
+
+  if (action_type === "ai_confirm") {
+    const addr = entries.find(e => e.field_changed === "customer_address");
+    const city = entries.find(e => e.field_changed === "customer_city");
+    if (addr || city) {
+      return `AI captured customer address & auto-confirmed order`;
+    }
+    return `AI auto-confirmed order`;
+  }
+
+  if (action_type === "whatsapp_confirm") {
+    return `Customer confirmed order via WhatsApp button`;
+  }
+  if (action_type === "whatsapp_cancel") {
+    return `Customer canceled order via WhatsApp button`;
+  }
+  if (action_type === "whatsapp_more_info") {
+    return `Customer requested more info via WhatsApp`;
+  }
 
   if (action_type === "retry") {
     const statusEntry = entries.find(e => e.field_changed === "confirmation_status");
@@ -151,20 +189,31 @@ export default function OrderHistoryModal({ open, onOpenChange, orderId, custome
     }
 
     const rows = data || [];
-    // Resolve names
-    const userIds = [...new Set(rows.map(h => h.changed_by))];
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("user_id, name")
-      .in("user_id", userIds);
+    const SYSTEM_ID = "00000000-0000-0000-0000-000000000000";
+    // Resolve names — skip sentinel system UUID
+    const userIds = [...new Set(rows.map(h => h.changed_by).filter(id => id && id !== SYSTEM_ID))];
+    const { data: profiles } = userIds.length > 0
+      ? await supabase.from("profiles").select("user_id, name").in("user_id", userIds)
+      : { data: [] as any[] };
     const nameMap = new Map((profiles || []).map(p => [p.user_id, p.name]));
+
+    const labelForSystemRole = (role: string) => {
+      switch (role) {
+        case "ai": return "AI Assistant";
+        case "whatsapp": return "WhatsApp";
+        case "system": return "System";
+        default: return "System";
+      }
+    };
 
     const entries: HistoryEntry[] = rows.map(h => ({
       ...h,
       action_type: (h as any).action_type || "edit",
       attempt_number: (h as any).attempt_number || null,
       group_id: (h as any).group_id || h.id,
-      agent_name: nameMap.get(h.changed_by) || "Unknown",
+      agent_name: h.changed_by === SYSTEM_ID
+        ? labelForSystemRole(h.changed_by_role)
+        : (nameMap.get(h.changed_by) || "Unknown"),
     }));
 
     return { entries, hasMore: rows.length === PAGE_SIZE };
