@@ -363,6 +363,139 @@ async function handleIncoming(value: any) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// AI continuation: when a customer replies in free text and no automation run
+// is paused, generate an AI follow-up reply using the same logic as the
+// automation runner's `ai_step` so the conversation keeps flowing
+// (e.g. for collecting missing address details).
+// ---------------------------------------------------------------------------
+async function aiContinueReply(args: {
+  conv: any;
+  order: any | null;
+  customerText: string;
+}) {
+  const { conv, order } = args;
+  if (!conv?.id) return;
+
+  const { data: aiSettings } = await admin
+    .from("whatsapp_ai_settings")
+    .select("*")
+    .eq("singleton", true)
+    .maybeSingle();
+  if (!aiSettings) {
+    log("ai-continue: settings missing");
+    return;
+  }
+
+  const { data: keyRow } = await admin
+    .from("app_settings")
+    .select("value")
+    .eq("key", "openai_api_key")
+    .maybeSingle();
+  const apiKey = (keyRow?.value as string)?.trim() || Deno.env.get("OPENAI_API_KEY") || "";
+  if (!apiKey) {
+    log("ai-continue: no api key configured");
+    return;
+  }
+
+  const { data: msgs } = await admin
+    .from("whatsapp_messages")
+    .select("direction,body,message_type,created_at")
+    .eq("conversation_id", conv.id)
+    .order("created_at", { ascending: false })
+    .limit(15);
+  const history = (msgs ?? []).reverse().map((m: any) => ({
+    role: m.direction === "in" ? "user" : "assistant",
+    content: m.body || `[${m.message_type}]`,
+  }));
+
+  const orderCtx = order
+    ? `\n\nOrder context:\n- Order ID: ${order.order_id}\n- Customer: ${order.customer_name}\n- Product: ${order.product_name}\n- Quantity: ${order.quantity}\n- Total: ${order.total_amount} PKR\n- City: ${order.customer_city}\n- Address: ${order.customer_address ?? "(not provided)"}`
+    : "";
+  const addressRule = order && (!order.customer_address || String(order.customer_address).trim().length < 10)
+    ? `\n\nIMPORTANT: The customer's delivery address is missing or incomplete. Do NOT close the conversation. Politely ask for the full address (house/flat number, street, area/landmark, and city) in the customer's language. Keep asking in follow-ups until you receive a complete, deliverable address.`
+    : "";
+  const baseSys = aiSettings.system_prompt || "You are a helpful WhatsApp sales assistant.";
+  const sysPrompt =
+    `${baseSys}\n\nBrand tone: ${aiSettings.brand_tone || "friendly"}.\nLanguage rules: ${aiSettings.language_rules || ""}\n\nKeep replies short (about ${aiSettings.response_lines ?? 3} line(s)). Do not invent facts.${orderCtx}${addressRule}`;
+
+  const rawModel = aiSettings.model || "gpt-4o-mini";
+  const model = rawModel.startsWith("openai/")
+    ? rawModel.replace("openai/", "")
+    : rawModel.includes("gemini")
+    ? "gpt-4o-mini"
+    : rawModel;
+
+  const aiResp = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "system", content: sysPrompt }, ...history],
+      temperature: aiSettings.temperature ?? 0.7,
+      max_tokens: aiSettings.max_tokens ?? 400,
+    }),
+  });
+  if (!aiResp.ok) {
+    const t = await aiResp.text();
+    errLog("ai-continue openai err", aiResp.status, t.slice(0, 200));
+    return;
+  }
+  const aiJson = await aiResp.json();
+  const reply: string = aiJson.choices?.[0]?.message?.content?.trim() || "";
+  if (!reply) {
+    log("ai-continue: empty reply");
+    return;
+  }
+
+  const settings = await getSettings();
+  if (!settings) return;
+  const accessToken = (settings as any).access_token || Deno.env.get("WHATSAPP_META_ACCESS_TOKEN");
+  if (!accessToken) {
+    errLog("ai-continue: no whatsapp access token");
+    return;
+  }
+  const to = conv.customer_phone;
+  const payload = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to,
+    type: "text",
+    text: { body: reply },
+  };
+  const url = `${settings.api_base_url}/${settings.phone_number_id}/messages`;
+  const sendResp = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const sendJson = await sendResp.json();
+  const ok = sendResp.ok;
+  const metaMsgId = ok ? sendJson?.messages?.[0]?.id : null;
+
+  await admin.from("whatsapp_messages").insert({
+    conversation_id: conv.id,
+    order_id: order?.order_id ?? null,
+    direction: "out",
+    message_type: "text",
+    body: reply,
+    payload: { ...payload, _ai_continuation: true },
+    meta_message_id: metaMsgId,
+    status: ok ? "sent" : "failed",
+    error_message: ok ? null : JSON.stringify(sendJson).slice(0, 500),
+  });
+
+  if (ok) {
+    await admin
+      .from("whatsapp_conversations")
+      .update({ status: "ai_active", updated_at: new Date().toISOString() })
+      .eq("id", conv.id);
+    log("ai-continue: replied", { conv: conv.id, len: reply.length });
+  } else {
+    errLog("ai-continue: send failed", sendJson);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
