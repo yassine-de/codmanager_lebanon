@@ -622,13 +622,6 @@ async function aiContinueReply(args: {
     return;
   }
 
-  const settings = await getSettings();
-  if (!settings) return;
-  const accessToken = (settings as any).access_token || Deno.env.get("WHATSAPP_META_ACCESS_TOKEN");
-  if (!accessToken) {
-    errLog("ai-continue: no whatsapp access token");
-    return;
-  }
   const to = conv.customer_phone;
   const payload = {
     messaging_product: "whatsapp",
