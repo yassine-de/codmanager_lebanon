@@ -1,5 +1,5 @@
 // Test connection / send a free-form text test message via Meta Cloud API.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?no-check";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
