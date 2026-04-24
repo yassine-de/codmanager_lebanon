@@ -57,6 +57,7 @@ type Conv = {
   status: string;
   last_message_at: string | null;
   last_reply_at: string | null;
+  last_read_at: string | null;
   updated_at: string;
   ai_enabled?: boolean;
 };
@@ -194,8 +195,9 @@ export default function WhatsappInbox() {
   });
 
   // Per-conversation unread counts (WhatsApp-style green badge).
-  // Counts inbound messages newer than the conversation's `last_message_at`,
-  // which we bump to "now" each time the user opens the thread.
+  // Counts inbound messages newer than `last_read_at` (the moment the user
+  // opened the thread). We deliberately don't use `last_message_at` because
+  // outbound sends bump it too, which would silently clear the badge.
   const convoIdsKey = convos.map((c) => c.id).join(",");
   const { data: unreadMap = {} } = useQuery<Record<string, number>>({
     queryKey: ["wts-unread-counts", convoIdsKey],
@@ -210,12 +212,12 @@ export default function WhatsappInbox() {
         .order("created_at", { ascending: false })
         .limit(2000);
       if (error) throw error;
-      const lastSeen = new Map<string, number>(
-        convos.map((c) => [c.id, c.last_message_at ? new Date(c.last_message_at).getTime() : 0]),
+      const lastRead = new Map<string, number>(
+        convos.map((c) => [c.id, c.last_read_at ? new Date(c.last_read_at).getTime() : 0]),
       );
       const map: Record<string, number> = {};
       for (const row of (data ?? []) as { conversation_id: string; created_at: string }[]) {
-        const seen = lastSeen.get(row.conversation_id) ?? 0;
+        const seen = lastRead.get(row.conversation_id) ?? 0;
         if (new Date(row.created_at).getTime() > seen) {
           map[row.conversation_id] = (map[row.conversation_id] ?? 0) + 1;
         }
@@ -299,12 +301,14 @@ export default function WhatsappInbox() {
     }
   }, [messages.length, selected]);
 
-  // Mark conversation read on open (clears the unread badge by setting last_message_at)
+  // Mark conversation read on open. We update `last_read_at` only — touching
+  // `last_message_at` would re-sort the list and jump this thread to the top
+  // (because of the `update_updated_at_column` trigger).
   useEffect(() => {
     if (!selected) return;
     void supabase
       .from("whatsapp_conversations")
-      .update({ last_message_at: new Date().toISOString() })
+      .update({ last_read_at: new Date().toISOString() })
       .eq("id", selected)
       .then(() => {
         qc.invalidateQueries({ queryKey: ["wts-unread-counts"] });
@@ -325,9 +329,13 @@ export default function WhatsappInbox() {
     if (filter === "unread") {
       list = list.filter((c) => (unreadMap[c.id] ?? 0) > 0);
     }
+    // Sort by most recent activity (last message timestamp), WhatsApp-style.
+    // We intentionally avoid `updated_at` here because a DB trigger bumps it
+    // every time the row changes (including when we mark the thread as read),
+    // which would incorrectly jump the opened conversation to the top.
     list.sort((a, b) => {
-      const ta = new Date(a.updated_at).getTime();
-      const tb = new Date(b.updated_at).getTime();
+      const ta = new Date(a.last_message_at || a.updated_at).getTime();
+      const tb = new Date(b.last_message_at || b.updated_at).getTime();
       return sortDesc ? tb - ta : ta - tb;
     });
     return list;
