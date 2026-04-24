@@ -710,6 +710,17 @@ Rules:
     updates.shipping_status = "Booked";
   }
 
+  // Snapshot before update for history
+  const trackedFields = [
+    "confirmation_status",
+    "customer_address",
+    "customer_city",
+    "delivery_status",
+    "shipping_status",
+  ];
+  const before: Record<string, any> = {};
+  for (const f of trackedFields) before[f] = order[f] ?? null;
+
   const { error: updErr } = await admin
     .from("orders")
     .update(updates)
@@ -723,6 +734,15 @@ Rules:
     .from("whatsapp_conversations")
     .update({ status: "confirmed", outcome: "confirmed", updated_at: new Date().toISOString() })
     .eq("id", conv.id);
+
+  await logOrderHistory({
+    orderId: order.order_id,
+    actionType: "ai_confirm",
+    role: "ai",
+    before,
+    after: updates,
+    fields: trackedFields,
+  });
 
   log("address-extract: auto-confirmed", {
     order: order.order_id,
