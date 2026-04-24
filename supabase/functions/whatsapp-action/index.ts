@@ -83,14 +83,64 @@ Deno.serve(async (req) => {
       };
       convStatus = "canceled";
     } else if (action === "resend") {
-      // Re-trigger send via the send function path
+      const templateLookup = conversation_id
+        ? await admin
+            .from("whatsapp_messages")
+            .select("payload")
+            .eq("conversation_id", conversation_id)
+            .eq("direction", "out")
+            .eq("message_type", "template")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : await admin
+            .from("whatsapp_messages")
+            .select("payload")
+            .eq("order_id", order_id)
+            .eq("direction", "out")
+            .eq("message_type", "template")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+      let templateId = templateLookup.data?.payload?._template_id ?? null;
+      if (!templateId) {
+        const templateName = templateLookup.data?.payload?.template?.name ?? templateLookup.data?.payload?._template_name ?? null;
+        if (templateName) {
+          const { data: byMeta } = await admin
+            .from("whatsapp_templates")
+            .select("id")
+            .eq("meta_template_name", templateName)
+            .limit(1)
+            .maybeSingle();
+          if (byMeta?.id) {
+            templateId = byMeta.id;
+          } else {
+            const { data: byName } = await admin
+              .from("whatsapp_templates")
+              .select("id")
+              .eq("name", templateName)
+              .limit(1)
+              .maybeSingle();
+            templateId = byName?.id ?? null;
+          }
+        }
+      }
+
+      // Re-trigger send via the send function path.
+      // If this conversation previously used a template, resend the same template
+      // so Meta-approved buttons remain attached.
       const sendResp = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-send`, {
         method: "POST",
         headers: {
           Authorization: authHeader,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ order_id }),
+        body: JSON.stringify(
+          templateId
+            ? { mode: "template", template_id: templateId, conversation_id: conversation_id ?? undefined, order_id }
+            : { order_id, conversation_id: conversation_id ?? undefined },
+        ),
       });
       const sendJson = await sendResp.json();
       return new Response(JSON.stringify(sendJson), {
