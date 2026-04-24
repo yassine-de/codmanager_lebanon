@@ -323,11 +323,7 @@ export default function WhatsappInbox() {
       );
     }
     if (filter === "unread") {
-      list = list.filter(
-        (c) =>
-          c.last_reply_at &&
-          (!c.last_message_at || new Date(c.last_reply_at) > new Date(c.last_message_at)),
-      );
+      list = list.filter((c) => (unreadMap[c.id] ?? 0) > 0);
     }
     list.sort((a, b) => {
       const ta = new Date(a.updated_at).getTime();
@@ -335,7 +331,7 @@ export default function WhatsappInbox() {
       return sortDesc ? tb - ta : ta - tb;
     });
     return list;
-  }, [convos, search, filter, sortDesc]);
+  }, [convos, search, filter, sortDesc, unreadMap]);
 
   const lastInboundAt = useMemo(() => {
     if (!conv?.last_reply_at) return null;
