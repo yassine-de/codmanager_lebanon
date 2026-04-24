@@ -189,20 +189,31 @@ export default function OrderHistoryModal({ open, onOpenChange, orderId, custome
     }
 
     const rows = data || [];
-    // Resolve names
-    const userIds = [...new Set(rows.map(h => h.changed_by))];
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("user_id, name")
-      .in("user_id", userIds);
+    const SYSTEM_ID = "00000000-0000-0000-0000-000000000000";
+    // Resolve names — skip sentinel system UUID
+    const userIds = [...new Set(rows.map(h => h.changed_by).filter(id => id && id !== SYSTEM_ID))];
+    const { data: profiles } = userIds.length > 0
+      ? await supabase.from("profiles").select("user_id, name").in("user_id", userIds)
+      : { data: [] as any[] };
     const nameMap = new Map((profiles || []).map(p => [p.user_id, p.name]));
+
+    const labelForSystemRole = (role: string) => {
+      switch (role) {
+        case "ai": return "AI Assistant";
+        case "whatsapp": return "WhatsApp";
+        case "system": return "System";
+        default: return "System";
+      }
+    };
 
     const entries: HistoryEntry[] = rows.map(h => ({
       ...h,
       action_type: (h as any).action_type || "edit",
       attempt_number: (h as any).attempt_number || null,
       group_id: (h as any).group_id || h.id,
-      agent_name: nameMap.get(h.changed_by) || "Unknown",
+      agent_name: h.changed_by === SYSTEM_ID
+        ? labelForSystemRole(h.changed_by_role)
+        : (nameMap.get(h.changed_by) || "Unknown"),
     }));
 
     return { entries, hasMore: rows.length === PAGE_SIZE };
