@@ -328,11 +328,24 @@ async function handleIncoming(value: any) {
         errLog("automation resume lookup failed", (e as Error).message);
       }
 
-      // AI fallback: if no paused run exists and this is a text message,
-      // generate a continuation reply so the AI keeps the conversation alive
-      // (e.g. to collect missing address, answer questions, etc.).
-      if (!resumedRun && m.type === "text" && !outcome) {
+      // AI continuation: keep the conversation alive after automation flows.
+      // Trigger when:
+      //  - this is a free-text message (not a button outcome), AND
+      //  - either no automation run was resumed, OR the order still needs
+      //    info (e.g. incomplete delivery address) — meaning the customer's
+      //    reply went into a now-finished automation step but no further
+      //    automation node will reply, so the AI must take over.
+      const addressIncomplete =
+        !!order && (!order.customer_address || String(order.customer_address).trim().length < 10);
+      const shouldContinueWithAI =
+        m.type === "text" &&
+        !outcome &&
+        (!resumedRun || addressIncomplete);
+
+      if (shouldContinueWithAI) {
         try {
+          // Small delay so the resumed runner (if any) finishes its DB writes first.
+          if (resumedRun) await new Promise((r) => setTimeout(r, 1500));
           await aiContinueReply({ conv, order, customerText: bodyText });
         } catch (e) {
           errLog("ai continuation failed", (e as Error).message);
