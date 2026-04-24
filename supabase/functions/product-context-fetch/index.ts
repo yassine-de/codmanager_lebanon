@@ -15,6 +15,11 @@ const MAX_CONTEXT_CHARS = 8000; // keep prompt cost reasonable
 
 const log = (...a: unknown[]) => console.log("[product-context]", ...a);
 const errLog = (...a: unknown[]) => console.error("[product-context]", ...a);
+const redactSecret = (value: string) => {
+  if (!value) return "missing";
+  if (value.length <= 8) return `${value.slice(0, 2)}…${value.slice(-2)}`;
+  return `${value.slice(0, 4)}…${value.slice(-4)}`;
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -38,11 +43,17 @@ Deno.serve(async (req) => {
 
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
     if (!FIRECRAWL_API_KEY) {
+      errLog("missing FIRECRAWL_API_KEY");
       return new Response(JSON.stringify({ error: "FIRECRAWL_API_KEY not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    log("firecrawl key detected", {
+      length: FIRECRAWL_API_KEY.length,
+      fingerprint: redactSecret(FIRECRAWL_API_KEY),
+    });
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -101,9 +112,20 @@ Deno.serve(async (req) => {
 
     const fcJson: any = await fcRes.json().catch(() => ({}));
     if (!fcRes.ok) {
-      errLog("firecrawl failed", fcRes.status, fcJson);
+      errLog("firecrawl failed", fcRes.status, {
+        details: fcJson?.error || null,
+        keyFingerprint: redactSecret(FIRECRAWL_API_KEY),
+        keyLength: FIRECRAWL_API_KEY.length,
+      });
+
+      const isUnauthorized = fcRes.status === 401;
       return new Response(
-        JSON.stringify({ error: `firecrawl error ${fcRes.status}`, details: fcJson?.error || null }),
+        JSON.stringify({
+          error: isUnauthorized ? "Firecrawl authentication failed" : `firecrawl error ${fcRes.status}`,
+          details: isUnauthorized
+            ? "The Firecrawl API key configured in Lovable Cloud is invalid or expired. Update FIRECRAWL_API_KEY and redeploy the function."
+            : fcJson?.error || null,
+        }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
