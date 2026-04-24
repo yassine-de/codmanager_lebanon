@@ -1,20 +1,22 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { pkrToUsd } from "@/lib/currency";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, ShoppingCart, CheckCircle2, Truck, Package, TrendingUp, ImageOff } from "lucide-react";
+import { ArrowLeft, ShoppingCart, CheckCircle2, Truck, Package, TrendingUp, ImageOff, Sparkles, RefreshCw, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { mockProducts, type Product } from "@/lib/products-data";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
-import { format, subDays } from "date-fns";
+import { format, subDays, formatDistanceToNow } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { authUser } = useAuth();
   const isAdmin = authUser?.role === "admin";
+  const [refreshingCtx, setRefreshingCtx] = useState(false);
 
   const isDbId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || "");
 
@@ -22,12 +24,12 @@ export default function ProductDetail() {
   const mockProduct = useMemo(() => isAdmin ? mockProducts.find(p => p.id === id) : undefined, [id, isAdmin]);
 
   // Fetch DB product
-  const { data: dbProduct } = useQuery({
+  const { data: dbProduct, refetch: refetchProduct } = useQuery({
     queryKey: ["product-detail", id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("*, variants, weight")
+        .select("*, variants, weight, ai_context, ai_context_scraped_at")
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
@@ -35,6 +37,28 @@ export default function ProductDetail() {
     },
     enabled: isDbId && !mockProduct,
   });
+
+  const handleRefreshAiContext = async () => {
+    if (!dbProduct?.id) return;
+    if (!dbProduct.product_url) {
+      toast.error("Product has no Store URL — add one first.");
+      return;
+    }
+    setRefreshingCtx(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("product-context-fetch", {
+        body: { product_id: dbProduct.id, force: true },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success("AI context refreshed from store page");
+      await refetchProduct();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to scrape store page");
+    } finally {
+      setRefreshingCtx(false);
+    }
+  };
 
   // Fetch seller profile (admin needs actual seller name)
   const { data: sellerProfile } = useQuery({
@@ -333,6 +357,61 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* AI Context Card (admin only) */}
+      {isAdmin && isDbId && (
+        <div className="bg-card rounded-lg border p-5 animate-slide-up" style={{ animationDelay: "120ms" }}>
+          <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles className="h-4 w-4 text-primary shrink-0" />
+              <h3 className="text-sm font-semibold">AI Product Context</h3>
+              {dbProduct?.ai_context_scraped_at && (
+                <span className="text-[11px] text-muted-foreground truncate">
+                  · updated {formatDistanceToNow(new Date(dbProduct.ai_context_scraped_at), { addSuffix: true })}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {dbProduct?.product_url && (
+                <a
+                  href={dbProduct.product_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Store <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRefreshAiContext}
+                disabled={refreshingCtx || !dbProduct?.product_url}
+                className="h-8"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshingCtx ? "animate-spin" : ""}`} />
+                {refreshingCtx ? "Scraping..." : dbProduct?.ai_context ? "Refresh" : "Scrape Store Page"}
+              </Button>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground mb-3">
+            The WhatsApp AI assistant uses this content (scraped from the Store URL) to answer customer questions about the product. Cached for 7 days.
+          </p>
+          {!dbProduct?.product_url ? (
+            <div className="text-xs text-muted-foreground bg-muted/40 border border-dashed rounded-md p-4 text-center">
+              No Store URL set on this product. Add one in product settings to enable AI context.
+            </div>
+          ) : dbProduct?.ai_context ? (
+            <div className="text-xs whitespace-pre-wrap font-mono bg-muted/40 border rounded-md p-3 max-h-72 overflow-auto leading-relaxed">
+              {dbProduct.ai_context}
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground bg-muted/40 border border-dashed rounded-md p-4 text-center">
+              No AI context yet. Click "Scrape Store Page" to fetch product details.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Daily Activity Chart */}
       <div className="bg-card rounded-lg border p-5 animate-slide-up" style={{ animationDelay: "150ms" }}>

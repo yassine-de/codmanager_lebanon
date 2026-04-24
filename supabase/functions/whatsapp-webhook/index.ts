@@ -541,17 +541,40 @@ async function aiContinueReply(args: {
     content: m.body || `[${m.message_type}]`,
   }));
 
-  // Look up the product (for image_url) linked to this order's product_name
+  // Look up the product (for image_url + ai_context) linked to this order's product_name
   let product: any = null;
   if (order?.product_name) {
     const { data: p } = await admin
       .from("products")
-      .select("id,name,image_url,price")
+      .select("id,name,image_url,price,product_url,ai_context,ai_context_scraped_at")
       .ilike("name", order.product_name.trim())
       .maybeSingle();
     product = p;
   }
   const hasProductImage = !!(product?.image_url && /^https?:\/\//i.test(product.image_url));
+
+  // Lazy-scrape the product page if we have a product_url but no fresh ai_context.
+  // Cached for 7 days inside product-context-fetch. Non-blocking on failure.
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const ctxAge = product?.ai_context_scraped_at
+    ? Date.now() - new Date(product.ai_context_scraped_at).getTime()
+    : Infinity;
+  const ctxStale = !product?.ai_context || ctxAge > SEVEN_DAYS_MS;
+  if (product?.id && product?.product_url && /^https?:\/\//i.test(product.product_url) && ctxStale) {
+    try {
+      const { data: ctxRes } = await admin.functions.invoke("product-context-fetch", {
+        body: { product_id: product.id },
+      });
+      if (ctxRes?.ai_context) {
+        product.ai_context = ctxRes.ai_context;
+      }
+    } catch (e) {
+      errLog("product-context-fetch invoke failed", (e as Error).message);
+    }
+  }
+  const productContext: string = product?.ai_context
+    ? `\n\nProduct details (from store page — use to answer customer questions about features, materials, sizes, colors, usage, etc. Stay accurate, do NOT invent facts not in this text):\n${product.ai_context}`
+    : "";
 
   const orderCtx = order
     ? `\n\nOrder context:\n- Order ID: ${order.order_id}\n- Customer: ${order.customer_name}\n- Product: ${order.product_name}\n- Quantity: ${order.quantity}\n- Total: ${order.total_amount} PKR\n- City: ${order.customer_city}\n- Address: ${order.customer_address ?? "(not provided)"}`
@@ -564,7 +587,7 @@ async function aiContinueReply(args: {
     : `\n\nProduct image: no official product image is available. If the customer asks for a photo, politely apologize and offer more details instead. Do NOT call \`send_product_image\`.`;
   const baseSys = aiSettings.system_prompt || "You are a helpful WhatsApp sales assistant.";
   const sysPrompt =
-    `${baseSys}\n\nBrand tone: ${aiSettings.brand_tone || "friendly"}.\nLanguage rules: ${aiSettings.language_rules || ""}\n\nKeep replies short (about ${aiSettings.response_lines ?? 3} line(s)). Do not invent facts.${orderCtx}${addressRule}${imageRule}`;
+    `${baseSys}\n\nBrand tone: ${aiSettings.brand_tone || "friendly"}.\nLanguage rules: ${aiSettings.language_rules || ""}\n\nKeep replies short (about ${aiSettings.response_lines ?? 3} line(s)). Do not invent facts.${orderCtx}${productContext}${addressRule}${imageRule}`;
 
   const rawModel = aiSettings.model || "gpt-4o-mini";
   // Always OpenAI: strip provider prefix; map gemini → gpt-4o-mini.
