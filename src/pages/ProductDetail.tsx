@@ -16,6 +16,7 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   const isAdmin = authUser?.role === "admin";
+  const [refreshingCtx, setRefreshingCtx] = useState(false);
 
   const isDbId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || "");
 
