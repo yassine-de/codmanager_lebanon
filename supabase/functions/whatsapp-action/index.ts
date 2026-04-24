@@ -107,13 +107,23 @@ Deno.serve(async (req) => {
       if (!templateId) {
         const templateName = templateLookup.data?.payload?.template?.name ?? templateLookup.data?.payload?._template_name ?? null;
         if (templateName) {
-          const { data: tpl } = await admin
+          const { data: byMeta } = await admin
             .from("whatsapp_templates")
             .select("id")
-            .or(`meta_template_name.eq.${templateName},name.eq.${templateName}`)
+            .eq("meta_template_name", templateName)
             .limit(1)
             .maybeSingle();
-          templateId = tpl?.id ?? null;
+          if (byMeta?.id) {
+            templateId = byMeta.id;
+          } else {
+            const { data: byName } = await admin
+              .from("whatsapp_templates")
+              .select("id")
+              .eq("name", templateName)
+              .limit(1)
+              .maybeSingle();
+            templateId = byName?.id ?? null;
+          }
         }
       }
 
