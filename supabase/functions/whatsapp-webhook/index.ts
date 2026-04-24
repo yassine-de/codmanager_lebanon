@@ -528,15 +528,38 @@ async function aiContinueReply(args: {
 
   const aiUrl = "https://api.openai.com/v1/chat/completions";
 
+  // Build tools list — only expose send_product_image when an image is available.
+  const tools = hasProductImage
+    ? [{
+        type: "function",
+        function: {
+          name: "send_product_image",
+          description: "Send the official product image to the customer via WhatsApp. Call this whenever the customer asks for a photo/picture/image of the product, in any language.",
+          parameters: { type: "object", properties: {}, additionalProperties: false },
+        },
+      }]
+    : undefined;
+
+  const settings = await getSettings();
+  if (!settings) return;
+  const accessToken = (settings as any).access_token || Deno.env.get("WHATSAPP_META_ACCESS_TOKEN");
+  if (!accessToken) {
+    errLog("ai-continue: no whatsapp access token");
+    return;
+  }
+
+  const aiBody: any = {
+    model,
+    messages: [{ role: "system", content: sysPrompt }, ...history],
+    temperature: aiSettings.temperature ?? 0.7,
+    max_tokens: aiSettings.max_tokens ?? 400,
+  };
+  if (tools) aiBody.tools = tools;
+
   const aiResp = await fetch(aiUrl, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "system", content: sysPrompt }, ...history],
-      temperature: aiSettings.temperature ?? 0.7,
-      max_tokens: aiSettings.max_tokens ?? 400,
-    }),
+    body: JSON.stringify(aiBody),
   });
   if (!aiResp.ok) {
     const t = await aiResp.text();
@@ -544,9 +567,58 @@ async function aiContinueReply(args: {
     return;
   }
   const aiJson = await aiResp.json();
-  const reply: string = aiJson.choices?.[0]?.message?.content?.trim() || "";
-  if (!reply) {
+  const aiMsg = aiJson.choices?.[0]?.message;
+  const toolCalls = aiMsg?.tool_calls ?? [];
+  let reply: string = aiMsg?.content?.trim() || "";
+
+  // If the AI asked to send the product image, send it first via WhatsApp media,
+  // then ask the AI for a short follow-up text.
+  let imageSent = false;
+  if (hasProductImage && toolCalls.some((c: any) => c?.function?.name === "send_product_image")) {
+    imageSent = await sendWhatsappImage({
+      to: conv.customer_phone,
+      imageUrl: product.image_url,
+      caption: order?.product_name ? `${order.product_name}` : undefined,
+      conversationId: conv.id,
+      orderId: order?.order_id ?? null,
+      settings,
+      accessToken,
+    });
+
+    if (imageSent && !reply) {
+      // Ask the model for a short natural follow-up confirming the image was sent.
+      const followResp = await fetch(aiUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: sysPrompt },
+            ...history,
+            { role: "assistant", content: "(I just sent the product photo to the customer.)" },
+            { role: "system", content: "Now write a short natural follow-up message confirming the photo was sent and inviting the customer to continue (e.g. asking if they want to confirm the order or need more info). Reply in the customer's language. 1-2 short lines max." },
+          ],
+          temperature: aiSettings.temperature ?? 0.7,
+          max_tokens: 120,
+        }),
+      });
+      if (followResp.ok) {
+        const fj = await followResp.json();
+        reply = fj.choices?.[0]?.message?.content?.trim() || "";
+      }
+    }
+  }
+
+  if (!reply && !imageSent) {
     log("ai-continue: empty reply");
+    return;
+  }
+  if (!reply && imageSent) {
+    // Nothing more to send; image already delivered.
+    await admin
+      .from("whatsapp_conversations")
+      .update({ status: "ai_active", updated_at: new Date().toISOString() })
+      .eq("id", conv.id);
     return;
   }
 
