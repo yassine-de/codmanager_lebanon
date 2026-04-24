@@ -587,7 +587,7 @@ async function aiContinueReply(args: {
     : `\n\nProduct image: no official product image is available. If the customer asks for a photo, politely apologize and offer more details instead. Do NOT call \`send_product_image\`.`;
   const baseSys = aiSettings.system_prompt || "You are a helpful WhatsApp sales assistant.";
   const sysPrompt =
-    `${baseSys}\n\nBrand tone: ${aiSettings.brand_tone || "friendly"}.\nLanguage rules: ${aiSettings.language_rules || ""}\n\nKeep replies short (about ${aiSettings.response_lines ?? 3} line(s)). Do not invent facts.${orderCtx}${addressRule}${imageRule}`;
+    `${baseSys}\n\nBrand tone: ${aiSettings.brand_tone || "friendly"}.\nLanguage rules: ${aiSettings.language_rules || ""}\n\nKeep replies short (about ${aiSettings.response_lines ?? 3} line(s)). Do not invent facts.${orderCtx}${productContext}${addressRule}${imageRule}`;
 
   const rawModel = aiSettings.model || "gpt-4o-mini";
   // Always OpenAI: strip provider prefix; map gemini → gpt-4o-mini.
