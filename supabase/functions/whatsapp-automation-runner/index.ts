@@ -120,6 +120,28 @@ async function sendTemplate(args: {
     }
   }
 
+  // Body parameters: detect {{var}} placeholders in the template body in the
+  // order they appear, and map each to a value from `vars`. Meta requires the
+  // parameter count to match the template definition exactly — otherwise it
+  // returns "(#132000) Number of parameters does not match the expected number
+  // of params".
+  const body = String(tpl.body || "");
+  const placeholders: string[] = [];
+  const re = /\{\{\s*([\w]+)\s*\}\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null) {
+    placeholders.push(m[1]);
+  }
+  if (placeholders.length > 0) {
+    components.push({
+      type: "body",
+      parameters: placeholders.map((name) => ({
+        type: "text",
+        text: String(vars[name] ?? ""),
+      })),
+    });
+  }
+
   const payload: any = {
     messaging_product: "whatsapp",
     recipient_type: "individual",
