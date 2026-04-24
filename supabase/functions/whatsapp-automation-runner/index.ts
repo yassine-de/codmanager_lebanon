@@ -220,12 +220,47 @@ async function sendText(args: {
 
 async function ensureConversation(order: any, normalizedPhone: string) {
   if (!order) return null;
-  const { data: existing } = await admin
+
+  // 1) Prefer the conversation already linked to this exact order.
+  const { data: byOrder } = await admin
     .from("whatsapp_conversations")
     .select("*")
     .eq("order_id", order.order_id)
     .maybeSingle();
-  if (existing) return existing;
+  if (byOrder) return byOrder;
+
+  // 2) Otherwise reuse the latest conversation for this phone (any phone variant).
+  //    This prevents creating a duplicate row when the same customer places a
+  //    new order — we just relink the existing thread to the new order.
+  const digits = (normalizedPhone || "").replace(/\D/g, "");
+  const withPlus = digits ? `+${digits}` : "";
+  const localZero = digits.startsWith("92") ? `0${digits.slice(2)}` : digits;
+  const phoneVariants = Array.from(
+    new Set([normalizedPhone, digits, withPlus, localZero].filter(Boolean)),
+  );
+  if (phoneVariants.length > 0) {
+    const { data: byPhone } = await admin
+      .from("whatsapp_conversations")
+      .select("*")
+      .in("customer_phone", phoneVariants)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (byPhone) {
+      // Relink to the new order so future messages/buttons resolve correctly.
+      await admin
+        .from("whatsapp_conversations")
+        .update({
+          order_id: order.order_id,
+          customer_name: order.customer_name ?? byPhone.customer_name,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", byPhone.id);
+      return { ...byPhone, order_id: order.order_id };
+    }
+  }
+
+  // 3) No existing conversation — create one.
   const { data: ins, error } = await admin
     .from("whatsapp_conversations")
     .insert({
