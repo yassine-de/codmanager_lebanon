@@ -328,11 +328,24 @@ async function handleIncoming(value: any) {
         errLog("automation resume lookup failed", (e as Error).message);
       }
 
-      // AI fallback: if no paused run exists and this is a text message,
-      // generate a continuation reply so the AI keeps the conversation alive
-      // (e.g. to collect missing address, answer questions, etc.).
-      if (!resumedRun && m.type === "text" && !outcome) {
+      // AI continuation: keep the conversation alive after automation flows.
+      // Trigger when:
+      //  - this is a free-text message (not a button outcome), AND
+      //  - either no automation run was resumed, OR the order still needs
+      //    info (e.g. incomplete delivery address) — meaning the customer's
+      //    reply went into a now-finished automation step but no further
+      //    automation node will reply, so the AI must take over.
+      const addressIncomplete =
+        !!order && (!order.customer_address || String(order.customer_address).trim().length < 10);
+      const shouldContinueWithAI =
+        m.type === "text" &&
+        !outcome &&
+        (!resumedRun || addressIncomplete);
+
+      if (shouldContinueWithAI) {
         try {
+          // Small delay so the resumed runner (if any) finishes its DB writes first.
+          if (resumedRun) await new Promise((r) => setTimeout(r, 1500));
           await aiContinueReply({ conv, order, customerText: bodyText });
         } catch (e) {
           errLog("ai continuation failed", (e as Error).message);
@@ -392,9 +405,13 @@ async function aiContinueReply(args: {
     .select("value")
     .eq("key", "openai_api_key")
     .maybeSingle();
-  const apiKey = (keyRow?.value as string)?.trim() || Deno.env.get("OPENAI_API_KEY") || "";
+  const openaiKey = (keyRow?.value as string)?.trim() || Deno.env.get("OPENAI_API_KEY") || "";
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY") || "";
+  // Prefer OpenAI when configured (faster + already wired for tools); fall back to Lovable AI Gateway.
+  const useGateway = !openaiKey && !!lovableKey;
+  const apiKey = openaiKey || lovableKey;
   if (!apiKey) {
-    log("ai-continue: no api key configured");
+    errLog("ai-continue: no AI key configured (set openai_api_key in app_settings or LOVABLE_API_KEY)");
     return;
   }
 
@@ -419,14 +436,22 @@ async function aiContinueReply(args: {
   const sysPrompt =
     `${baseSys}\n\nBrand tone: ${aiSettings.brand_tone || "friendly"}.\nLanguage rules: ${aiSettings.language_rules || ""}\n\nKeep replies short (about ${aiSettings.response_lines ?? 3} line(s)). Do not invent facts.${orderCtx}${addressRule}`;
 
-  const rawModel = aiSettings.model || "gpt-4o-mini";
-  const model = rawModel.startsWith("openai/")
+  const rawModel = aiSettings.model || "google/gemini-3-flash-preview";
+  // When using OpenAI directly, strip provider prefix; map gemini → gpt-4o-mini.
+  // When using Lovable Gateway, keep the original "provider/model" identifier.
+  const model = useGateway
+    ? (rawModel.includes("/") ? rawModel : `openai/${rawModel}`)
+    : rawModel.startsWith("openai/")
     ? rawModel.replace("openai/", "")
     : rawModel.includes("gemini")
     ? "gpt-4o-mini"
     : rawModel;
 
-  const aiResp = await fetch("https://api.openai.com/v1/chat/completions", {
+  const aiUrl = useGateway
+    ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+    : "https://api.openai.com/v1/chat/completions";
+
+  const aiResp = await fetch(aiUrl, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -504,6 +529,7 @@ async function aiContinueReply(args: {
           history,
           apiKey,
           model,
+          useGateway,
         });
       } catch (e) {
         errLog("address extraction failed", (e as Error).message);
@@ -525,8 +551,9 @@ async function tryExtractAndConfirmAddress(args: {
   history: { role: string; content: string }[];
   apiKey: string;
   model: string;
+  useGateway?: boolean;
 }) {
-  const { order, conv, customerText, history, apiKey, model } = args;
+  const { order, conv, customerText, history, apiKey, model, useGateway } = args;
 
   // Skip if order already has a long address & is already confirmed
   if (order.confirmation_status === "confirmed") return;
@@ -565,7 +592,11 @@ Rules:
     { role: "user", content: customerText },
   ];
 
-  const exResp = await fetch("https://api.openai.com/v1/chat/completions", {
+  const exUrl = useGateway
+    ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+    : "https://api.openai.com/v1/chat/completions";
+
+  const exResp = await fetch(exUrl, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
