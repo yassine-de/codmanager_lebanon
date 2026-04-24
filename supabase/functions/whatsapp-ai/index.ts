@@ -4,7 +4,7 @@
 //  - analyze: detect intent, sentiment, language for a message
 //  - auto_reply: full auto-reply (used by webhook)
 //  - update_memory: refresh AI memory summary for a phone
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?no-check";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
