@@ -347,6 +347,8 @@ export default function WhatsappInbox() {
     qc.invalidateQueries({ queryKey: ["wts-convos"] });
     toast.success(next ? "AI auto-reply enabled" : "AI stopped for this conversation");
   };
+
+  const sendReply = async () => {
     if (!selected || !conv || !draft.trim()) return;
     if (windowExpired) {
       toast.error("24h window expired — use a template");
