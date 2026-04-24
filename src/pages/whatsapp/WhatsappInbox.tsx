@@ -271,6 +271,7 @@ export default function WhatsappInbox() {
         { event: "*", schema: "public", table: "whatsapp_conversations" },
         () => {
           qc.invalidateQueries({ queryKey: ["wts-convos"] });
+          qc.invalidateQueries({ queryKey: ["wts-unread-counts"] });
         },
       )
       .on(
@@ -279,6 +280,7 @@ export default function WhatsappInbox() {
         (payload) => {
           const row: any = payload.new ?? payload.old;
           qc.invalidateQueries({ queryKey: ["wts-convos"] });
+          qc.invalidateQueries({ queryKey: ["wts-unread-counts"] });
           if (row?.conversation_id) {
             qc.invalidateQueries({ queryKey: ["wts-messages", row.conversation_id] });
           }
@@ -297,14 +299,17 @@ export default function WhatsappInbox() {
     }
   }, [messages.length, selected]);
 
-  // Mark conversation read on open (clears the unread dot by setting last_message_at)
+  // Mark conversation read on open (clears the unread badge by setting last_message_at)
   useEffect(() => {
     if (!selected) return;
     void supabase
       .from("whatsapp_conversations")
       .update({ last_message_at: new Date().toISOString() })
-      .eq("id", selected);
-  }, [selected]);
+      .eq("id", selected)
+      .then(() => {
+        qc.invalidateQueries({ queryKey: ["wts-unread-counts"] });
+      });
+  }, [selected, qc]);
 
   const filteredConvos = useMemo(() => {
     let list = convos.slice();
