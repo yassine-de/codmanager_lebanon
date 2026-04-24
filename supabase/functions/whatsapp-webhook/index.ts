@@ -551,8 +551,9 @@ async function tryExtractAndConfirmAddress(args: {
   history: { role: string; content: string }[];
   apiKey: string;
   model: string;
+  useGateway?: boolean;
 }) {
-  const { order, conv, customerText, history, apiKey, model } = args;
+  const { order, conv, customerText, history, apiKey, model, useGateway } = args;
 
   // Skip if order already has a long address & is already confirmed
   if (order.confirmation_status === "confirmed") return;
@@ -591,7 +592,11 @@ Rules:
     { role: "user", content: customerText },
   ];
 
-  const exResp = await fetch("https://api.openai.com/v1/chat/completions", {
+  const exUrl = useGateway
+    ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+    : "https://api.openai.com/v1/chat/completions";
+
+  const exResp = await fetch(exUrl, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
