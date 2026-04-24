@@ -325,9 +325,13 @@ export default function WhatsappInbox() {
     if (filter === "unread") {
       list = list.filter((c) => (unreadMap[c.id] ?? 0) > 0);
     }
+    // Sort by most recent activity (last message timestamp), WhatsApp-style.
+    // We intentionally avoid `updated_at` here because a DB trigger bumps it
+    // every time the row changes (including when we mark the thread as read),
+    // which would incorrectly jump the opened conversation to the top.
     list.sort((a, b) => {
-      const ta = new Date(a.updated_at).getTime();
-      const tb = new Date(b.updated_at).getTime();
+      const ta = new Date(a.last_message_at || a.updated_at).getTime();
+      const tb = new Date(b.last_message_at || b.updated_at).getTime();
       return sortDesc ? tb - ta : ta - tb;
     });
     return list;
