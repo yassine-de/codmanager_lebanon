@@ -520,7 +520,6 @@ async function aiContinueReply(args: {
           history,
           apiKey,
           model,
-          useGateway,
         });
       } catch (e) {
         errLog("address extraction failed", (e as Error).message);
@@ -542,9 +541,8 @@ async function tryExtractAndConfirmAddress(args: {
   history: { role: string; content: string }[];
   apiKey: string;
   model: string;
-  useGateway?: boolean;
 }) {
-  const { order, conv, customerText, history, apiKey, model, useGateway } = args;
+  const { order, conv, customerText, history, apiKey, model } = args;
 
   // Skip if order already has a long address & is already confirmed
   if (order.confirmation_status === "confirmed") return;
