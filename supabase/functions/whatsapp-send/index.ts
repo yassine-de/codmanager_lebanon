@@ -104,6 +104,35 @@ Deno.serve(async (req) => {
       if (!order) throw new Error("Order not found");
       const { data: c } = await admin.from("whatsapp_conversations").select("*").eq("order_id", body.order_id).maybeSingle();
       conv = c;
+
+      // If no conversation yet for this order, reuse the latest one for this phone
+      // (across normalized variants) so a repeat customer keeps a single thread.
+      if (!conv && order.customer_phone) {
+        const digits = order.customer_phone.replace(/\D/g, "");
+        const withPlus = digits ? `+${digits}` : "";
+        const localZero = digits.startsWith("92") ? `0${digits.slice(2)}` : digits;
+        const variants = Array.from(
+          new Set([order.customer_phone, digits, withPlus, localZero].filter(Boolean)),
+        );
+        const { data: byPhone } = await admin
+          .from("whatsapp_conversations")
+          .select("*")
+          .in("customer_phone", variants)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (byPhone) {
+          await admin
+            .from("whatsapp_conversations")
+            .update({
+              order_id: order.order_id,
+              customer_name: order.customer_name ?? byPhone.customer_name,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", byPhone.id);
+          conv = { ...byPhone, order_id: order.order_id };
+        }
+      }
     } else {
       throw new Error("conversation_id or order_id required");
     }
