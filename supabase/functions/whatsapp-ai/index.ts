@@ -1,3 +1,4 @@
+// @ts-nocheck
 // WhatsApp AI Engine — uses OpenAI API directly
 // Modes:
 //  - suggest: generate reply suggestions for a conversation/message

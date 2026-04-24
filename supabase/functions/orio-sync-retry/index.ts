@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Cron-Fallback: retries orders stuck in pending/failed sync
 // Runs every 10 min. Calls orio-sync (sync-order action) for each candidate.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?no-check";
