@@ -1,14 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { pkrToUsd } from "@/lib/currency";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, ShoppingCart, CheckCircle2, Truck, Package, TrendingUp, ImageOff } from "lucide-react";
+import { ArrowLeft, ShoppingCart, CheckCircle2, Truck, Package, TrendingUp, ImageOff, Sparkles, RefreshCw, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { mockProducts, type Product } from "@/lib/products-data";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
-import { format, subDays } from "date-fns";
+import { format, subDays, formatDistanceToNow } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
