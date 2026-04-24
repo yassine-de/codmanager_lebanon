@@ -15,6 +15,11 @@ const MAX_CONTEXT_CHARS = 8000; // keep prompt cost reasonable
 
 const log = (...a: unknown[]) => console.log("[product-context]", ...a);
 const errLog = (...a: unknown[]) => console.error("[product-context]", ...a);
+const redactSecret = (value: string) => {
+  if (!value) return "missing";
+  if (value.length <= 8) return `${value.slice(0, 2)}…${value.slice(-2)}`;
+  return `${value.slice(0, 4)}…${value.slice(-4)}`;
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
