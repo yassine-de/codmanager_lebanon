@@ -351,6 +351,41 @@ export default function WhatsappAI() {
                   />
                 </div>
               )}
+              <div className="rounded-lg border p-4 bg-muted/30 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Timer className="h-4 w-4 text-primary" />
+                  <div>
+                    <div className="text-sm font-medium">AI Reply Batching</div>
+                    <div className="text-xs text-muted-foreground">Control how long AI waits before replying and duplicate detection window.</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Batch Wait (seconds)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={300}
+                      className="mt-1"
+                      value={s.ai_batch_wait_seconds ?? 20}
+                      onChange={(e) => setS({ ...s, ai_batch_wait_seconds: Math.max(0, parseInt(e.target.value) || 0) })}
+                    />
+                    <div className="text-[11px] text-muted-foreground mt-1">How long AI waits for more messages before replying</div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Dedup Window (seconds)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={600}
+                      className="mt-1"
+                      value={s.ai_dedup_window_seconds ?? 30}
+                      onChange={(e) => setS({ ...s, ai_dedup_window_seconds: Math.max(0, parseInt(e.target.value) || 0) })}
+                    />
+                    <div className="text-[11px] text-muted-foreground mt-1">Skip duplicate AI reply if one was sent within this window</div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
