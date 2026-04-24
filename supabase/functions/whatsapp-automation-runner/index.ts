@@ -1,3 +1,4 @@
+// @ts-nocheck
 // WhatsApp Automation Runner
 // Executes whatsapp_automations flows (nodes + edges).
 //

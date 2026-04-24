@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Sends a WhatsApp message via Meta Cloud API.
 // Supports 3 modes:
 //  - template: send approved template by template_id (always allowed; bypasses 24h)

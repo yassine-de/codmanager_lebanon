@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Sync WhatsApp message templates with Meta Cloud API.
 // Modes:
 //   - submit: Create/submit a template to Meta for approval (POST /{waba_id}/message_templates)

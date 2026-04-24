@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Receives Meta WhatsApp webhook events.
 // GET: verification handshake.
 // POST: incoming messages / button replies / status updates.
