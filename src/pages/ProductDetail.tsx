@@ -24,12 +24,12 @@ export default function ProductDetail() {
   const mockProduct = useMemo(() => isAdmin ? mockProducts.find(p => p.id === id) : undefined, [id, isAdmin]);
 
   // Fetch DB product
-  const { data: dbProduct } = useQuery({
+  const { data: dbProduct, refetch: refetchProduct } = useQuery({
     queryKey: ["product-detail", id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("*, variants, weight")
+        .select("*, variants, weight, ai_context, ai_context_scraped_at")
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
@@ -37,6 +37,28 @@ export default function ProductDetail() {
     },
     enabled: isDbId && !mockProduct,
   });
+
+  const handleRefreshAiContext = async () => {
+    if (!dbProduct?.id) return;
+    if (!dbProduct.product_url) {
+      toast.error("Product has no Store URL — add one first.");
+      return;
+    }
+    setRefreshingCtx(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("product-context-fetch", {
+        body: { product_id: dbProduct.id, force: true },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success("AI context refreshed from store page");
+      await refetchProduct();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to scrape store page");
+    } finally {
+      setRefreshingCtx(false);
+    }
+  };
 
   // Fetch seller profile (admin needs actual seller name)
   const { data: sellerProfile } = useQuery({
