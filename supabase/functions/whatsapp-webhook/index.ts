@@ -663,7 +663,7 @@ async function aiContinueReply(args: {
   if (hasProductImage && toolCalls.some((c: any) => c?.function?.name === "send_product_image")) {
     imageSent = await sendWhatsappImage({
       to: conv.customer_phone,
-      imageUrl: product.image_url,
+      imageUrl: effectiveImageUrl!,
       caption: order?.product_name ? `${order.product_name}` : undefined,
       conversationId: conv.id,
       orderId: order?.order_id ?? null,
