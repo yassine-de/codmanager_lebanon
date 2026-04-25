@@ -129,6 +129,9 @@ const AgentDashboard = () => {
       return [...assigned, ...extra];
     },
     enabled: !!userId,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const statusActionsInPeriod = useMemo(() => {
