@@ -611,7 +611,60 @@ async function handleIncoming(value: any) {
       .eq("meta_message_id", s.id);
     if (error) errLog("status update failed", s.id, error);
     if (s.status === "failed") log("delivery failed", s.id, errMsg);
+
+    // Mirror status onto campaign recipient (if this msg belongs to a campaign).
+    try {
+      const recipUpdate: Record<string, unknown> = {};
+      const nowIso = new Date().toISOString();
+      if (s.status === "delivered") {
+        recipUpdate.status = "delivered";
+        recipUpdate.delivered_at = nowIso;
+      } else if (s.status === "read") {
+        recipUpdate.status = "read";
+        recipUpdate.read_at = nowIso;
+      } else if (s.status === "failed") {
+        recipUpdate.status = "failed";
+        recipUpdate.failed_at = nowIso;
+        if (errMsg) recipUpdate.error_message = errMsg;
+      }
+      if (Object.keys(recipUpdate).length > 0) {
+        const { data: recip } = await admin
+          .from("whatsapp_campaign_recipients")
+          .update(recipUpdate)
+          .eq("meta_message_id", s.id)
+          .select("campaign_id")
+          .maybeSingle();
+        if (recip?.campaign_id) {
+          await refreshCampaignCounters(recip.campaign_id);
+        }
+      }
+    } catch (e) {
+      errLog("campaign status mirror failed", e);
+    }
   }
+}
+
+// Recompute campaign counters from recipients table (cheap with indexes).
+async function refreshCampaignCounters(campaignId: string) {
+  const statuses = ["sent", "delivered", "read", "replied", "failed"] as const;
+  const counts: Record<string, number> = {};
+  for (const st of statuses) {
+    const { count } = await admin
+      .from("whatsapp_campaign_recipients")
+      .select("*", { count: "exact", head: true })
+      .eq("campaign_id", campaignId)
+      .eq("status", st);
+    counts[st] = count ?? 0;
+  }
+  // "sent" total = anything that left our side successfully.
+  const sentTotal = counts.sent + counts.delivered + counts.read + counts.replied;
+  await admin.from("whatsapp_campaigns").update({
+    sent_count: sentTotal,
+    delivered_count: counts.delivered + counts.read + counts.replied,
+    read_count: counts.read + counts.replied,
+    replied_count: counts.replied,
+    failed_count: counts.failed,
+  }).eq("id", campaignId);
 }
 
 // ---------------------------------------------------------------------------
