@@ -566,7 +566,7 @@ function CreateCampaignDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Megaphone className="h-5 w-5 text-emerald-500" />
@@ -1152,204 +1152,199 @@ function TemplatePicker({
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
-        {/* Dropdown selector */}
-        <div className="lg:col-span-2 space-y-3">
-          {templates.length === 0 ? (
-            <Card className="p-6 text-center border-dashed">
-              <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
-              <p className="text-sm font-medium">No active templates</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Create one in the Templates tab first.
-              </p>
-            </Card>
-          ) : (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Template</Label>
-                <Select value={templateId} onValueChange={onSelect}>
-                  <SelectTrigger className="h-11 bg-card">
-                    <SelectValue placeholder="Select approved template" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[320px]">
-                    {templates.map((t: any) => {
-                      const approved = t.sync_status === "APPROVED";
-                      return (
-                        <SelectItem key={t.id} value={t.id} disabled={!approved}>
-                          {t.name}{!approved ? ` — ${t.sync_status ?? "pending"}` : ""}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
+      {templates.length === 0 ? (
+        <Card className="p-6 text-center border-dashed">
+          <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+          <p className="text-sm font-medium">No active templates</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Create one in the Templates tab first.
+          </p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* LEFT: Selector + summary */}
+          <div className="space-y-3 min-w-0">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Template</Label>
+              <Select value={templateId} onValueChange={onSelect}>
+                <SelectTrigger className="h-11 bg-card">
+                  <SelectValue placeholder="Select approved template" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[320px]">
+                  {templates.map((t: any) => {
+                    const approved = t.sync_status === "APPROVED";
+                    return (
+                      <SelectItem key={t.id} value={t.id} disabled={!approved}>
+                        {t.name}
+                        {!approved ? ` — ${t.sync_status ?? "pending"}` : ""}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <Card className={cn(
-                "p-4 min-h-[238px] transition-colors",
+            <Card
+              className={cn(
+                "p-4 transition-colors",
                 selectedTemplate ? "border-primary/30 bg-primary/5" : "border-dashed",
-              )}>
-                {selectedTemplate ? (
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold truncate">{selectedTemplate.name}</p>
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-5">
-                          {selectedTemplate.body}
-                        </p>
-                      </div>
-                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-600 bg-emerald-500/10">
-                        ✓ Approved
-                      </Badge>
-                      {selectedTemplate.category && (
-                        <Badge variant="outline" className="text-[10px] capitalize">
-                          {selectedTemplate.category.toLowerCase()}
-                        </Badge>
-                      )}
-                      {selectedTemplate.language && (
-                        <Badge variant="outline" className="text-[10px] uppercase">
-                          {selectedTemplate.language}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="h-full min-h-[206px] flex flex-col items-center justify-center text-center">
-                    <MessageSquare className="h-8 w-8 text-muted-foreground/40 mb-2" />
-                    <p className="text-sm font-medium">No template selected</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Choose one from the dropdown to preview it.
-                    </p>
-                  </div>
-                )}
-              </Card>
-            </>
-          )}
-        </div>
-
-        {/* Preview - WhatsApp chat bubble style */}
-        <div className="lg:col-span-3">
-          <div className="rounded-lg border bg-[#0b141a] dark:bg-[#0b141a] p-4 h-full min-h-[340px] relative overflow-hidden">
-            {/* WhatsApp chat-pattern background */}
-            <div
-              className="absolute inset-0 opacity-[0.04] pointer-events-none"
-              style={{
-                backgroundImage:
-                  "radial-gradient(circle at 25% 25%, white 1px, transparent 1px), radial-gradient(circle at 75% 75%, white 1px, transparent 1px)",
-                backgroundSize: "24px 24px",
-              }}
-            />
-            {!selectedTemplate ? (
-              <div className="relative h-full flex flex-col items-center justify-center text-center">
-                <Eye className="h-10 w-10 text-white/20 mb-3" />
-                <p className="text-sm text-white/60 font-medium">Live preview</p>
-                <p className="text-xs text-white/40 mt-1 max-w-[220px]">
-                  Select a template on the left to see how it will look on WhatsApp.
-                </p>
-              </div>
-            ) : (
-              <div className="relative space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">
-                    Preview
-                  </div>
-                  <div className="text-[10px] text-white/40">
-                    {selectedTemplate.language?.toUpperCase() ?? "EN"}
-                  </div>
-                </div>
-
-                {/* WhatsApp bubble */}
-                <div className="flex justify-start">
-                  <div className="max-w-[85%] rounded-lg rounded-tl-sm bg-[#202c33] text-white shadow-md overflow-hidden">
-                    {/* Header */}
-                    {selectedTemplate.header_type === "TEXT" && selectedTemplate.header_text && (
-                      <div className="px-3 pt-2 pb-1">
-                        <p className="font-bold text-sm">{selectedTemplate.header_text}</p>
-                      </div>
-                    )}
-                    {selectedTemplate.header_type === "IMAGE" && (
-                      <div className="aspect-video bg-[#111b21] flex items-center justify-center">
-                        {selectedTemplate.header_media_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={selectedTemplate.header_media_url}
-                            alt="header"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xs text-white/40">[Image header]</span>
-                        )}
-                      </div>
-                    )}
-                    {selectedTemplate.header_type === "VIDEO" && (
-                      <div className="aspect-video bg-[#111b21] flex items-center justify-center">
-                        <span className="text-xs text-white/40">[Video header]</span>
-                      </div>
-                    )}
-
-                    {/* Body */}
-                    <div className="px-3 py-2">
-                      <p className="text-[13px] leading-relaxed whitespace-pre-wrap">
+              )}
+            >
+              {selectedTemplate ? (
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">{selectedTemplate.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-4 whitespace-pre-wrap break-words">
                         {selectedTemplate.body}
                       </p>
                     </div>
-
-                    {/* Footer */}
-                    {selectedTemplate.footer && (
-                      <div className="px-3 pb-1">
-                        <p className="text-[11px] text-white/50">{selectedTemplate.footer}</p>
-                      </div>
+                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] border-emerald-500/40 text-emerald-600 bg-emerald-500/10"
+                    >
+                      ✓ Approved
+                    </Badge>
+                    {selectedTemplate.category && (
+                      <Badge variant="outline" className="text-[10px] capitalize">
+                        {selectedTemplate.category.toLowerCase()}
+                      </Badge>
                     )}
-
-                    {/* Time */}
-                    <div className="flex justify-end px-3 pb-1.5">
-                      <span className="text-[10px] text-white/40">
-                        {format(new Date(), "HH:mm")}
-                      </span>
-                    </div>
-
-                    {/* Buttons */}
-                    {Array.isArray(selectedTemplate.buttons) && selectedTemplate.buttons.length > 0 && (
-                      <div className="border-t border-white/10 divide-y divide-white/10">
-                        {selectedTemplate.buttons.map((b: any, i: number) => (
-                          <div
-                            key={i}
-                            className="px-3 py-2 text-center text-[13px] font-medium text-[#53bdeb]"
-                          >
-                            {b.text ?? b.label ?? "Button"}
-                          </div>
-                        ))}
-                      </div>
+                    {selectedTemplate.language && (
+                      <Badge variant="outline" className="text-[10px] uppercase">
+                        {selectedTemplate.language}
+                      </Badge>
                     )}
                   </div>
                 </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center py-6">
+                  <MessageSquare className="h-8 w-8 text-muted-foreground/40 mb-2" />
+                  <p className="text-sm font-medium">No template selected</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Choose one from the dropdown to preview it.
+                  </p>
+                </div>
+              )}
+            </Card>
+          </div>
 
-                {/* Variables hint */}
-                {Array.isArray(selectedTemplate.variables) && selectedTemplate.variables.length > 0 && (
-                  <div className="rounded-md bg-white/5 border border-white/10 p-2.5">
-                    <p className="text-[10px] uppercase tracking-wider text-white/50 font-semibold mb-1.5">
-                      Variables
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {selectedTemplate.variables.map((v: any, i: number) => (
-                        <Badge
-                          key={i}
-                          variant="outline"
-                          className="text-[10px] border-white/20 bg-white/5 text-white/80"
-                        >
-                          {typeof v === "string" ? v : v.name ?? `var_${i + 1}`}
-                        </Badge>
-                      ))}
+          {/* RIGHT: WhatsApp live preview */}
+          <div className="min-w-0">
+            <div className="rounded-lg border bg-[#0b141a] p-4 h-full min-h-[340px] relative overflow-hidden">
+              <div
+                className="absolute inset-0 opacity-[0.04] pointer-events-none"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle at 25% 25%, white 1px, transparent 1px), radial-gradient(circle at 75% 75%, white 1px, transparent 1px)",
+                  backgroundSize: "24px 24px",
+                }}
+              />
+              {!selectedTemplate ? (
+                <div className="relative h-full flex flex-col items-center justify-center text-center min-h-[300px]">
+                  <Eye className="h-10 w-10 text-white/20 mb-3" />
+                  <p className="text-sm text-white/60 font-medium">Live preview</p>
+                  <p className="text-xs text-white/40 mt-1 max-w-[220px]">
+                    Select a template on the left to see how it will look on WhatsApp.
+                  </p>
+                </div>
+              ) : (
+                <div className="relative space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">
+                      Preview
+                    </div>
+                    <div className="text-[10px] text-white/40">
+                      {selectedTemplate.language?.toUpperCase() ?? "EN"}
                     </div>
                   </div>
-                )}
-              </div>
-            )}
+
+                  <div className="flex justify-start">
+                    <div className="max-w-[92%] rounded-lg rounded-tl-sm bg-[#202c33] text-white shadow-md overflow-hidden">
+                      {selectedTemplate.header_type === "TEXT" && selectedTemplate.header_text && (
+                        <div className="px-3 pt-2 pb-1">
+                          <p className="font-bold text-sm break-words">{selectedTemplate.header_text}</p>
+                        </div>
+                      )}
+                      {selectedTemplate.header_type === "IMAGE" && (
+                        <div className="aspect-video bg-[#111b21] flex items-center justify-center">
+                          {selectedTemplate.header_media_url ? (
+                            <img
+                              src={selectedTemplate.header_media_url}
+                              alt="header"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-xs text-white/40">[Image header]</span>
+                          )}
+                        </div>
+                      )}
+                      {selectedTemplate.header_type === "VIDEO" && (
+                        <div className="aspect-video bg-[#111b21] flex items-center justify-center">
+                          <span className="text-xs text-white/40">[Video header]</span>
+                        </div>
+                      )}
+
+                      <div className="px-3 py-2">
+                        <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">
+                          {selectedTemplate.body}
+                        </p>
+                      </div>
+
+                      {selectedTemplate.footer && (
+                        <div className="px-3 pb-1">
+                          <p className="text-[11px] text-white/50 break-words">{selectedTemplate.footer}</p>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end px-3 pb-1.5">
+                        <span className="text-[10px] text-white/40">
+                          {format(new Date(), "HH:mm")}
+                        </span>
+                      </div>
+
+                      {Array.isArray(selectedTemplate.buttons) && selectedTemplate.buttons.length > 0 && (
+                        <div className="border-t border-white/10 divide-y divide-white/10">
+                          {selectedTemplate.buttons.map((b: any, i: number) => (
+                            <div
+                              key={i}
+                              className="px-3 py-2 text-center text-[13px] font-medium text-[#53bdeb]"
+                            >
+                              {b.text ?? b.label ?? "Button"}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {Array.isArray(selectedTemplate.variables) && selectedTemplate.variables.length > 0 && (
+                    <div className="rounded-md bg-white/5 border border-white/10 p-2.5">
+                      <p className="text-[10px] uppercase tracking-wider text-white/50 font-semibold mb-1.5">
+                        Variables
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedTemplate.variables.map((v: any, i: number) => (
+                          <Badge
+                            key={i}
+                            variant="outline"
+                            className="text-[10px] border-white/20 bg-white/5 text-white/80"
+                          >
+                            {typeof v === "string" ? v : v.name ?? `var_${i + 1}`}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
