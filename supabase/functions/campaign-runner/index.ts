@@ -62,12 +62,18 @@ async function buildRecipients(campaign: any) {
   const { data, error } = await q;
   if (error) throw new Error(error.message);
 
+  const totalOrders = (data ?? []).length;
+  let invalidPhones = 0;
+
   // Dedup by phone (keep first / most recent occurrence).
   const seen = new Set<string>();
   const recipients: any[] = [];
   for (const o of data ?? []) {
     const phone = (o.customer_phone || "").trim();
-    if (!phone) continue;
+    if (!phone) {
+      invalidPhones++;
+      continue;
+    }
     if (seen.has(phone)) continue;
     seen.add(phone);
     recipients.push({
@@ -85,8 +91,9 @@ async function buildRecipients(campaign: any) {
       status: "pending",
     });
   }
-  return recipients;
+  return { recipients, totalOrders, invalidPhones, duplicates: totalOrders - recipients.length - invalidPhones };
 }
+
 
 // ---------------------------------------------------------------------------
 // Send a single template message via Meta Cloud API.
