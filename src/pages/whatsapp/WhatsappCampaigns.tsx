@@ -401,7 +401,7 @@ function CreateCampaignDialog({
       setDescription("");
       setTemplateId("");
       setFilters({
-        seller_ids: [], cities: [], confirmation_status: [], delivery_status: [],
+        seller_ids: [], confirmation_status: [], delivery_status: [],
         product_names: [], date_from: null, date_to: null,
       });
       setSendMode("immediate");
