@@ -822,7 +822,7 @@ function CreateCampaignDialog({
               </div>
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="flex-row justify-between gap-2 sm:justify-between">
           <Button
