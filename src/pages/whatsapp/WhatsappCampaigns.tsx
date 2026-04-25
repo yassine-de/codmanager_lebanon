@@ -411,6 +411,7 @@ function CreateCampaignDialog({
       setScheduledTime("10:00");
       setThrottle(30);
       setPreviewCount(null);
+      setTemplateSearch("");
     }
   }, [open]);
 
