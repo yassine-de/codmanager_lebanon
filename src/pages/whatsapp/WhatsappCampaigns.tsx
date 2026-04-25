@@ -393,7 +393,6 @@ function CreateCampaignDialog({
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [templateSearch, setTemplateSearch] = useState("");
 
   // Reset on open.
   useEffect(() => {
@@ -411,7 +410,6 @@ function CreateCampaignDialog({
       setScheduledTime("10:00");
       setThrottle(30);
       setPreviewCount(null);
-      setTemplateSearch("");
     }
   }, [open]);
 
@@ -634,8 +632,6 @@ function CreateCampaignDialog({
                 templates={templates}
                 templateId={templateId}
                 onSelect={setTemplateId}
-                search={templateSearch}
-                onSearchChange={setTemplateSearch}
                 selectedTemplate={selectedTemplate}
               />
             </div>
