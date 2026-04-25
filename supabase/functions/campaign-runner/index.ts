@@ -62,12 +62,18 @@ async function buildRecipients(campaign: any) {
   const { data, error } = await q;
   if (error) throw new Error(error.message);
 
+  const totalOrders = (data ?? []).length;
+  let invalidPhones = 0;
+
   // Dedup by phone (keep first / most recent occurrence).
   const seen = new Set<string>();
   const recipients: any[] = [];
   for (const o of data ?? []) {
     const phone = (o.customer_phone || "").trim();
-    if (!phone) continue;
+    if (!phone) {
+      invalidPhones++;
+      continue;
+    }
     if (seen.has(phone)) continue;
     seen.add(phone);
     recipients.push({
@@ -85,8 +91,9 @@ async function buildRecipients(campaign: any) {
       status: "pending",
     });
   }
-  return recipients;
+  return { recipients, totalOrders, invalidPhones, duplicates: totalOrders - recipients.length - invalidPhones };
 }
+
 
 // ---------------------------------------------------------------------------
 // Send a single template message via Meta Cloud API.
@@ -394,7 +401,7 @@ Deno.serve(async (req) => {
           .select("*", { count: "exact", head: true })
           .eq("campaign_id", id);
         if ((recipCount ?? 0) === 0) {
-          const recipients = await buildRecipients(c);
+          const { recipients } = await buildRecipients(c);
           if (recipients.length) {
             // Insert in chunks to avoid PG row limit.
             const chunkSize = 500;
@@ -425,10 +432,18 @@ Deno.serve(async (req) => {
       // Just count recipients without persisting.
       const { campaign } = body;
       if (!campaign) throw new Error("campaign required");
-      const recipients = await buildRecipients({ ...campaign, id: "preview" });
-      return new Response(JSON.stringify({ ok: true, count: recipients.length, sample: recipients.slice(0, 5) }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const { recipients, totalOrders, invalidPhones, duplicates } = await buildRecipients({ ...campaign, id: "preview" });
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          count: recipients.length,
+          total_orders: totalOrders,
+          invalid_phones: invalidPhones,
+          duplicates,
+          sample: recipients.slice(0, 5),
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     if (action === "start") {
@@ -438,7 +453,7 @@ Deno.serve(async (req) => {
       if (!c) throw new Error("Campaign not found");
 
       // Build recipients.
-      const recipients = await buildRecipients(c);
+      const { recipients } = await buildRecipients(c);
       if (recipients.length === 0) {
         await admin.from("whatsapp_campaigns").update({
           status: "failed",

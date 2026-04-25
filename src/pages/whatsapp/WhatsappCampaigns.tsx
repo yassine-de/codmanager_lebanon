@@ -390,6 +390,9 @@ function CreateCampaignDialog({
   const [scheduledTime, setScheduledTime] = useState("10:00");
   const [throttle, setThrottle] = useState(30);
   const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const [previewBreakdown, setPreviewBreakdown] = useState<{
+    total_orders: number; invalid_phones: number; duplicates: number;
+  } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -492,9 +495,15 @@ function CreateCampaignDialog({
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || "Preview failed");
       setPreviewCount(data.count);
+      setPreviewBreakdown({
+        total_orders: data.total_orders ?? 0,
+        invalid_phones: data.invalid_phones ?? 0,
+        duplicates: data.duplicates ?? 0,
+      });
     } catch (e: any) {
       toast.error(e.message);
       setPreviewCount(0);
+      setPreviewBreakdown(null);
     } finally {
       setPreviewLoading(false);
     }
@@ -707,7 +716,7 @@ function CreateCampaignDialog({
                       <Users className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Estimated recipients</div>
+                      <div className="text-xs text-muted-foreground">Unique recipients (1 message per phone)</div>
                       <div className="text-2xl font-bold">
                         {previewLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : previewCount ?? "—"}
                       </div>
@@ -717,6 +726,24 @@ function CreateCampaignDialog({
                     {previewLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : "Refresh"}
                   </Button>
                 </div>
+
+                {previewBreakdown && !previewLoading && (
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-md bg-background/60 border p-2">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Orders matched</div>
+                      <div className="text-sm font-semibold">{previewBreakdown.total_orders}</div>
+                    </div>
+                    <div className="rounded-md bg-background/60 border p-2">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Duplicate phones</div>
+                      <div className="text-sm font-semibold">−{previewBreakdown.duplicates}</div>
+                    </div>
+                    <div className="rounded-md bg-background/60 border p-2">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Empty phones</div>
+                      <div className="text-sm font-semibold">−{previewBreakdown.invalid_phones}</div>
+                    </div>
+                  </div>
+                )}
+
                 {previewCount === 0 && (
                   <p className="text-xs text-destructive mt-2">
                     No recipients match these filters. Adjust the filters above.
