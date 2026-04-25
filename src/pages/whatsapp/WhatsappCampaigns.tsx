@@ -604,7 +604,7 @@ function CreateCampaignDialog({
           ))}
         </div>
 
-        <ScrollArea className="flex-1 pr-3 -mr-3">
+        <div className="flex-1 overflow-y-auto pr-3 -mr-3 min-h-0">
           {step === 0 && (
             <div className="space-y-4 py-2">
               <div>
@@ -822,7 +822,7 @@ function CreateCampaignDialog({
               </div>
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="flex-row justify-between gap-2 sm:justify-between">
           <Button
