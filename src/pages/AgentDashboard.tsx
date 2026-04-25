@@ -65,6 +65,9 @@ const AgentDashboard = () => {
       return all;
     },
     enabled: !!userId,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   // Fetch orders this agent treated — includes:
