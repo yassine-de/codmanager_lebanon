@@ -393,6 +393,35 @@ async function handleIncoming(value: any) {
       });
       if (msgErr) errLog("message insert failed", msgErr);
 
+      // Mark any recent campaign recipient on this conversation as "replied".
+      try {
+        const { data: lastCampRecip } = await admin
+          .from("whatsapp_campaign_recipients")
+          .select("id, campaign_id, status")
+          .eq("conversation_id", conv.id)
+          .in("status", ["sent", "delivered", "read"])
+          .order("sent_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lastCampRecip) {
+          await admin
+            .from("whatsapp_campaign_recipients")
+            .update({ status: "replied", replied_at: new Date().toISOString() })
+            .eq("id", lastCampRecip.id);
+          // Bump campaign reply counter.
+          const { count } = await admin
+            .from("whatsapp_campaign_recipients")
+            .select("*", { count: "exact", head: true })
+            .eq("campaign_id", lastCampRecip.campaign_id)
+            .eq("status", "replied");
+          await admin.from("whatsapp_campaigns").update({
+            replied_count: count ?? 0,
+          }).eq("id", lastCampRecip.campaign_id);
+        }
+      } catch (e) {
+        errLog("campaign reply mirror failed", e);
+      }
+
       // Decide conversation status:
       //  - button reply → outcome (confirmed / more_info / canceled)
       //  - free text   → manual_review_needed
