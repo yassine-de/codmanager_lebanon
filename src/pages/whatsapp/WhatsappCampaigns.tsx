@@ -1128,28 +1128,13 @@ function TemplatePicker({
   templates,
   templateId,
   onSelect,
-  search,
-  onSearchChange,
   selectedTemplate,
 }: {
   templates: any[];
   templateId: string;
   onSelect: (id: string) => void;
-  search: string;
-  onSearchChange: (v: string) => void;
   selectedTemplate: any;
 }) {
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return templates;
-    return templates.filter(
-      (t) =>
-        (t.name ?? "").toLowerCase().includes(q) ||
-        (t.body ?? "").toLowerCase().includes(q) ||
-        (t.category ?? "").toLowerCase().includes(q),
-    );
-  }, [templates, search]);
-
   const approvedCount = templates.filter((t) => t.sync_status === "APPROVED").length;
 
   return (
