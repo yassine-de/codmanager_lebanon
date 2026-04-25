@@ -660,13 +660,6 @@ function CreateCampaignDialog({
               />
 
               <FilterMultiSelect
-                label="Cities"
-                options={cities.map((c) => ({ value: c, label: c }))}
-                selected={filters.cities}
-                onChange={(v) => setFilters({ ...filters, cities: v })}
-              />
-
-              <FilterMultiSelect
                 label="Products"
                 options={products.map((p: any) => ({ value: p.name, label: p.name }))}
                 selected={filters.product_names}
