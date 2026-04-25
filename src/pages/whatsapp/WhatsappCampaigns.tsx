@@ -379,7 +379,6 @@ function CreateCampaignDialog({
   const [templateId, setTemplateId] = useState<string>("");
   const [filters, setFilters] = useState<any>({
     seller_ids: [],
-    cities: [],
     confirmation_status: [],
     delivery_status: [],
     product_names: [],
