@@ -520,7 +520,48 @@ async function handleIncoming(value: any) {
         errLog("automation resume lookup failed", (e as Error).message);
       }
 
-      // AI continuation: keep the conversation alive after automation flows.
+      // From-template trigger: if no run was resumed and the customer's reply
+      // targets one of our outbound template messages, fire matching automations.
+      if (!resumedRun) {
+        try {
+          const repliedTemplateId = await resolveRepliedTemplate(replyToMetaMessageId);
+          if (repliedTemplateId) {
+            let buttonIndex: number | undefined;
+            if (messageType === "button_reply" && bodyText) {
+              const { data: tplRow } = await admin
+                .from("whatsapp_templates")
+                .select("buttons")
+                .eq("id", repliedTemplateId)
+                .maybeSingle();
+              const tplButtons: any[] = Array.isArray(tplRow?.buttons) ? tplRow!.buttons : [];
+              const idx = tplButtons.findIndex(
+                (b) => String(b?.text ?? "").trim().toLowerCase() === bodyText.trim().toLowerCase(),
+              );
+              if (idx >= 0) buttonIndex = idx;
+            }
+            const projectUrl = Deno.env.get("SUPABASE_URL")!;
+            const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+            fetch(`${projectUrl}/functions/v1/whatsapp-automation-runner`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${anonKey}` },
+              body: JSON.stringify({
+                trigger_type: "from_template",
+                template_id: repliedTemplateId,
+                conversation_id: conv.id,
+                order_id: order?.order_id ?? null,
+                customer_phone: from,
+                ...(buttonIndex !== undefined
+                  ? { button_index: buttonIndex }
+                  : { reply_text: bodyText }),
+              }),
+            }).catch((e) => errLog("from_template runner invoke failed", e));
+          }
+        } catch (e) {
+          errLog("from_template trigger lookup failed", (e as Error).message);
+        }
+      }
+
+
       // Trigger when:
       //  - this is a free-text message (not a button outcome), AND
       //  - either no automation run was resumed, OR the order still needs
