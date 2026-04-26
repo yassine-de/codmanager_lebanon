@@ -476,10 +476,31 @@ export default function WhatsappAutomationBuilder() {
                                   </div>
                                   <div className="flex items-center justify-between gap-2 pt-1 border-t">
                                     <Label className="text-[10px] text-muted-foreground cursor-pointer flex-1">
+                                      AI validates before applying
+                                    </Label>
+                                    <Switch
+                                      checked={action.ai_gate === "validate"}
+                                      onCheckedChange={(v) =>
+                                        updateAction({
+                                          ai_gate: v ? "validate" : "off",
+                                          // When gating is on, AI takeover is implicit.
+                                          ...(v ? { ai_takeover: true } : {}),
+                                        })
+                                      }
+                                    />
+                                  </div>
+                                  {action.ai_gate === "validate" && (
+                                    <p className="text-[9px] text-muted-foreground leading-tight">
+                                      AI will talk to the customer first. Status only changes after AI validates address (confirm) or after the rescue attempt (cancel).
+                                    </p>
+                                  )}
+                                  <div className="flex items-center justify-between gap-2 pt-1 border-t">
+                                    <Label className="text-[10px] text-muted-foreground cursor-pointer flex-1">
                                       AI takes over after click
                                     </Label>
                                     <Switch
-                                      checked={!!action.ai_takeover}
+                                      checked={!!action.ai_takeover || action.ai_gate === "validate"}
+                                      disabled={action.ai_gate === "validate"}
                                       onCheckedChange={(v) => updateAction({ ai_takeover: v })}
                                     />
                                   </div>
