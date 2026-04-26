@@ -538,6 +538,8 @@ export default function WhatsappInbox() {
     }
     if (filter === "unread") {
       list = list.filter((c) => (unreadMap[c.id] ?? 0) > 0);
+    } else if (filter === "needs_review") {
+      list = list.filter((c) => c.status === "manual_review_needed");
     } else if (filter === "ai_on") {
       list = list.filter((c) => c.ai_enabled !== false);
     } else if (filter === "ai_off") {
