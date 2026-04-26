@@ -63,6 +63,9 @@ type Conv = {
   last_read_at: string | null;
   updated_at: string;
   ai_enabled?: boolean;
+  review_note?: string | null;
+  resolved_by?: string | null;
+  resolved_at?: string | null;
 };
 
 type Msg = {
