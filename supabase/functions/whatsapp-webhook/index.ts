@@ -193,6 +193,22 @@ async function resolveReplyTarget(replyToMetaMessageId?: string | null) {
   return { conv, order };
 }
 
+// Look up which template (if any) the customer's reply was sent to.
+// Returns the template_id stored on the outbound message payload.
+async function resolveRepliedTemplate(replyToMetaMessageId?: string | null): Promise<string | null> {
+  if (!replyToMetaMessageId) return null;
+  const { data: msg } = await admin
+    .from("whatsapp_messages")
+    .select("payload, message_type, direction")
+    .eq("meta_message_id", replyToMetaMessageId)
+    .eq("direction", "out")
+    .maybeSingle();
+  if (!msg) return null;
+  const payload: any = msg.payload ?? {};
+  const tplId = payload?._template_id ?? null;
+  return tplId ? String(tplId) : null;
+}
+
 // Apply CRM updates for a button action. Mirrors whatsapp-action logic so
 // behavior stays consistent between manual Inbox actions and automated webhook.
 async function applyOutcome(
