@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { TRIGGERS } from "./WhatsappAutomations";
 
 /* ---------- Step types ---------- */
+const TRIGGER_VIRTUAL_ID = "__trigger__";
 const STEP_TYPES = [
   { value: "send_message", label: "Send Message", description: "Send text/buttons", icon: MessageSquare },
   { value: "send_template", label: "Send Template", description: "Send WhatsApp template", icon: FileText },
