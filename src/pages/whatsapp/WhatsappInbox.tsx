@@ -641,6 +641,45 @@ export default function WhatsappInbox() {
   };
 
   const aiEnabled = conv?.ai_enabled !== false;
+
+  const markAsResolved = async () => {
+    if (!selected || !conv) return;
+    setResolving(true);
+    const note = resolveNote.trim();
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("whatsapp_conversations")
+      .update({
+        status: "handled",
+        review_note: note || null,
+        resolved_by: u?.user?.id ?? null,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("id", selected);
+    if (error) {
+      setResolving(false);
+      toast.error(error.message || "Failed to mark as resolved");
+      return;
+    }
+    // Save the note as an internal note in the chat for traceability
+    if (note) {
+      await supabase.from("whatsapp_messages").insert({
+        conversation_id: selected,
+        order_id: conv.order_id ?? null,
+        direction: "in",
+        message_type: "note",
+        body: `[Resolved] ${note}`,
+        status: "internal",
+        payload: { internal_note: true, resolution: true },
+      });
+    }
+    setResolving(false);
+    setResolveOpen(false);
+    setResolveNote("");
+    qc.invalidateQueries({ queryKey: ["wts-convos"] });
+    qc.invalidateQueries({ queryKey: ["wts-msgs", selected] });
+    toast.success("Conversation marked as resolved");
+  };
   const toggleAi = async () => {
     if (!selected || !conv) return;
     const next = !aiEnabled;
