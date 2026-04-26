@@ -740,14 +740,30 @@ async function startNewRuns(triggerType: string, orderId: string) {
 
 /**
  * Apply the per-button "action" configured on the from_template trigger.
- * - status === "no_change" → only flag the conversation/order (whatsapp_note).
- * - status === <confirmation_status> → update orders.confirmation_status accordingly.
- * - ai_takeover → enable AI replies on the conversation (sets ai_enabled=true).
- *                 (When false, we leave ai_enabled untouched so existing settings stay.)
- * Logs to order_history when the order status actually changes.
+ *
+ * Action shape:
+ *  - status: "no_change" | <confirmation_status>  (admin-mapped target)
+ *  - ai_takeover: boolean                         (enable AI on the conversation)
+ *  - ai_gate: "off" | "validate"                  (NEW)
+ *      - "off"      → apply status immediately (legacy behavior).
+ *      - "validate" → DO NOT apply status. Store the desired outcome as a
+ *                     "pending_button_intent" on the conversation, force
+ *                     ai_enabled=true, and let the AI engine drive the
+ *                     conversation. The AI will only finalize the status
+ *                     after validating address / handling cancel rescue.
+ *  - intent_kind: "confirm" | "cancel" | "info"   (NEW, optional hint for AI)
+ *
+ * Logs to order_history only when the order status actually changes.
  */
 async function applyButtonAction(opts: {
-  action: { status?: string; ai_takeover?: boolean } | undefined;
+  action:
+    | {
+        status?: string;
+        ai_takeover?: boolean;
+        ai_gate?: "off" | "validate";
+        intent_kind?: "confirm" | "cancel" | "info";
+      }
+    | undefined;
   order: any | null;
   conversationId: string | null;
   buttonText: string;
@@ -755,29 +771,68 @@ async function applyButtonAction(opts: {
   const { action, order, conversationId, buttonText } = opts;
   if (!action) return;
 
-  // 1) AI takeover toggle on the conversation
-  if (conversationId && action.ai_takeover === true) {
+  const aiGated = action.ai_gate === "validate";
+  const wantsTakeover = action.ai_takeover === true || aiGated;
+
+  // 1) AI takeover (gated buttons always force takeover so AI drives the convo)
+  if (conversationId && wantsTakeover) {
     await admin
       .from("whatsapp_conversations")
       .update({ ai_enabled: true })
       .eq("id", conversationId);
   }
 
-  // 2) Order status / flag
   if (!order) return;
+
+  const status = action.status;
+  const hasMappedStatus = !!status && status !== "no_change";
+
+  // 2) AI-gated path: stash the intent, do NOT change order status yet.
+  if (aiGated && conversationId) {
+    const intentKind =
+      action.intent_kind ||
+      (status === "confirmed"
+        ? "confirm"
+        : status === "cancelled" || status === "canceled"
+        ? "cancel"
+        : "info");
+
+    const pending = {
+      intent: intentKind,
+      mapped_status: hasMappedStatus ? status : null,
+      button_text: buttonText,
+      created_at: new Date().toISOString(),
+    };
+    await admin
+      .from("whatsapp_conversations")
+      .update({ pending_button_intent: pending })
+      .eq("id", conversationId);
+
+    // Still flag the order so admins see customer interaction, but DON'T touch status.
+    await admin
+      .from("orders")
+      .update({
+        whatsapp_note: `Customer clicked "${buttonText}" — AI validating (${intentKind})`,
+        whatsapp_last_reply_at: new Date().toISOString(),
+      })
+      .eq("order_id", order.order_id);
+    return;
+  }
+
+  // 3) Non-gated path: apply mapping immediately (legacy).
   const noteFlag = `Customer clicked "${buttonText}" on WhatsApp`;
   const updates: Record<string, any> = {
     whatsapp_note: noteFlag,
     whatsapp_last_reply_at: new Date().toISOString(),
   };
 
-  const status = action.status;
-  if (status && status !== "no_change") {
+  if (hasMappedStatus) {
     const before = order.confirmation_status;
     updates.confirmation_status = status;
     updates.confirmation_channel = "whatsapp";
     if (status === "confirmed") updates.confirmed_at = new Date().toISOString();
-    if (status === "cancelled") updates.cancel_reason = `Cancelled via WhatsApp button "${buttonText}"`;
+    if (status === "cancelled" || status === "canceled")
+      updates.cancel_reason = `Cancelled via WhatsApp button "${buttonText}"`;
 
     await admin.from("orders").update(updates).eq("order_id", order.order_id);
 
@@ -793,7 +848,6 @@ async function applyButtonAction(opts: {
       });
     }
   } else {
-    // No status change — only persist the flag/note timestamp.
     await admin.from("orders").update(updates).eq("order_id", order.order_id);
   }
 }
