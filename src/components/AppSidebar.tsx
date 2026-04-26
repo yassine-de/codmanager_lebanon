@@ -412,7 +412,12 @@ export function AppSidebar() {
                                   activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                                 >
                                   <sub.icon className="mr-2 h-3.5 w-3.5 opacity-60" />
-                                  <span>{sub.title}</span>
+                                  <span className="flex-1">{sub.title}</span>
+                                  {(sub as any).badge != null && (
+                                    <span className="ml-auto inline-flex items-center justify-center rounded-md bg-primary/90 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground min-w-[20px]">
+                                      {(sub as any).badge > 999 ? '999+' : (sub as any).badge}
+                                    </span>
+                                  )}
                                 </NavLink>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
