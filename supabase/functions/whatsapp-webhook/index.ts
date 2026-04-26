@@ -585,7 +585,6 @@ async function handleIncoming(value: any) {
             (!resumedRun || addressIncomplete || orderNotConfirmed)
           ) || (
             messageType === "button_reply" &&
-            outcome === "confirmed" &&
             !resumedRun
           )
         );
