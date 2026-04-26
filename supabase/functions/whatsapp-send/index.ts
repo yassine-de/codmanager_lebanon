@@ -278,48 +278,46 @@ Deno.serve(async (req) => {
       const re = /\{\{\s*([\w]+)\s*\}\}/g;
       let mm: RegExpExecArray | null;
       while ((mm = re.exec(tplBody)) !== null) placeholders.push(mm[1]);
-      if (placeholders.length > 0) {
-        // Positional fallback for generic placeholders imported from Meta
-        // (var_1, var_2, var_3, ...). Maps to common order fields by position.
-        const positionalFallback = [
-          (order?.customer_name && String(order.customer_name).trim()) || "",
-          (order?.product_name && String(order.product_name).trim()) || "",
-          (order?.total_amount != null && String(order.total_amount)) || "",
-          (order?.customer_city && String(order.customer_city).trim()) || "",
-          (order?.order_id && String(order.order_id)) || "",
-        ];
-        const finalFallback =
-          (order?.customer_name && String(order.customer_name).trim()) ||
-          (order?.product_name && String(order.product_name).trim()) ||
-          (order?.order_id && String(order.order_id)) ||
-          "-";
 
+      // Meta-imported templates are stored locally as {{var_1}}, {{var_2}}, ...
+      // Resolve those to real order fields both for the Meta payload AND the inbox preview.
+      const positionalFallback = [
+        (order?.customer_name && String(order.customer_name).trim()) || "",
+        (order?.product_name && String(order.product_name).trim()) || "",
+        (order?.total_amount != null && String(order.total_amount)) || "",
+        (order?.customer_city && String(order.customer_city).trim()) || "",
+        (order?.order_id && String(order.order_id)) || "",
+      ];
+      const finalFallback =
+        (order?.customer_name && String(order.customer_name).trim()) ||
+        (order?.product_name && String(order.product_name).trim()) ||
+        (order?.order_id && String(order.order_id)) ||
+        "-";
+      const resolvePlaceholder = (name: string, idx: number) => {
+        const raw = vars[name];
+        let val = raw == null ? "" : String(raw).trim();
+        const lower = String(name).toLowerCase();
+        if (!val && (lower.includes("customer") || lower === "name" || lower.includes("customer_name"))) {
+          val = (order?.customer_name && String(order.customer_name).trim()) || "";
+        } else if (!val && lower.includes("product")) {
+          val = (order?.product_name && String(order.product_name).trim()) || "";
+        } else if (!val && lower.includes("city")) {
+          val = (order?.customer_city && String(order.customer_city).trim()) || "";
+        } else if (!val && (lower.includes("amount") || lower.includes("price") || lower.includes("total"))) {
+          val = (order?.total_amount != null && String(order.total_amount)) || "";
+        } else if (!val && lower.includes("order")) {
+          val = (order?.order_id && String(order.order_id)) || "";
+        }
+        const varMatch = /^var_(\d+)$/i.exec(name);
+        if (!val && varMatch) val = positionalFallback[Math.max(0, Number(varMatch[1]) - 1)] || "";
+        if (!val) val = positionalFallback[idx] || finalFallback;
+        return val;
+      };
+      const resolvedVars = Object.fromEntries(placeholders.map((name, idx) => [name, resolvePlaceholder(name, idx)]));
+      if (placeholders.length > 0) {
         components.push({
           type: "body",
-          parameters: placeholders.map((name, idx) => {
-            const raw = vars[name];
-            let val = raw == null ? "" : String(raw).trim();
-            // Meta rejects empty text parameters with error 131008.
-            if (!val) {
-              // Try named match (e.g. {{customer_name}}, {{product_name}})
-              const lower = String(name).toLowerCase();
-              if (lower.includes("customer") || lower.includes("name")) {
-                val = (order?.customer_name && String(order.customer_name).trim()) || "";
-              } else if (lower.includes("product")) {
-                val = (order?.product_name && String(order.product_name).trim()) || "";
-              } else if (lower.includes("city")) {
-                val = (order?.customer_city && String(order.customer_city).trim()) || "";
-              } else if (lower.includes("amount") || lower.includes("price") || lower.includes("total")) {
-                val = (order?.total_amount != null && String(order.total_amount)) || "";
-              } else if (lower.includes("order")) {
-                val = (order?.order_id && String(order.order_id)) || "";
-              }
-              // Fall back to positional mapping for var_1, var_2, etc.
-              if (!val) val = positionalFallback[idx] || "";
-              if (!val) val = finalFallback;
-            }
-            return { type: "text", text: val };
-          }),
+          parameters: placeholders.map((name, idx) => ({ type: "text", text: resolvedVars[name] || resolvePlaceholder(name, idx) })),
         });
       }
 
@@ -334,7 +332,7 @@ Deno.serve(async (req) => {
           ...(components.length ? { components } : {}),
         },
       };
-      bodyText = render(tplBody, vars);
+      bodyText = render(tplBody, { ...vars, ...resolvedVars });
     } else {
       // order: legacy interactive confirmation buttons (free-form, requires 24h window)
       if (!order) throw new Error("Order required for order mode");
