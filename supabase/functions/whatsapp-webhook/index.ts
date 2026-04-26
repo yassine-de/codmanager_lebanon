@@ -111,7 +111,65 @@ async function transcribeWhatsappAudio(audio: any): Promise<string | null> {
   }
 }
 
-// Try to find an order linked to this phone number.
+/**
+ * Fetch a WhatsApp media (image/document) and return it as a base64 data URL
+ * usable directly in OpenAI multimodal `image_url` content parts.
+ *
+ * WhatsApp's lookaside.fbsbx.com URLs require a Bearer token, so the AI cannot
+ * fetch them directly. We download server-side, then inline as data URL.
+ */
+async function fetchWhatsappMediaAsDataUrl(media: any): Promise<{ dataUrl: string; mimeType: string } | null> {
+  try {
+    const mediaId: string | undefined = media?.id;
+    const directUrl: string | undefined = media?.link || media?.url;
+    let mimeType: string = media?.mime_type || "image/jpeg";
+    if (!mediaId && !directUrl) return null;
+
+    const settings = await getSettings();
+    const accessToken =
+      (settings as any)?.access_token || Deno.env.get("WHATSAPP_META_ACCESS_TOKEN");
+    if (!accessToken) {
+      log("media-fetch: WhatsApp access token missing");
+      return null;
+    }
+
+    let downloadUrl = directUrl;
+    if (mediaId) {
+      const base = ((settings as any)?.api_base_url || "https://graph.facebook.com/v21.0").replace(/\/$/, "");
+      const metaResp = await fetch(`${base}/${mediaId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const metaJson = await metaResp.json().catch(() => ({}));
+      if (!metaResp.ok || !metaJson?.url) {
+        log("media-fetch: meta resolve failed", metaResp.status, metaJson?.error);
+        return null;
+      }
+      downloadUrl = metaJson.url;
+      if (metaJson.mime_type) mimeType = metaJson.mime_type;
+    }
+
+    const mediaResp = await fetch(downloadUrl!, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!mediaResp.ok) {
+      log("media-fetch: download failed", mediaResp.status);
+      return null;
+    }
+    const buf = await mediaResp.arrayBuffer();
+    // Encode to base64 in chunks to avoid call-stack issues on large images
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+    }
+    const base64 = btoa(binary);
+    return { dataUrl: `data:${mimeType};base64,${base64}`, mimeType };
+  } catch (e) {
+    errLog("media-fetch: exception", (e as Error).message);
+    return null;
+  }
+}
 // Priority:
 //  1. explicit orderId from button payload
 //  2. latest order with confirmation_status = 'new_wts'
@@ -669,6 +727,16 @@ async function handleIncoming(value: any) {
       const orderNotConfirmed =
         !!order && order.confirmation_status !== "confirmed" && order.confirmation_status !== "canceled";
       const aiDisabledForConv = conv?.ai_enabled === false;
+      // Image analysis flag — default ON unless admin disabled it in AI settings
+      let imageAnalysisOn = true;
+      if (m.type === "image") {
+        const { data: aiCfgRow } = await admin
+          .from("whatsapp_ai_settings")
+          .select("ai_image_analysis_enabled")
+          .eq("singleton", true)
+          .maybeSingle();
+        imageAnalysisOn = aiCfgRow?.ai_image_analysis_enabled !== false;
+      }
       const shouldContinueWithAI =
         !aiDisabledForConv &&
         (
@@ -676,6 +744,10 @@ async function handleIncoming(value: any) {
             (m.type === "text" || messageType === "audio_transcribed") &&
             !outcome &&
             (!resumedRun || addressIncomplete || orderNotConfirmed)
+          ) || (
+            // Customer sent an image — let the AI look at it and reply
+            // (e.g. screenshot of address, photo of CNIC, picture of issue).
+            m.type === "image" && imageAnalysisOn && !outcome
           ) || (
             messageType === "button_reply" &&
             !resumedRun
@@ -930,14 +1002,67 @@ async function aiContinueReply(args: {
 
   const { data: msgs } = await admin
     .from("whatsapp_messages")
-    .select("direction,body,message_type,created_at")
+    .select("direction,body,message_type,created_at,payload")
     .eq("conversation_id", conv.id)
     .order("created_at", { ascending: false })
     .limit(15);
-  const history = (msgs ?? []).reverse().map((m: any) => ({
+  const orderedMsgs = (msgs ?? []).slice().reverse();
+
+  // Build standard text-only history. We will rewrite the LAST inbound entry
+  // into a multimodal message if it (or any consecutive trailing inbound)
+  // contains an image, so the AI can actually see what the customer sent.
+  const history: any[] = orderedMsgs.map((m: any) => ({
     role: m.direction === "in" ? "user" : "assistant",
     content: m.body || `[${m.message_type}]`,
   }));
+
+  // Find trailing inbound images (the customer just sent one or more images,
+  // possibly with a text caption batched in). We attach them to the last user
+  // message as image_url parts (OpenAI multimodal format).
+  const trailingInboundImages: any[] = [];
+  for (let i = orderedMsgs.length - 1; i >= 0; i--) {
+    const mm = orderedMsgs[i];
+    if (mm.direction !== "in") break;
+    if (mm.message_type === "image") {
+      const imgPayload = mm.payload?.image || mm.payload;
+      trailingInboundImages.unshift(imgPayload);
+    }
+  }
+
+  if (trailingInboundImages.length > 0) {
+    // Inline up to 3 most recent images as base64 data URLs (Meta media URLs
+    // are private and require our access token, so the AI can't fetch them).
+    const dataUrls: string[] = [];
+    for (const img of trailingInboundImages.slice(-3)) {
+      const fetched = await fetchWhatsappMediaAsDataUrl(img);
+      if (fetched) dataUrls.push(fetched.dataUrl);
+    }
+
+    if (dataUrls.length > 0) {
+      // Find the last user entry in history and rewrite it as a multimodal
+      // message that combines the original text (caption / batched text) with
+      // the inlined image(s).
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role === "user") {
+          const textPart = typeof history[i].content === "string" ? history[i].content : "";
+          const parts: any[] = [];
+          if (textPart && textPart.trim() && !/^\[image\]$/i.test(textPart.trim())) {
+            parts.push({ type: "text", text: textPart });
+          } else {
+            parts.push({ type: "text", text: "[The customer sent the image(s) above. Look at them and reply naturally in their language.]" });
+          }
+          for (const url of dataUrls) {
+            parts.push({ type: "image_url", image_url: { url } });
+          }
+          history[i] = { role: "user", content: parts };
+          break;
+        }
+      }
+      log("ai-continue: attached inbound images", { count: dataUrls.length, conv: conv.id });
+    } else {
+      log("ai-continue: failed to fetch inbound images", { conv: conv.id });
+    }
+  }
 
   // Look up the product (for image_url + ai_context) linked to this order's product_name
   let product: any = null;
