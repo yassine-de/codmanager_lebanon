@@ -475,11 +475,26 @@ function CreateCampaignDialog({
   const { data: products = [] } = useQuery({
     queryKey: ["products-for-campaign"],
     queryFn: async () => {
-      const { data } = await supabase.from("products").select("id, name").order("name");
+      const { data } = await supabase.from("products").select("id, name, seller_id").order("name");
       return data ?? [];
     },
     enabled: open,
   });
+
+  // Filter products by selected sellers (if any). Deduplicate by name.
+  const filteredProductOptions = useMemo(() => {
+    const list = (products as any[]).filter((p) =>
+      filters.seller_ids.length === 0 ? true : filters.seller_ids.includes(p.seller_id),
+    );
+    const seen = new Set<string>();
+    const opts: { value: string; label: string }[] = [];
+    for (const p of list) {
+      if (!p?.name || seen.has(p.name)) continue;
+      seen.add(p.name);
+      opts.push({ value: p.name, label: p.name });
+    }
+    return opts;
+  }, [products, filters.seller_ids]);
 
   const selectedTemplate = useMemo(
     () => templates.find((t: any) => t.id === templateId),
@@ -664,15 +679,28 @@ function CreateCampaignDialog({
                 label="Sellers"
                 options={sellers.map((s) => ({ value: s.id, label: s.name }))}
                 selected={filters.seller_ids}
-                onChange={(v) => setFilters({ ...filters, seller_ids: v })}
+                onChange={(v) => {
+                  // Drop any selected products that don't belong to the new seller scope
+                  const allowedNames = new Set(
+                    (products as any[])
+                      .filter((p) => v.length === 0 || v.includes(p.seller_id))
+                      .map((p) => p.name),
+                  );
+                  setFilters({
+                    ...filters,
+                    seller_ids: v,
+                    product_names: filters.product_names.filter((n) => allowedNames.has(n)),
+                  });
+                }}
               />
 
               <FilterMultiSelect
                 label="Products"
-                options={products.map((p: any) => ({ value: p.name, label: p.name }))}
+                options={filteredProductOptions}
                 selected={filters.product_names}
                 onChange={(v) => setFilters({ ...filters, product_names: v })}
               />
+
 
               <FilterMultiSelect
                 label="Confirmation Status"
