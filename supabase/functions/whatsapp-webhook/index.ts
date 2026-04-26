@@ -1002,14 +1002,67 @@ async function aiContinueReply(args: {
 
   const { data: msgs } = await admin
     .from("whatsapp_messages")
-    .select("direction,body,message_type,created_at")
+    .select("direction,body,message_type,created_at,payload")
     .eq("conversation_id", conv.id)
     .order("created_at", { ascending: false })
     .limit(15);
-  const history = (msgs ?? []).reverse().map((m: any) => ({
+  const orderedMsgs = (msgs ?? []).slice().reverse();
+
+  // Build standard text-only history. We will rewrite the LAST inbound entry
+  // into a multimodal message if it (or any consecutive trailing inbound)
+  // contains an image, so the AI can actually see what the customer sent.
+  const history: any[] = orderedMsgs.map((m: any) => ({
     role: m.direction === "in" ? "user" : "assistant",
     content: m.body || `[${m.message_type}]`,
   }));
+
+  // Find trailing inbound images (the customer just sent one or more images,
+  // possibly with a text caption batched in). We attach them to the last user
+  // message as image_url parts (OpenAI multimodal format).
+  const trailingInboundImages: any[] = [];
+  for (let i = orderedMsgs.length - 1; i >= 0; i--) {
+    const mm = orderedMsgs[i];
+    if (mm.direction !== "in") break;
+    if (mm.message_type === "image") {
+      const imgPayload = mm.payload?.image || mm.payload;
+      trailingInboundImages.unshift(imgPayload);
+    }
+  }
+
+  if (trailingInboundImages.length > 0) {
+    // Inline up to 3 most recent images as base64 data URLs (Meta media URLs
+    // are private and require our access token, so the AI can't fetch them).
+    const dataUrls: string[] = [];
+    for (const img of trailingInboundImages.slice(-3)) {
+      const fetched = await fetchWhatsappMediaAsDataUrl(img);
+      if (fetched) dataUrls.push(fetched.dataUrl);
+    }
+
+    if (dataUrls.length > 0) {
+      // Find the last user entry in history and rewrite it as a multimodal
+      // message that combines the original text (caption / batched text) with
+      // the inlined image(s).
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role === "user") {
+          const textPart = typeof history[i].content === "string" ? history[i].content : "";
+          const parts: any[] = [];
+          if (textPart && textPart.trim() && !/^\[image\]$/i.test(textPart.trim())) {
+            parts.push({ type: "text", text: textPart });
+          } else {
+            parts.push({ type: "text", text: "[The customer sent the image(s) above. Look at them and reply naturally in their language.]" });
+          }
+          for (const url of dataUrls) {
+            parts.push({ type: "image_url", image_url: { url } });
+          }
+          history[i] = { role: "user", content: parts };
+          break;
+        }
+      }
+      log("ai-continue: attached inbound images", { count: dataUrls.length, conv: conv.id });
+    } else {
+      log("ai-continue: failed to fetch inbound images", { conv: conv.id });
+    }
+  }
 
   // Look up the product (for image_url + ai_context) linked to this order's product_name
   let product: any = null;
