@@ -311,7 +311,52 @@ async function logOrderHistory(args: {
   } catch (e) {
     errLog("logOrderHistory exception", (e as Error).message);
   }
-}
+      }
+
+      // From-template trigger: if no run was resumed and the customer's reply
+      // is to one of our outbound template messages, start matching automations.
+      let startedFromTemplate = false;
+      if (!resumedRun) {
+        try {
+          const repliedTemplateId = await resolveRepliedTemplate(replyToMetaMessageId);
+          if (repliedTemplateId) {
+            // Match clicked-button index against the template's stored buttons
+            let buttonIndex: number | undefined;
+            if (messageType === "button_reply" && bodyText) {
+              const { data: tplRow } = await admin
+                .from("whatsapp_templates")
+                .select("buttons")
+                .eq("id", repliedTemplateId)
+                .maybeSingle();
+              const tplButtons: any[] = Array.isArray(tplRow?.buttons) ? tplRow!.buttons : [];
+              const idx = tplButtons.findIndex(
+                (b) => String(b?.text ?? "").trim().toLowerCase() === bodyText.trim().toLowerCase(),
+              );
+              if (idx >= 0) buttonIndex = idx;
+            }
+
+            const projectUrl = Deno.env.get("SUPABASE_URL")!;
+            const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+            startedFromTemplate = true;
+            fetch(`${projectUrl}/functions/v1/whatsapp-automation-runner`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${anonKey}` },
+              body: JSON.stringify({
+                trigger_type: "from_template",
+                template_id: repliedTemplateId,
+                conversation_id: conv.id,
+                order_id: order?.order_id ?? null,
+                customer_phone: from,
+                ...(buttonIndex !== undefined
+                  ? { button_index: buttonIndex }
+                  : { reply_text: bodyText }),
+              }),
+            }).catch((e) => errLog("from_template runner invoke failed", e));
+          }
+        } catch (e) {
+          errLog("from_template trigger lookup failed", (e as Error).message);
+        }
+      }
 
 
 async function handleIncoming(value: any) {
