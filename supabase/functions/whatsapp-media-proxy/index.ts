@@ -100,20 +100,20 @@ Deno.serve(async (req) => {
       });
       const metaJson = await metaResp.json().catch(() => ({}));
       if (!metaResp.ok || !metaJson?.url) {
-        // Meta only retains media ~30 days. Expired/missing media → return 404 (not 502)
-        // so the client treats it as "audio unavailable" without a runtime error.
+        // Meta retains media ~30 days. Return 200 with expired flag so the platform
+        // doesn't surface a runtime error overlay; the client checks `expired` to show fallback UI.
         const errCode = metaJson?.error?.code;
         const errSubcode = metaJson?.error?.error_subcode;
         const isExpired = errCode === 100 || errSubcode === 33 || metaResp.status === 404;
         return new Response(
           JSON.stringify({
             ok: false,
-            error: isExpired ? "Audio no longer available (expired on WhatsApp servers)" : "Failed to resolve media URL",
             expired: isExpired,
+            error: isExpired ? "Audio no longer available (expired on WhatsApp servers)" : "Failed to resolve media URL",
             details: metaJson,
           }),
           {
-            status: isExpired ? 404 : 502,
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
@@ -131,12 +131,12 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           ok: false,
-          error: isExpired ? "Audio no longer available" : "Failed to download audio",
           expired: isExpired,
+          error: isExpired ? "Audio no longer available" : "Failed to download audio",
           details,
         }),
         {
-          status: isExpired ? 404 : 502,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
