@@ -538,6 +538,19 @@ export default function WhatsappInbox() {
     }
     if (filter === "unread") {
       list = list.filter((c) => (unreadMap[c.id] ?? 0) > 0);
+    } else if (filter === "ai_on") {
+      list = list.filter((c) => c.ai_enabled !== false);
+    } else if (filter === "ai_off") {
+      list = list.filter((c) => c.ai_enabled === false);
+    } else if (filter === "with_order") {
+      list = list.filter((c) => !!c.order_id);
+    } else if (filter === "no_order") {
+      list = list.filter((c) => !c.order_id);
+    } else if (filter === "window_open") {
+      list = list.filter((c) => {
+        if (!c.last_reply_at) return false;
+        return differenceInHours(new Date(), new Date(c.last_reply_at)) < 24;
+      });
     }
     // Sort by most recent activity (last message timestamp), WhatsApp-style.
     // We intentionally avoid `updated_at` here because a DB trigger bumps it
@@ -550,6 +563,35 @@ export default function WhatsappInbox() {
     });
     return list;
   }, [convos, search, filter, sortDesc, unreadMap]);
+
+  const totalUnread = useMemo(
+    () => Object.values(unreadMap).reduce((sum, n) => sum + n, 0),
+    [unreadMap],
+  );
+
+  const markAllAsRead = async () => {
+    const unreadIds = Object.keys(unreadMap).filter((id) => (unreadMap[id] ?? 0) > 0);
+    if (unreadIds.length === 0) {
+      toast.info("No unread conversations");
+      return;
+    }
+    setMarkingAllRead(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const { error } = await supabase
+        .from("whatsapp_conversations")
+        .update({ last_read_at: nowIso })
+        .in("id", unreadIds);
+      if (error) throw error;
+      toast.success(`Marked ${unreadIds.length} conversation${unreadIds.length > 1 ? "s" : ""} as read`);
+      qc.invalidateQueries({ queryKey: ["wts-unread-counts"] });
+      qc.invalidateQueries({ queryKey: ["wts-convos"] });
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to mark as read");
+    } finally {
+      setMarkingAllRead(false);
+    }
+  };
 
   const lastInboundAt = useMemo(() => {
     if (!conv?.last_reply_at) return null;
