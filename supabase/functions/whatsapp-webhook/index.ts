@@ -961,17 +961,41 @@ async function aiContinueReply(args: {
 
   const aiUrl = "https://api.openai.com/v1/chat/completions";
 
-  // Build tools list — only expose send_product_image when an image is available.
-  const tools = hasProductImage
-    ? [{
-        type: "function",
-        function: {
-          name: "send_product_image",
-          description: "Send the official product image to the customer via WhatsApp. Call this whenever the customer asks for a photo/picture/image of the product, in any language.",
-          parameters: { type: "object", properties: {}, additionalProperties: false },
+  // Build tools list — always include the discount-flag tool when an order
+  // exists so AI can escalate price objections to a human; image tool only
+  // when an image is available.
+  const toolList: any[] = [];
+  if (hasProductImage) {
+    toolList.push({
+      type: "function",
+      function: {
+        name: "send_product_image",
+        description: "Send the official product image to the customer via WhatsApp. Call this whenever the customer asks for a photo/picture/image of the product, in any language.",
+        parameters: { type: "object", properties: {}, additionalProperties: false },
+      },
+    });
+  }
+  if (order) {
+    toolList.push({
+      type: "function",
+      function: {
+        name: "flag_for_human_discount",
+        description: "Flag this conversation so a human agent will follow up to negotiate a price/discount. Call this ONLY when the customer wants to cancel or hesitates clearly because of PRICE / 'too expensive' / 'ghali' / 'mahnga' and would buy with a discount. Never offer a discount yourself; the human agent decides the amount.",
+        parameters: {
+          type: "object",
+          properties: {
+            reason: {
+              type: "string",
+              description: "Short explanation in English of the customer's price objection (max 120 chars).",
+            },
+          },
+          required: ["reason"],
+          additionalProperties: false,
         },
-      }]
-    : undefined;
+      },
+    });
+  }
+  const tools = toolList.length > 0 ? toolList : undefined;
 
   const settings = await getSettings();
   if (!settings) return;
