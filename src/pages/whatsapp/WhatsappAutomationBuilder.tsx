@@ -138,6 +138,22 @@ export default function WhatsappAutomationBuilder() {
       errors.push("Follow-up trigger needs target status");
     if (automation?.trigger_type === "from_template" && !triggerConfig.template_id)
       errors.push("Pick the template that should trigger this automation");
+    // Per-button action mapping is required when the template has buttons.
+    if (
+      automation?.trigger_type === "from_template" &&
+      Array.isArray(triggerConfig.template_buttons) &&
+      triggerConfig.template_buttons.length > 0
+    ) {
+      const actions = Array.isArray(triggerConfig.button_actions)
+        ? triggerConfig.button_actions
+        : [];
+      triggerConfig.template_buttons.forEach((b: any, i: number) => {
+        const a = actions[i];
+        if (!a || typeof a.status === "undefined" || a.status === "") {
+          errors.push(`Pick a status action for button "${b?.text || `#${i + 1}`}"`);
+        }
+      });
+    }
     return { ok: errors.length === 0, errors };
   }, [nodes, triggerConfig, automation?.trigger_type]);
 
