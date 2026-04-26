@@ -123,6 +123,15 @@ function AudioMessagePlayer({ message }: { message: Msg }) {
         });
 
         if (!response.ok) {
+          // 404 = audio expired on WhatsApp servers (Meta only retains media ~30 days). Treat as unavailable, no error.
+          if (response.status === 404) {
+            if (!cancelled) {
+              setFailed(true);
+              setSrc(null);
+              setLoading(false);
+            }
+            return;
+          }
           throw new Error(`Audio proxy failed (${response.status})`);
         }
 
