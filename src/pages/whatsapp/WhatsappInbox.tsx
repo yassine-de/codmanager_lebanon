@@ -354,7 +354,10 @@ export default function WhatsappInbox() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [filter, setFilter] = useState<
+    "all" | "unread" | "ai_on" | "ai_off" | "with_order" | "no_order" | "window_open"
+  >("all");
+  const [markingAllRead, setMarkingAllRead] = useState(false);
   const [tab, setTab] = useState<"reply" | "note">("reply");
   const [draft, setDraft] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
