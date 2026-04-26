@@ -123,7 +123,6 @@ function AudioMessagePlayer({ message }: { message: Msg }) {
         });
 
         if (!response.ok) {
-          // 404 = audio expired on WhatsApp servers (Meta only retains media ~30 days). Treat as unavailable, no error.
           if (response.status === 404) {
             if (!cancelled) {
               setFailed(true);
@@ -133,6 +132,17 @@ function AudioMessagePlayer({ message }: { message: Msg }) {
             return;
           }
           throw new Error(`Audio proxy failed (${response.status})`);
+        }
+
+        // Proxy returns 200 + JSON when media expired/unavailable (to avoid runtime error overlay)
+        const contentType = response.headers.get("Content-Type") || "";
+        if (contentType.includes("application/json")) {
+          if (!cancelled) {
+            setFailed(true);
+            setSrc(null);
+            setLoading(false);
+          }
+          return;
         }
 
         const blob = await response.blob();
