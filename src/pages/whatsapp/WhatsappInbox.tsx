@@ -354,7 +354,10 @@ export default function WhatsappInbox() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [filter, setFilter] = useState<
+    "all" | "unread" | "ai_on" | "ai_off" | "with_order" | "no_order" | "window_open"
+  >("all");
+  const [markingAllRead, setMarkingAllRead] = useState(false);
   const [tab, setTab] = useState<"reply" | "note">("reply");
   const [draft, setDraft] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
@@ -535,6 +538,19 @@ export default function WhatsappInbox() {
     }
     if (filter === "unread") {
       list = list.filter((c) => (unreadMap[c.id] ?? 0) > 0);
+    } else if (filter === "ai_on") {
+      list = list.filter((c) => c.ai_enabled !== false);
+    } else if (filter === "ai_off") {
+      list = list.filter((c) => c.ai_enabled === false);
+    } else if (filter === "with_order") {
+      list = list.filter((c) => !!c.order_id);
+    } else if (filter === "no_order") {
+      list = list.filter((c) => !c.order_id);
+    } else if (filter === "window_open") {
+      list = list.filter((c) => {
+        if (!c.last_reply_at) return false;
+        return differenceInHours(new Date(), new Date(c.last_reply_at)) < 24;
+      });
     }
     // Sort by most recent activity (last message timestamp), WhatsApp-style.
     // We intentionally avoid `updated_at` here because a DB trigger bumps it
@@ -547,6 +563,35 @@ export default function WhatsappInbox() {
     });
     return list;
   }, [convos, search, filter, sortDesc, unreadMap]);
+
+  const totalUnread = useMemo(
+    () => Object.values(unreadMap).reduce((sum, n) => sum + n, 0),
+    [unreadMap],
+  );
+
+  const markAllAsRead = async () => {
+    const unreadIds = Object.keys(unreadMap).filter((id) => (unreadMap[id] ?? 0) > 0);
+    if (unreadIds.length === 0) {
+      toast.info("No unread conversations");
+      return;
+    }
+    setMarkingAllRead(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const { error } = await supabase
+        .from("whatsapp_conversations")
+        .update({ last_read_at: nowIso })
+        .in("id", unreadIds);
+      if (error) throw error;
+      toast.success(`Marked ${unreadIds.length} conversation${unreadIds.length > 1 ? "s" : ""} as read`);
+      qc.invalidateQueries({ queryKey: ["wts-unread-counts"] });
+      qc.invalidateQueries({ queryKey: ["wts-convos"] });
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to mark as read");
+    } finally {
+      setMarkingAllRead(false);
+    }
+  };
 
   const lastInboundAt = useMemo(() => {
     if (!conv?.last_reply_at) return null;
@@ -786,16 +831,38 @@ export default function WhatsappInbox() {
             <div className="flex items-center gap-2">
               <FilterIcon className="h-4 w-4 text-muted-foreground" />
               <div className="text-sm font-semibold">Inbox</div>
+              {totalUnread > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-semibold">
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </span>
+              )}
             </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => setSortDesc((v) => !v)}
-              title={sortDesc ? "Newest first" : "Oldest first"}
-            >
-              <ArrowDownUp className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs gap-1"
+                onClick={markAllAsRead}
+                disabled={markingAllRead || totalUnread === 0}
+                title="Mark all conversations as read"
+              >
+                {markingAllRead ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CheckCheck className="h-3.5 w-3.5" />
+                )}
+                <span className="hidden sm:inline">Mark all read</span>
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => setSortDesc((v) => !v)}
+                title={sortDesc ? "Newest first" : "Oldest first"}
+              >
+                <ArrowDownUp className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           <div className="p-3 space-y-3 border-b border-border">
@@ -808,29 +875,29 @@ export default function WhatsappInbox() {
                 className="pl-9 h-9"
               />
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <button
-                onClick={() => setFilter("all")}
-                className={cn(
-                  "px-3 py-1 rounded-full font-medium border transition-colors text-xs",
-                  filter === "all"
-                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                    : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                )}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setFilter("unread")}
-                className={cn(
-                  "px-3 py-1 rounded-full font-medium border transition-colors text-xs",
-                  filter === "unread"
-                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                    : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                )}
-              >
-                Unread
-              </button>
+            <div className="flex items-center gap-1.5 text-sm flex-wrap">
+              {([
+                { key: "all", label: "All" },
+                { key: "unread", label: "Unread" },
+                { key: "ai_on", label: "AI On" },
+                { key: "ai_off", label: "AI Off" },
+                { key: "with_order", label: "With Order" },
+                { key: "no_order", label: "No Order" },
+                { key: "window_open", label: "24h Window" },
+              ] as const).map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(f.key)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-full font-medium border transition-colors text-[11px]",
+                    filter === f.key
+                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                      : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
             </div>
           </div>
 
