@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { TRIGGERS } from "./WhatsappAutomations";
 
 /* ---------- Step types ---------- */
+const TRIGGER_VIRTUAL_ID = "__trigger__";
 const STEP_TYPES = [
   { value: "send_message", label: "Send Message", description: "Send text/buttons", icon: MessageSquare },
   { value: "send_template", label: "Send Template", description: "Send WhatsApp template", icon: FileText },
@@ -237,11 +238,17 @@ export default function WhatsappAutomationBuilder() {
     return m;
   }, [edges]);
 
-  // Roots = nodes with no incoming edges
+  // Roots = nodes with no incoming edges (incoming from any source, including __trigger__)
   const rootNodeIds = useMemo(() => {
     const targets = new Set(edges.map((e) => e.target));
     return nodes.filter((n) => !targets.has(n.id)).map((n) => n.id);
   }, [nodes, edges]);
+
+  // Children of the virtual trigger node (used by from_template w/ buttons)
+  const triggerChildren = useMemo(
+    () => (childrenMap.get(TRIGGER_VIRTUAL_ID) ?? []),
+    [childrenMap],
+  );
 
   if (isLoading) {
     return (
@@ -385,19 +392,132 @@ export default function WhatsappAutomationBuilder() {
                     <div className="text-xs text-muted-foreground mt-3">Then</div>
                   </Card>
 
-                  {rootNodeIds.length === 0 ? (
-                    <div className="mt-6">
-                      <ConnectorLine />
-                      <Button
-                        variant="outline" size="sm"
-                        onClick={() => openAddStep(null)}
-                        className="mt-2 border-dashed"
-                      >
-                        <Plus className="h-3.5 w-3.5 mr-1" /> Add first step
-                      </Button>
-                    </div>
-                  ) : (
-                    rootNodeIds.map((rid) => (
+                  {(() => {
+                    const triggerButtons: any[] =
+                      automation.trigger_type === "from_template" &&
+                      Array.isArray(triggerConfig.template_buttons)
+                        ? triggerConfig.template_buttons
+                        : [];
+                    const hasTriggerButtons = triggerButtons.length > 0;
+
+                    // Roots not connected to virtual trigger
+                    const triggerChildTargets = new Set(
+                      triggerChildren.map((c) => c.target),
+                    );
+                    const orphanRoots = rootNodeIds.filter(
+                      (rid) => !triggerChildTargets.has(rid),
+                    );
+
+                    if (hasTriggerButtons) {
+                      return (
+                        <div className="flex gap-6 mt-4 items-start flex-wrap justify-center">
+                          {triggerButtons.map((b: any, i: number) => {
+                            const handle = `btn:${i}`;
+                            const child = triggerChildren.find((c) => c.handle === handle);
+                            return (
+                              <div key={handle} className="flex flex-col items-center min-w-[120px]">
+                                <Badge
+                                  variant="outline"
+                                  className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 max-w-[160px] truncate"
+                                  title={b.text || `Button ${i + 1}`}
+                                >
+                                  {b.text || `Button ${i + 1}`}
+                                </Badge>
+                                {child ? (
+                                  <NodeBranch
+                                    nodeId={child.target}
+                                    nodes={nodes}
+                                    childrenMap={childrenMap}
+                                    selectedId={selectedNodeId}
+                                    onSelect={setSelectedNodeId}
+                                    onAddBelow={(fromId, h) => openAddStep(fromId, h)}
+                                    onDelete={deleteNode}
+                                  />
+                                ) : (
+                                  <>
+                                    <ConnectorLine />
+                                    <Button
+                                      size="icon" variant="outline"
+                                      className="mt-2 h-7 w-7 rounded-full border-dashed"
+                                      onClick={() => openAddStep(TRIGGER_VIRTUAL_ID, handle)}
+                                    >
+                                      <Plus className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {/* default branch for free-text replies */}
+                          <div className="flex flex-col items-center min-w-[120px]">
+                            <Badge variant="outline" className="bg-muted text-muted-foreground max-w-[160px] truncate">
+                              Free-text reply
+                            </Badge>
+                            {(() => {
+                              const child = triggerChildren.find((c) => c.handle === "default");
+                              return child ? (
+                                <NodeBranch
+                                  nodeId={child.target}
+                                  nodes={nodes}
+                                  childrenMap={childrenMap}
+                                  selectedId={selectedNodeId}
+                                  onSelect={setSelectedNodeId}
+                                  onAddBelow={(fromId, h) => openAddStep(fromId, h)}
+                                  onDelete={deleteNode}
+                                />
+                              ) : (
+                                <>
+                                  <ConnectorLine />
+                                  <Button
+                                    size="icon" variant="outline"
+                                    className="mt-2 h-7 w-7 rounded-full border-dashed"
+                                    onClick={() => openAddStep(TRIGGER_VIRTUAL_ID, "default")}
+                                  >
+                                    <Plus className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              );
+                            })()}
+                          </div>
+                          {orphanRoots.length > 0 && (
+                            <div className="w-full mt-6 flex flex-col items-center gap-2">
+                              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
+                                Orphan steps (not attached to a button)
+                              </Badge>
+                              {orphanRoots.map((rid) => (
+                                <NodeBranch
+                                  key={rid}
+                                  nodeId={rid}
+                                  nodes={nodes}
+                                  childrenMap={childrenMap}
+                                  selectedId={selectedNodeId}
+                                  onSelect={setSelectedNodeId}
+                                  onAddBelow={(fromId, h) => openAddStep(fromId, h)}
+                                  onDelete={deleteNode}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    if (rootNodeIds.length === 0) {
+                      return (
+                        <div className="mt-6">
+                          <ConnectorLine />
+                          <Button
+                            variant="outline" size="sm"
+                            onClick={() => openAddStep(null)}
+                            className="mt-2 border-dashed"
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Add first step
+                          </Button>
+                        </div>
+                      );
+                    }
+
+                    return rootNodeIds.map((rid) => (
                       <NodeBranch
                         key={rid}
                         nodeId={rid}
@@ -408,8 +528,8 @@ export default function WhatsappAutomationBuilder() {
                         onAddBelow={(fromId, handle) => openAddStep(fromId, handle)}
                         onDelete={deleteNode}
                       />
-                    ))
-                  )}
+                    ));
+                  })()}
                 </div>
               </div>
 
@@ -643,13 +763,16 @@ function FromTemplateConfig({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("whatsapp_templates")
-        .select("id, name, language, body, meta_template_name, active")
+        .select("id, name, language, body, meta_template_name, active, buttons")
         .eq("active", true)
         .order("name", { ascending: true });
       if (error) throw error;
       return data ?? [];
     },
   });
+
+  const selected = templates.find((t: any) => t.id === config.template_id);
+  const buttons: any[] = Array.isArray(selected?.buttons) ? selected!.buttons : [];
 
   return (
     <div className="mt-3 space-y-2">
@@ -658,7 +781,16 @@ function FromTemplateConfig({
       </Label>
       <Select
         value={config.template_id ?? ""}
-        onValueChange={(v) => onChange({ ...config, template_id: v })}
+        onValueChange={(v) => {
+          const tpl = templates.find((t: any) => t.id === v);
+          const btns = Array.isArray(tpl?.buttons) ? tpl!.buttons : [];
+          onChange({
+            ...config,
+            template_id: v,
+            template_name: tpl?.name ?? null,
+            template_buttons: btns,
+          });
+        }}
       >
         <SelectTrigger className="h-8 text-xs">
           <SelectValue placeholder={isLoading ? "Loading…" : "Pick a template"} />
@@ -667,6 +799,9 @@ function FromTemplateConfig({
           {templates.map((t: any) => (
             <SelectItem key={t.id} value={t.id} className="text-xs">
               {t.name} <span className="text-muted-foreground">({t.language})</span>
+              {Array.isArray(t.buttons) && t.buttons.length > 0 && (
+                <span className="text-emerald-500"> · {t.buttons.length} buttons</span>
+              )}
             </SelectItem>
           ))}
           {!isLoading && templates.length === 0 && (
@@ -676,9 +811,15 @@ function FromTemplateConfig({
           )}
         </SelectContent>
       </Select>
-      <p className="text-[10px] text-muted-foreground leading-snug">
-        Automation will start when the customer sends any reply to a message that used this template.
-      </p>
+      {buttons.length > 0 ? (
+        <p className="text-[10px] text-emerald-600 leading-snug">
+          {buttons.length} button{buttons.length > 1 ? "s" : ""} detected. Each button gets its own branch below.
+        </p>
+      ) : (
+        <p className="text-[10px] text-muted-foreground leading-snug">
+          Automation will start when the customer sends any reply to a message that used this template.
+        </p>
+      )}
     </div>
   );
 }
