@@ -1582,18 +1582,30 @@ Rules:
     return;
   }
 
-  // STEP 3: Confirm + (optionally) book for shipping
+  // STEP 3: Confirm + (optionally) book for shipping.
+  // If the order is ALREADY confirmed (e.g. customer clicked the confirm
+  // button before sending the address), we keep the existing confirmation
+  // metadata but still trigger booking if it hasn't shipped yet — and we
+  // always make sure whatsapp_status reflects the final state.
   const settings = await getSettings();
+  const wasAlreadyConfirmed = order.confirmation_status === "confirmed";
   const confirmUpdate: Record<string, any> = {
-    confirmation_status: "confirmed",
-    confirmation_channel: "whatsapp",
-    confirmed_at: new Date().toISOString(),
     whatsapp_status: "confirmed",
     whatsapp_last_reply_at: new Date().toISOString(),
   };
+  if (!wasAlreadyConfirmed) {
+    confirmUpdate.confirmation_status = "confirmed";
+    confirmUpdate.confirmation_channel = "whatsapp";
+    confirmUpdate.confirmed_at = new Date().toISOString();
+  }
   if (settings?.auto_book_shipping) {
-    confirmUpdate.delivery_status = "booked";
-    confirmUpdate.shipping_status = "Booked";
+    // Only (re)book if not already booked/shipped/delivered.
+    const ds = String(order.delivery_status ?? "").toLowerCase();
+    const blockBooking = ["booked", "shipped", "in_transit", "delivered", "returned"].includes(ds);
+    if (!blockBooking) {
+      confirmUpdate.delivery_status = "booked";
+      confirmUpdate.shipping_status = "Booked";
+    }
   }
   const { error: updErr } = await admin
     .from("orders")
