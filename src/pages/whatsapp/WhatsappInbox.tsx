@@ -293,6 +293,7 @@ const statusBadge = (s: string) => {
     canceled: { label: "canceled", cls: "bg-rose-500/15 text-rose-500 border-rose-500/25" },
     more_info: { label: "sent to agent", cls: "bg-violet-500/15 text-violet-500 border-violet-500/25" },
     manual_review_needed: { label: "needs review", cls: "bg-sky-500/15 text-sky-500 border-sky-500/25" },
+    handled: { label: "resolved", cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25" },
   };
   return map[s] ?? { label: s || "—", cls: "bg-muted text-muted-foreground border-border" };
 };
