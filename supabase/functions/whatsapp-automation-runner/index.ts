@@ -853,7 +853,7 @@ async function startNewRunsFromTemplate(args: {
   return { started };
 }
 
-
+async function resumeRun(runId: string, opts: { buttonIndex?: number; replyText?: string }) {
   const { data: run } = await admin
     .from("whatsapp_automation_runs")
     .select("*")
