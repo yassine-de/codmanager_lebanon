@@ -738,7 +738,122 @@ async function startNewRuns(triggerType: string, orderId: string) {
   return { started };
 }
 
-async function resumeRun(runId: string, opts: { buttonIndex?: number; replyText?: string }) {
+/**
+ * Start runs for the `from_template` trigger.
+ * Triggered by the webhook when a customer replies to one of our outbound
+ * template messages. Picks the entry node from edges where `source = "__trigger__"`
+ * and `sourceHandle = "btn:N"` (matching the clicked button) or `"default"`.
+ */
+async function startNewRunsFromTemplate(args: {
+  templateId: string;
+  conversationId: string;
+  orderId?: string | null;
+  customerPhone?: string | null;
+  buttonIndex?: number;
+  replyText?: string;
+}) {
+  const { data: conv } = await admin
+    .from("whatsapp_conversations")
+    .select("*")
+    .eq("id", args.conversationId)
+    .maybeSingle();
+  if (!conv) {
+    log("from_template: conversation not found", args.conversationId);
+    return { started: 0 };
+  }
+  const phone =
+    (args.customerPhone && args.customerPhone.replace(/\D/g, "")) ||
+    (conv.customer_phone || "").replace(/\D/g, "");
+
+  const { data: order } = args.orderId
+    ? await admin.from("orders").select("*").eq("order_id", args.orderId).maybeSingle()
+    : { data: null };
+
+  const { data: autos } = await admin
+    .from("whatsapp_automations")
+    .select("*")
+    .eq("trigger_type", "from_template")
+    .eq("status", "active");
+  const matched = (autos ?? []).filter(
+    (a) => (a.trigger_config as any)?.template_id === args.templateId,
+  );
+  if (!matched.length) {
+    log("from_template: no automations for template", args.templateId);
+    return { started: 0 };
+  }
+
+  const handleWanted =
+    typeof args.buttonIndex === "number" ? `btn:${args.buttonIndex}` : "default";
+
+  let started = 0;
+  for (const a of matched) {
+    const nodes: FlowNode[] = (a.nodes as any) ?? [];
+    const edges: FlowEdge[] = (a.edges as any) ?? [];
+    if (!nodes.length || !edges.length) continue;
+
+    const triggerEdges = edges.filter((e) => e.source === "__trigger__");
+    const entryEdge =
+      triggerEdges.find((e) => e.sourceHandle === handleWanted) ||
+      (handleWanted !== "default"
+        ? triggerEdges.find((e) => e.sourceHandle === "default")
+        : undefined);
+
+    if (!entryEdge) {
+      log("from_template: no branch for handle", { auto: a.id, handle: handleWanted });
+      continue;
+    }
+    const entryNode = nodes.find((n) => n.id === entryEdge.target);
+    if (!entryNode) {
+      log("from_template: entry node missing", entryEdge.target);
+      continue;
+    }
+
+    const { data: run, error } = await admin
+      .from("whatsapp_automation_runs")
+      .insert({
+        automation_id: a.id,
+        order_id: order?.order_id ?? null,
+        customer_phone: phone,
+        conversation_id: conv.id,
+        status: "running",
+        current_node_id: entryNode.id,
+        trigger_payload: {
+          trigger_type: "from_template",
+          template_id: args.templateId,
+          conversation_id: conv.id,
+          button_index: args.buttonIndex ?? null,
+          reply_text: args.replyText ?? null,
+        },
+        steps_log: [],
+      })
+      .select()
+      .single();
+    if (error) {
+      errLog("from_template run insert failed", error);
+      continue;
+    }
+
+    await admin
+      .from("whatsapp_automations")
+      .update({
+        runs_count: (a.runs_count ?? 0) + 1,
+        last_run_at: new Date().toISOString(),
+      })
+      .eq("id", a.id);
+
+    await executeFlow({
+      runId: run.id,
+      automation: a,
+      order,
+      conversation: conv,
+      startNodeId: entryNode.id,
+    });
+    started++;
+  }
+  return { started };
+}
+
+
   const { data: run } = await admin
     .from("whatsapp_automation_runs")
     .select("*")
