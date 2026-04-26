@@ -129,12 +129,63 @@ async function sendTemplateForRecipient(
   const re = /\{\{\s*([\w]+)\s*\}\}/g;
   let mm: RegExpExecArray | null;
   while ((mm = re.exec(tplBody)) !== null) placeholders.push(mm[1]);
+
+  // Resolve a placeholder name to an actual value from recipient variables.
+  // Supports:
+  //  - Direct keys: customer_name, product_name, order_id, price, city
+  //  - Common synonyms: name, product, order, total, address
+  //  - Positional: {{1}}, {{2}}, {{var_1}}, {{var_2}} → ordered fallbacks
+  const vars = recipient.variables ?? {};
+  const positional = [
+    vars.customer_name,
+    vars.product_name,
+    vars.order_id,
+    vars.price,
+    vars.city,
+  ];
+  const synonyms: Record<string, any> = {
+    name: vars.customer_name,
+    customer: vars.customer_name,
+    customer_name: vars.customer_name,
+    product: vars.product_name,
+    product_name: vars.product_name,
+    order: vars.order_id,
+    order_id: vars.order_id,
+    price: vars.price,
+    total: vars.price,
+    amount: vars.price,
+    city: vars.city,
+    address: vars.city,
+  };
+  const resolveVar = (name: string): string => {
+    // Direct match in variables
+    if (vars[name] !== undefined && vars[name] !== null && String(vars[name]).trim() !== "") {
+      return String(vars[name]);
+    }
+    // Synonym match
+    const key = name.toLowerCase();
+    if (synonyms[key] !== undefined && synonyms[key] !== null && String(synonyms[key]).trim() !== "") {
+      return String(synonyms[key]);
+    }
+    // Positional: {{1}}, {{2}}, {{var_1}}, {{var2}}, {{param_1}}
+    const numMatch = key.match(/^(?:var|param|p|v)?_?(\d+)$/);
+    if (numMatch) {
+      const idx = parseInt(numMatch[1], 10) - 1;
+      if (idx >= 0 && idx < positional.length) {
+        const val = positional[idx];
+        if (val !== undefined && val !== null && String(val).trim() !== "") return String(val);
+      }
+    }
+    // Last-resort fallback so Meta never rejects with empty parameter
+    return "—";
+  };
+
   if (placeholders.length > 0) {
     components.push({
       type: "body",
       parameters: placeholders.map((name) => ({
         type: "text",
-        text: String(recipient.variables?.[name] ?? ""),
+        text: resolveVar(name),
       })),
     });
   }
