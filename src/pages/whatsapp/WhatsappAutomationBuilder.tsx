@@ -135,6 +135,8 @@ export default function WhatsappAutomationBuilder() {
       errors.push("Delivery trigger needs target status");
     if (automation?.trigger_type === "follow_up_status_changed" && !triggerConfig.to)
       errors.push("Follow-up trigger needs target status");
+    if (automation?.trigger_type === "from_template" && !triggerConfig.template_id)
+      errors.push("Pick the template that should trigger this automation");
     return { ok: errors.length === 0, errors };
   }, [nodes, triggerConfig, automation?.trigger_type]);
 
