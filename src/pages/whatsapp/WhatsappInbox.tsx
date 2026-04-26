@@ -63,6 +63,9 @@ type Conv = {
   last_read_at: string | null;
   updated_at: string;
   ai_enabled?: boolean;
+  review_note?: string | null;
+  resolved_by?: string | null;
+  resolved_at?: string | null;
 };
 
 type Msg = {
@@ -290,6 +293,7 @@ const statusBadge = (s: string) => {
     canceled: { label: "canceled", cls: "bg-rose-500/15 text-rose-500 border-rose-500/25" },
     more_info: { label: "sent to agent", cls: "bg-violet-500/15 text-violet-500 border-violet-500/25" },
     manual_review_needed: { label: "needs review", cls: "bg-sky-500/15 text-sky-500 border-sky-500/25" },
+    handled: { label: "resolved", cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25" },
   };
   return map[s] ?? { label: s || "—", cls: "bg-muted text-muted-foreground border-border" };
 };
@@ -370,6 +374,9 @@ export default function WhatsappInbox() {
   const [recording, setRecording] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [orderInfoOpen, setOrderInfoOpen] = useState(false);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [resolveNote, setResolveNote] = useState("");
+  const [resolving, setResolving] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -634,6 +641,45 @@ export default function WhatsappInbox() {
   };
 
   const aiEnabled = conv?.ai_enabled !== false;
+
+  const markAsResolved = async () => {
+    if (!selected || !conv) return;
+    setResolving(true);
+    const note = resolveNote.trim();
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("whatsapp_conversations")
+      .update({
+        status: "handled",
+        review_note: note || null,
+        resolved_by: u?.user?.id ?? null,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("id", selected);
+    if (error) {
+      setResolving(false);
+      toast.error(error.message || "Failed to mark as resolved");
+      return;
+    }
+    // Save the note as an internal note in the chat for traceability
+    if (note) {
+      await supabase.from("whatsapp_messages").insert({
+        conversation_id: selected,
+        order_id: conv.order_id ?? null,
+        direction: "in",
+        message_type: "note",
+        body: `[Resolved] ${note}`,
+        status: "internal",
+        payload: { internal_note: true, resolution: true },
+      });
+    }
+    setResolving(false);
+    setResolveOpen(false);
+    setResolveNote("");
+    qc.invalidateQueries({ queryKey: ["wts-convos"] });
+    qc.invalidateQueries({ queryKey: ["wts-msgs", selected] });
+    toast.success("Conversation marked as resolved");
+  };
   const toggleAi = async () => {
     if (!selected || !conv) return;
     const next = !aiEnabled;
@@ -1142,6 +1188,21 @@ export default function WhatsappInbox() {
                   </div>
                   </div>
                 </div>
+
+                {/* Mark as resolved (only when conversation needs review) */}
+                {conv?.status === "manual_review_needed" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setResolveOpen(true)}
+                    className="h-8 shrink-0 gap-1.5 rounded-full px-3 text-xs font-medium border-sky-500/30 bg-sky-500/10 text-sky-600 hover:bg-sky-500/20 hover:text-sky-700 dark:text-sky-400"
+                    title="Mark this conversation as resolved"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span className="hidden md:inline">Mark Resolved</span>
+                  </Button>
+                )}
 
                 {/* AI auto-reply toggle */}
                 <Button
@@ -1826,6 +1887,44 @@ export default function WhatsappInbox() {
                 No order linked to this conversation
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark as resolved dialog */}
+      <Dialog open={resolveOpen} onOpenChange={(o) => { setResolveOpen(o); if (!o) setResolveNote(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-sky-500" />
+              Mark as Resolved
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Confirm this conversation has been handled. Add an optional note to record what was done.
+            </p>
+            <Textarea
+              value={resolveNote}
+              onChange={(e) => setResolveNote(e.target.value)}
+              placeholder="Reviewer note (optional)…"
+              rows={4}
+              className="resize-none"
+            />
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Button variant="ghost" size="sm" onClick={() => setResolveOpen(false)} disabled={resolving}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={markAsResolved}
+                disabled={resolving}
+                className="gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white"
+              >
+                {resolving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                Mark Resolved
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
