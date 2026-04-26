@@ -355,7 +355,7 @@ export default function WhatsappInbox() {
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<
-    "all" | "unread" | "ai_on" | "ai_off" | "with_order" | "no_order" | "window_open"
+    "all" | "unread" | "needs_review" | "ai_on" | "ai_off" | "with_order" | "no_order" | "window_open"
   >("all");
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [tab, setTab] = useState<"reply" | "note">("reply");
@@ -538,6 +538,8 @@ export default function WhatsappInbox() {
     }
     if (filter === "unread") {
       list = list.filter((c) => (unreadMap[c.id] ?? 0) > 0);
+    } else if (filter === "needs_review") {
+      list = list.filter((c) => c.status === "manual_review_needed");
     } else if (filter === "ai_on") {
       list = list.filter((c) => c.ai_enabled !== false);
     } else if (filter === "ai_off") {
@@ -567,6 +569,11 @@ export default function WhatsappInbox() {
   const totalUnread = useMemo(
     () => Object.values(unreadMap).reduce((sum, n) => sum + n, 0),
     [unreadMap],
+  );
+
+  const needsReviewCount = useMemo(
+    () => convos.filter((c) => c.status === "manual_review_needed").length,
+    [convos],
   );
 
   const markAllAsRead = async () => {
@@ -879,6 +886,7 @@ export default function WhatsappInbox() {
               {([
                 { key: "all", label: "All" },
                 { key: "unread", label: "Unread" },
+                { key: "needs_review", label: "Needs Review", count: needsReviewCount },
                 { key: "ai_on", label: "AI On" },
                 { key: "ai_off", label: "AI Off" },
                 { key: "with_order", label: "With Order" },
@@ -889,13 +897,25 @@ export default function WhatsappInbox() {
                   key={f.key}
                   onClick={() => setFilter(f.key)}
                   className={cn(
-                    "px-2.5 py-1 rounded-full font-medium border transition-colors text-[11px]",
+                    "px-2.5 py-1 rounded-full font-medium border transition-colors text-[11px] inline-flex items-center gap-1",
                     filter === f.key
-                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                      ? f.key === "needs_review"
+                        ? "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30"
+                        : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                       : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/50",
                   )}
                 >
                   {f.label}
+                  {"count" in f && f.count > 0 && (
+                    <span className={cn(
+                      "inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-semibold",
+                      filter === f.key
+                        ? "bg-sky-500 text-white"
+                        : "bg-sky-500/20 text-sky-600 dark:text-sky-400",
+                    )}>
+                      {f.count > 99 ? "99+" : f.count}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
