@@ -1844,11 +1844,13 @@ export type Database = {
           customer_name: string | null
           customer_phone: string
           id: string
+          labels: string[]
           last_message_at: string | null
           last_read_at: string | null
           last_reply_at: string | null
           order_id: string | null
           outcome: string | null
+          pending_button_intent: Json | null
           status: string
           updated_at: string
         }
@@ -1858,11 +1860,13 @@ export type Database = {
           customer_name?: string | null
           customer_phone: string
           id?: string
+          labels?: string[]
           last_message_at?: string | null
           last_read_at?: string | null
           last_reply_at?: string | null
           order_id?: string | null
           outcome?: string | null
+          pending_button_intent?: Json | null
           status?: string
           updated_at?: string
         }
@@ -1872,11 +1876,13 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string
           id?: string
+          labels?: string[]
           last_message_at?: string | null
           last_read_at?: string | null
           last_reply_at?: string | null
           order_id?: string | null
           outcome?: string | null
+          pending_button_intent?: Json | null
           status?: string
           updated_at?: string
         }
