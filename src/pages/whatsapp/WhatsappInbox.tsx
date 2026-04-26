@@ -1143,7 +1143,7 @@ export default function WhatsappInbox() {
                               {isOut && m.status && (
                                 <>
                                   {m.status === "failed" ? (
-                                    <span className="inline-flex items-center gap-0.5 text-red-200 font-semibold">
+                                    <span className="inline-flex items-center gap-0.5 text-red-200 font-semibold" title="Message failed to deliver">
                                       <AlertCircle className="w-3 h-3" />
                                       failed
                                     </span>
