@@ -309,6 +309,7 @@ async function logOrderHistory(args: {
     const { error } = await admin.from("order_history").insert(rows);
     if (error) errLog("order_history insert failed", error.message);
   } catch (e) {
+    errLog("logOrderHistory exception", (e as Error).message);
   }
 }
 
