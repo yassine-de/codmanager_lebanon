@@ -908,7 +908,7 @@ function FromTemplateConfig({
 
 /* ---------- Render a node + its children recursively ---------- */
 function NodeBranch({
-  nodeId, nodes, childrenMap, selectedId, onSelect, onAddBelow, onDelete,
+  nodeId, nodes, childrenMap, selectedId, onSelect, onAddBelow, onDelete, onUpdateNodeData,
 }: {
   nodeId: string;
   nodes: FlowNode[];
@@ -917,6 +917,7 @@ function NodeBranch({
   onSelect: (id: string) => void;
   onAddBelow: (id: string, handle?: string) => void;
   onDelete: (id: string) => void;
+  onUpdateNodeData: (id: string, data: Record<string, any>) => void;
 }) {
   const node = nodes.find((n) => n.id === nodeId);
   if (!node) return null;
