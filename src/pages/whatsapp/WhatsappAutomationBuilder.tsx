@@ -514,6 +514,7 @@ export default function WhatsappAutomationBuilder() {
                                     onSelect={setSelectedNodeId}
                                     onAddBelow={(fromId, h) => openAddStep(fromId, h)}
                                     onDelete={deleteNode}
+                                  onUpdateNodeData={updateNodeData}
                                   />
                                 ) : (
                                   <>
@@ -546,6 +547,7 @@ export default function WhatsappAutomationBuilder() {
                                   onSelect={setSelectedNodeId}
                                   onAddBelow={(fromId, h) => openAddStep(fromId, h)}
                                   onDelete={deleteNode}
+                                  onUpdateNodeData={updateNodeData}
                                 />
                               ) : (
                                 <>
@@ -576,6 +578,7 @@ export default function WhatsappAutomationBuilder() {
                                   onSelect={setSelectedNodeId}
                                   onAddBelow={(fromId, h) => openAddStep(fromId, h)}
                                   onDelete={deleteNode}
+                                  onUpdateNodeData={updateNodeData}
                                 />
                               ))}
                             </div>
@@ -609,6 +612,7 @@ export default function WhatsappAutomationBuilder() {
                         onSelect={setSelectedNodeId}
                         onAddBelow={(fromId, handle) => openAddStep(fromId, handle)}
                         onDelete={deleteNode}
+                                  onUpdateNodeData={updateNodeData}
                       />
                     ));
                   })()}
@@ -986,6 +990,7 @@ function NodeBranch({
                     onSelect={onSelect}
                     onAddBelow={onAddBelow}
                     onDelete={onDelete}
+                    onUpdateNodeData={onUpdateNodeData}
                   />
                 ) : (
                   <>
@@ -1090,6 +1095,7 @@ function NodeBranch({
                     onSelect={onSelect}
                     onAddBelow={onAddBelow}
                     onDelete={onDelete}
+                    onUpdateNodeData={onUpdateNodeData}
                   />
                 ) : (
                   <>
@@ -1118,6 +1124,7 @@ function NodeBranch({
             onSelect={onSelect}
             onAddBelow={onAddBelow}
             onDelete={onDelete}
+                    onUpdateNodeData={onUpdateNodeData}
           />
         ))
       ) : (
