@@ -679,15 +679,28 @@ function CreateCampaignDialog({
                 label="Sellers"
                 options={sellers.map((s) => ({ value: s.id, label: s.name }))}
                 selected={filters.seller_ids}
-                onChange={(v) => setFilters({ ...filters, seller_ids: v })}
+                onChange={(v) => {
+                  // Drop any selected products that don't belong to the new seller scope
+                  const allowedNames = new Set(
+                    (products as any[])
+                      .filter((p) => v.length === 0 || v.includes(p.seller_id))
+                      .map((p) => p.name),
+                  );
+                  setFilters({
+                    ...filters,
+                    seller_ids: v,
+                    product_names: filters.product_names.filter((n) => allowedNames.has(n)),
+                  });
+                }}
               />
 
               <FilterMultiSelect
                 label="Products"
-                options={products.map((p: any) => ({ value: p.name, label: p.name }))}
+                options={filteredProductOptions}
                 selected={filters.product_names}
                 onChange={(v) => setFilters({ ...filters, product_names: v })}
               />
+
 
               <FilterMultiSelect
                 label="Confirmation Status"
