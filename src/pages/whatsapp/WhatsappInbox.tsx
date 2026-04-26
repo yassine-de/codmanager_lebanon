@@ -571,6 +571,11 @@ export default function WhatsappInbox() {
     [unreadMap],
   );
 
+  const needsReviewCount = useMemo(
+    () => convos.filter((c) => c.status === "manual_review_needed").length,
+    [convos],
+  );
+
   const markAllAsRead = async () => {
     const unreadIds = Object.keys(unreadMap).filter((id) => (unreadMap[id] ?? 0) > 0);
     if (unreadIds.length === 0) {
