@@ -1132,24 +1132,23 @@ async function tryExtractAndConfirmAddress(args: {
     return;
   }
 
-  const extractPrompt = `You are an address-extraction assistant. Given a WhatsApp conversation between a customer and a sales agent in Pakistan, extract the customer's complete delivery address ONLY if all required parts are present.
+  const extractPrompt = `You are an address-extraction assistant. Given a WhatsApp conversation between a customer and a sales agent in Pakistan, extract the customer's delivery address ONLY if it is detailed enough for a courier to find.
 
-Required parts:
-- house_or_flat (house/flat/shop number)
-- street (street name or block)
-- area (neighborhood / sector / landmark)
-- city (must be a real Pakistan city)
+What "detailed enough" means:
+- The address must contain a city (a real Pakistan city) AND
+- At least ONE strong location signal: a house/flat/plot/shop number, OR a specific street/lane/road name, OR a clear block/sector/phase identifier, OR a recognizable named landmark (mosque, school, bazaar, plaza, etc.) tied to a specific area.
+- A combination of these signals is even better, but not all are required.
 
 Return JSON ONLY in this exact schema:
 { "complete": boolean, "full_address": string, "city": string }
 
 Rules:
-- "complete" = true ONLY if house/flat number, street, AND area are ALL explicitly present (city is mandatory too).
-- "full_address" must be a single line combining house/flat + street + area (DO NOT include the city).
+- "complete" = true ONLY if the address is specific enough for a courier (a single named landmark with no area/city is NOT enough; a city alone is NOT enough).
+- "full_address" must be a single line containing all detail parts the customer provided (house/flat, street, block/sector, area, landmark) — DO NOT include the city.
 - "city" must be the city name in English/Latin script (e.g. "Karachi", "Lahore").
-- REJECT obvious fake / test / placeholder addresses such as "test address", "fake", "dummy", "sample", "abc", "xyz", "n/a", "asdf", random keyboard mashing, or a single word. For these, return complete=false.
-- REJECT vague answers like just "my home", "same as before", "near masjid" without a real street/area, or only a city name.
-- If ANY required part is missing, vague, fake, or test data, return { "complete": false, "full_address": "", "city": "" }.
+- REJECT obvious fake / test / placeholder values such as "test address", "fake", "dummy", "sample", "abc", "xyz", "n/a", "asdf", random keyboard mashing, or a single word. For these, return complete=false.
+- REJECT vague answers like just "my home", "same as before", "here", "send it" or only a city name.
+- If the address is missing, vague, fake, or not detailed enough, return { "complete": false, "full_address": "", "city": "" }.
 - DO NOT invent details. Only use what the customer explicitly said.`;
 
   const extractMessages = [
