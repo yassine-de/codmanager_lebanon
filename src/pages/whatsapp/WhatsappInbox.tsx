@@ -123,6 +123,15 @@ function AudioMessagePlayer({ message }: { message: Msg }) {
         });
 
         if (!response.ok) {
+          // 404 = audio expired on WhatsApp servers (Meta only retains media ~30 days). Treat as unavailable, no error.
+          if (response.status === 404) {
+            if (!cancelled) {
+              setFailed(true);
+              setSrc(null);
+              setLoading(false);
+            }
+            return;
+          }
           throw new Error(`Audio proxy failed (${response.status})`);
         }
 
@@ -140,7 +149,7 @@ function AudioMessagePlayer({ message }: { message: Msg }) {
 
         setSrc(objectUrl);
       } catch (error) {
-        console.error("Failed to load WhatsApp audio", error);
+        // Silent fail — UI shows "audio unavailable" state. Avoid console.error to prevent runtime overlay.
         if (!cancelled) {
           setFailed(true);
           setSrc(null);
