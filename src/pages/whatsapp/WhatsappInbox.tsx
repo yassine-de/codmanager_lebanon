@@ -374,6 +374,9 @@ export default function WhatsappInbox() {
   const [recording, setRecording] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [orderInfoOpen, setOrderInfoOpen] = useState(false);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [resolveNote, setResolveNote] = useState("");
+  const [resolving, setResolving] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
