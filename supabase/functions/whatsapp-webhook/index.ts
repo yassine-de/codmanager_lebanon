@@ -236,7 +236,7 @@ async function applyOutcome(
   } else if (outcome === "canceled") {
     updates.confirmation_status = "cancelled";
     updates.confirmation_channel = "whatsapp";
-    updates.cancelled_at = new Date().toISOString();
+    updates.cancel_reason = "Canceled by customer via WhatsApp";
     updates.whatsapp_note = "Canceled in WhatsApp";
     updates.note = `${order.note ? order.note + "\n" : ""}Canceled in WhatsApp`;
   }
