@@ -1130,15 +1130,23 @@ function CampaignDetailsDialog({ campaign, onClose }: { campaign: Campaign | nul
                     No recipients yet.
                   </div>
                 ) : recipients.map((r: any) => (
-                  <div key={r.id} className="p-3 flex items-center justify-between gap-3 text-sm">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{r.customer_name || "—"}</div>
-                      <div className="text-xs text-muted-foreground">{r.customer_phone}</div>
+                  <div key={r.id} className="p-3 flex flex-col gap-1.5 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{r.customer_name || "—"}</div>
+                        <div className="text-xs text-muted-foreground">{r.customer_phone}</div>
+                      </div>
+                      {r.order_id && (
+                        <Badge variant="outline" className="text-xs">{r.order_id}</Badge>
+                      )}
+                      <RecipientStatusBadge status={r.status} />
                     </div>
-                    {r.order_id && (
-                      <Badge variant="outline" className="text-xs">{r.order_id}</Badge>
+                    {r.status === "failed" && (
+                      <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded px-2 py-1.5">
+                        <span className="font-medium">Reason: </span>
+                        {explainFailure(r.error_message)}
+                      </div>
                     )}
-                    <RecipientStatusBadge status={r.status} />
                   </div>
                 ))}
               </div>
@@ -1157,6 +1165,32 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <span className="font-medium">{value}</span>
     </div>
   );
+}
+
+function explainFailure(raw?: string | null): string {
+  if (!raw) return "No reason reported by WhatsApp.";
+  const s = String(raw);
+  // Meta error code mapping
+  if (/131026/.test(s)) return "Message undeliverable — the recipient's number can't be reached on WhatsApp (not registered, blocked the business, or no app).";
+  if (/131030/.test(s)) return "Recipient not in allowed list — phone number not authorized to receive messages from this business.";
+  if (/131047/.test(s)) return "24-hour window expired — customer hasn't messaged in 24h, only template messages allowed.";
+  if (/131051/.test(s)) return "Unsupported message type for this recipient.";
+  if (/131008/.test(s)) return "Missing template parameter — one of the template variables was empty.";
+  if (/131009/.test(s)) return "Parameter format mismatch — a template variable doesn't match the expected format.";
+  if (/131053/.test(s)) return "Media upload failed — the file format/codec isn't supported by WhatsApp.";
+  if (/132000/.test(s)) return "Template parameter count mismatch — number of variables doesn't match the template.";
+  if (/132001/.test(s)) return "Template doesn't exist or wasn't approved in this language.";
+  if (/132005/.test(s)) return "Template translated content too long.";
+  if (/132007/.test(s)) return "Template format error — rejected by WhatsApp.";
+  if (/132012|132015/.test(s)) return "Template parameter format invalid.";
+  if (/133000/.test(s)) return "Incomplete deregistration — number was being deregistered.";
+  if (/133010/.test(s)) return "Phone number not registered on WhatsApp Business.";
+  if (/368/.test(s)) return "Number temporarily blocked by Meta (policy/quality issue).";
+  if (/rate.?limit/i.test(s)) return "Rate limit reached — too many messages sent in a short time.";
+  if (/invalid.+phone|phone.+invalid/i.test(s)) return "Invalid phone number format.";
+  if (/template/i.test(s) && /not.+found|missing/i.test(s)) return "Template not found or not approved.";
+  // Fallback: show raw message trimmed
+  return s.length > 200 ? s.slice(0, 200) + "…" : s;
 }
 
 function RecipientStatusBadge({ status }: { status: string }) {
