@@ -204,6 +204,82 @@ function AudioMessagePlayer({ message }: { message: Msg }) {
   return <audio controls preload="metadata" src={src} className="max-w-full" />;
 }
 
+/**
+ * Renders an image attachment by fetching it through the media-proxy edge function.
+ * WhatsApp's lookaside.fbsbx.com URLs require a Bearer token, so we cannot use them
+ * as <img src> directly — we proxy + blob URL instead.
+ */
+function MediaImage({ message, directUrl, alt = "attachment", className }: { message: Msg; directUrl?: string | null; alt?: string; className?: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const isTemporary = typeof directUrl === "string" && directUrl.includes("lookaside.fbsbx.com");
+
+  useEffect(() => {
+    if (directUrl && !isTemporary) {
+      setSrc(directUrl);
+      setFailed(false);
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    const load = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) throw new Error("Missing session");
+
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-media-proxy?messageId=${message.id}`;
+        const response = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const contentType = response.headers.get("Content-Type") || "";
+        if (!response.ok || contentType.includes("application/json")) {
+          if (!cancelled) setFailed(true);
+          return;
+        }
+
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        setSrc(objectUrl);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [message.id, directUrl, isTemporary]);
+
+  if (failed) {
+    return (
+      <div className="text-xs text-muted-foreground italic px-2 py-3">
+        Image unavailable (expired on WhatsApp servers)
+      </div>
+    );
+  }
+
+  if (!src) {
+    return (
+      <div className={cn("flex items-center justify-center bg-muted/40 rounded-lg", className)} style={{ minHeight: 120, minWidth: 160 }}>
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return <img src={src} alt={alt} className={className} />;
+}
+
 const statusBadge = (s: string) => {
   const map: Record<string, { label: string; cls: string }> = {
     pending: { label: "open", cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25" },
