@@ -15,6 +15,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import {
   ChevronLeft, Save, Play, Pause, CheckCircle2, Eye, Pencil, Plus,
   MessageSquare, FileText, Sparkles, GitBranch, Clock, Tag, Trash2,
