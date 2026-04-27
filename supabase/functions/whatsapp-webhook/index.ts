@@ -914,8 +914,17 @@ async function handleIncoming(value: any) {
               const { data: o } = await admin.from("orders").select("*").eq("id", orderId).maybeSingle();
               if (o) freshOrder = o;
             }
+            // Re-fetch conv too — applyOutcome may have stashed pending_button_intent
+            // (gated confirm) or flipped ai_enabled while we were waiting.
+            let freshConv = conv;
+            const { data: c } = await admin
+              .from("whatsapp_conversations")
+              .select("*")
+              .eq("id", convId)
+              .maybeSingle();
+            if (c) freshConv = c;
 
-            await aiContinueReply({ conv, order: freshOrder, customerText: combinedText || bodyText });
+            await aiContinueReply({ conv: freshConv, order: freshOrder, customerText: combinedText || bodyText });
           } catch (e) {
             errLog("ai continuation failed", (e as Error).message);
           }
