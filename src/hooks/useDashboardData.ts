@@ -173,17 +173,17 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
     nextDay.setDate(nextDay.getDate() + 1);
     const dayOrders = orders.filter((o) => {
       const treatDate = getTreatmentDate(o);
-      return isAfter(treatDate, date) && !isAfter(treatDate, nextDay);
+      return isInDay(treatDate, date, nextDay);
     });
     const confirmed = orders.filter((o) => {
       if (!reachedConfirmedStage(o)) return false;
       const confirmationDate = getConfirmationEventDate(o);
-      return isAfter(confirmationDate, date) && !isAfter(confirmationDate, nextDay);
+      return isInDay(confirmationDate, date, nextDay);
     }).length;
     // Dropped = orders created on this day (based on created_at, not treatment date)
     const dropped = orders.filter((o) => {
       const createdDate = new Date(o.created_at);
-      return isAfter(createdDate, date) && !isAfter(createdDate, nextDay);
+      return isInDay(createdDate, date, nextDay);
     }).length;
     const total = dayOrders.length;
     // Confirmed = confirmation events that happened on this day, regardless of current delivery status.
