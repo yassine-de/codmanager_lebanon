@@ -145,7 +145,12 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
       return isAfter(createdDate, date) && !isAfter(createdDate, nextDay);
     }).length;
     const total = dayOrders.length;
-    const confirmed = dayOrders.filter(o => o.confirmation_status === 'confirmed').length;
+    // Confirmed = any order whose confirmation event happened on this day,
+    // regardless of where it moved next (booked/shipped/in_transit/delivered/...).
+    const confirmed = dayOrders.filter(o =>
+      o.confirmation_status === 'confirmed' ||
+      ['booked', 'shipped', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'].includes(o.delivery_status || '')
+    ).length;
     const delivered = dayOrders.filter(o => o.delivery_status === 'delivered').length;
     const shipped = dayOrders.filter(o => ['shipped', 'in_transit', 'with_courier', 'delivered'].includes(o.delivery_status || '')).length;
     return {
