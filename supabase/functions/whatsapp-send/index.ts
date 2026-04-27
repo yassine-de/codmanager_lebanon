@@ -219,9 +219,18 @@ Deno.serve(async (req) => {
         }
         mediaObj.id = upJson.id;
         mediaObj.voice = true;
+      } else if (mode === "image") {
+        // WhatsApp Cloud only accepts image/jpeg and image/png. For unsafe
+        // formats (e.g. .webp, .avif) route through wsrv.nl which serves a
+        // re-encoded JPEG with the correct Content-Type.
+        const lowerUrl = body.media_url.toLowerCase().split("?")[0];
+        const safeForLink = /\.(jpe?g|png)$/.test(lowerUrl);
+        mediaObj.link = safeForLink
+          ? body.media_url
+          : `https://wsrv.nl/?url=${encodeURIComponent(body.media_url)}&output=jpg&q=85`;
+        if (bodyText) mediaObj.caption = bodyText;
       } else {
         mediaObj.link = body.media_url;
-        if (mode === "image" && bodyText) mediaObj.caption = bodyText;
         if (mode === "document") {
           if (bodyText) mediaObj.caption = bodyText;
           if (body.media_filename) mediaObj.filename = body.media_filename;

@@ -942,7 +942,20 @@ async function refreshCampaignCounters(campaignId: string) {
 // ---------------------------------------------------------------------------
 // Send a WhatsApp image message (used by the AI when the customer asks for a
 // product photo). Logs the outbound message and returns whether it succeeded.
+//
+// IMPORTANT: WhatsApp Cloud API only accepts image/jpeg and image/png. WebP /
+// AVIF / etc. are rejected ("Unsupported Image mime type image/webp"). We
+// detect non-JPEG/PNG URLs and route them through the public wsrv.nl image
+// proxy which serves a re-encoded JPEG with the correct Content-Type, so
+// Meta's media-fetch accepts it.
 // ---------------------------------------------------------------------------
+function ensureJpegFriendlyUrl(srcUrl: string): string {
+  const lower = srcUrl.toLowerCase().split("?")[0];
+  if (/\.(jpe?g|png)$/.test(lower)) return srcUrl;
+  // Route through wsrv.nl to force re-encoding to image/jpeg.
+  return `https://wsrv.nl/?url=${encodeURIComponent(srcUrl)}&output=jpg&q=85`;
+}
+
 async function sendWhatsappImage(args: {
   to: string;
   imageUrl: string;
@@ -953,7 +966,8 @@ async function sendWhatsappImage(args: {
   accessToken: string;
 }): Promise<boolean> {
   const { to, imageUrl, caption, conversationId, orderId, settings, accessToken } = args;
-  const mediaObj: any = { link: imageUrl };
+  const finalUrl = ensureJpegFriendlyUrl(imageUrl);
+  const mediaObj: any = { link: finalUrl };
   if (caption) mediaObj.caption = caption;
   const payload = {
     messaging_product: "whatsapp",
@@ -977,13 +991,13 @@ async function sendWhatsappImage(args: {
     direction: "out",
     message_type: "image",
     body: caption || "[image]",
-    payload: { ...payload, _ai_continuation: true, _ai_tool: "send_product_image" },
+    payload: { ...payload, _ai_continuation: true, _ai_tool: "send_product_image", _src_url: imageUrl },
     meta_message_id: metaMsgId,
     status: ok ? "sent" : "failed",
     error_message: ok ? null : JSON.stringify(respJson).slice(0, 500),
   });
   if (!ok) errLog("ai send_product_image failed", respJson);
-  else log("ai send_product_image sent", { conv: conversationId });
+  else log("ai send_product_image sent", { conv: conversationId, proxied: finalUrl !== imageUrl });
   return ok;
 }
 
