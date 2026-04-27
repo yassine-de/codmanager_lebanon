@@ -592,8 +592,11 @@ export default function WhatsappInbox() {
       list = list.filter((c) => !c.order_id);
     } else if (filter === "window_open") {
       list = list.filter((c) => {
-        if (!c.last_reply_at) return false;
-        return differenceInHours(new Date(), new Date(c.last_reply_at)) < 24;
+        // Use last_message_at as a proxy for last customer activity (the
+        // 24h WA window opens on inbound messages).
+        const ts = c.last_message_at || c.last_reply_at;
+        if (!ts) return false;
+        return differenceInHours(new Date(), new Date(ts)) < 24;
       });
     }
     // Sort by most recent activity (last message timestamp), WhatsApp-style.
