@@ -201,13 +201,7 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
 export function useDashboardData(dateRange?: DateRange) {
   const { data: allOrders = [], isLoading, error } = useQuery({
     queryKey: ["dashboard-orders"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("id, order_id, confirmation_status, delivery_status, total_amount, price, quantity, product_name, seller_id, created_at, confirmed_at, delivered_at, last_attempt_at, last_activity_at, updated_at");
-      if (error) throw error;
-      return (data || []) as DashboardOrder[];
-    },
+    queryFn: fetchAllDashboardOrders,
     refetchInterval: 30_000, // refresh every 30s so chart picks up new confirmations live
     refetchOnWindowFocus: true,
   });
