@@ -221,7 +221,7 @@ export function useDashboardData(dateRange?: DateRange) {
       if (['delivered', 'paid'].includes(o.delivery_status || '')) map[o.product_name].delivered += o.quantity;
       if (['shipped', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'].includes(o.delivery_status || '')) map[o.product_name].shipped += o.quantity;
       // Confirmed = any order that was confirmed (regardless of current delivery status)
-      if (o.confirmation_status === 'confirmed' || ['shipped', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'].includes(o.delivery_status || '')) {
+      if (reachedConfirmedStage(o)) {
         map[o.product_name].confirmed += o.quantity;
       }
     });
