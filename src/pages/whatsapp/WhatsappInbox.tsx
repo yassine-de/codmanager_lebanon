@@ -960,7 +960,7 @@ export default function WhatsappInbox() {
     <>
       {/* Horizontal filters bar above inbox — hidden on mobile when a conversation is open */}
       <div className={cn(
-        "mb-2 items-center gap-2 flex-wrap rounded-xl border border-border bg-card px-3 py-2",
+        "mb-1.5 items-center gap-2 flex-wrap rounded-xl border border-border bg-card px-3 py-2",
         selected ? "hidden md:flex" : "flex"
       )}>
         <div className="flex items-center gap-1.5 mr-1">
@@ -1006,10 +1006,10 @@ export default function WhatsappInbox() {
 
       <div className={cn(
         "grid grid-cols-12 gap-0 rounded-xl border border-border overflow-hidden bg-card",
-        // Full-screen on mobile when chat is open; constrained on desktop and on mobile list view
+        // Full-screen on mobile when chat is open; near-full viewport on desktop to maximize message area
         selected
-          ? "h-[calc(100dvh-80px)] max-h-[calc(100dvh-80px)] md:h-[calc(100dvh-200px)] md:max-h-[calc(100dvh-160px)]"
-          : "h-[calc(100dvh-200px)] max-h-[calc(100dvh-160px)]"
+          ? "h-[calc(100dvh-80px)] max-h-[calc(100dvh-80px)] md:h-[calc(100dvh-140px)] md:max-h-[calc(100dvh-140px)]"
+          : "h-[calc(100dvh-140px)] max-h-[calc(100dvh-140px)]"
       )}>
         {/* LEFT PANEL — hidden on mobile when a conversation is selected */}
         <aside className={cn(
