@@ -35,6 +35,7 @@ import {
   Check,
   CheckCheck,
   AlertCircle,
+  Languages,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -377,6 +378,9 @@ export default function WhatsappInbox() {
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolveNote, setResolveNote] = useState("");
   const [resolving, setResolving] = useState(false);
+  // Per-message English translations (internal only)
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [translatingId, setTranslatingId] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -693,6 +697,34 @@ export default function WhatsappInbox() {
     }
     qc.invalidateQueries({ queryKey: ["wts-convos"] });
     toast.success(next ? "AI auto-reply enabled" : "AI stopped for this conversation");
+  };
+
+  // Detect if a message body likely needs English translation (internal staff only).
+  const needsTranslation = (text: string | null | undefined): boolean => {
+    if (!text) return false;
+    const t = text.trim();
+    if (t.length < 2) return false;
+    if (/[\u0600-\u06FF\u0900-\u097F\u0980-\u09FF\u4E00-\u9FFF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(t)) {
+      return true;
+    }
+    const romanHints = /\b(hai|hain|nahi|nhi|kya|kyun|kyu|kuch|raha|rahi|rahe|karo|karna|mujhe|mera|meri|aap|apka|tum|tumhara|bhai|theek|thik|acha|achha|abhi|chahiye|paisa|paise|qeemat|keemat|bhej|plz|haan|bilkul|sahi|ghalat|samjh|samajh|matlab|kaisa|kaise|kahan|magar|lekin|liye|wala|wali|mein|hum|hamara|pouch|pucha|baat|kaam)\b/i;
+    return romanHints.test(t);
+  };
+
+  const handleTranslate = async (m: Msg) => {
+    if (!m.body || translations[m.id]) return;
+    setTranslatingId(m.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-translate", {
+        body: { message_id: m.id, text: m.body },
+      });
+      if (error || !data?.ok) throw new Error(error?.message || data?.error || "Translation failed");
+      setTranslations((prev) => ({ ...prev, [m.id]: data.translation }));
+    } catch (e: any) {
+      toast.error(e.message || "Translation failed");
+    } finally {
+      setTranslatingId(null);
+    }
   };
 
   const sendReply = async () => {
@@ -1389,6 +1421,38 @@ export default function WhatsappInbox() {
                                   })}
                                 </div>
                               );
+                            })()}
+                            {/* Internal English translation (staff-only, never sent to customer) */}
+                            {!isOut && !isTemplate && m.body && (() => {
+                              const cached = m.payload?._translation_en as string | undefined;
+                              const shown = translations[m.id] || cached;
+                              if (shown) {
+                                return (
+                                  <div className="mt-1.5 pt-1.5 border-t border-border/60 text-[12px] italic text-muted-foreground flex gap-1.5">
+                                    <Languages className="h-3 w-3 mt-0.5 shrink-0 opacity-70" />
+                                    <span className="whitespace-pre-wrap break-words">{shown}</span>
+                                  </div>
+                                );
+                              }
+                              if (needsTranslation(m.body)) {
+                                const isLoading = translatingId === m.id;
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTranslate(m)}
+                                    disabled={isLoading}
+                                    className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-60"
+                                  >
+                                    {isLoading ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Languages className="h-3 w-3" />
+                                    )}
+                                    {isLoading ? "Translating…" : "Translate to English"}
+                                  </button>
+                                );
+                              }
+                              return null;
                             })()}
                             <div
                               className={cn(
