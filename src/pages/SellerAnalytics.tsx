@@ -68,14 +68,7 @@ export default function SellerAnalytics() {
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["seller-analytics-orders"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("id, order_id, confirmation_status, delivery_status, product_name, seller_id, price, quantity, created_at, delivered_at")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: fetchAllSellerAnalyticsOrders,
   });
 
   const { data: profiles = [] } = useQuery({
@@ -101,8 +94,14 @@ export default function SellerAnalytics() {
   const filteredOrders = useMemo(() => {
     let filtered = [...orders];
     if (sellerFilter !== "all") filtered = filtered.filter(o => o.seller_id === sellerFilter);
-    if (dateRange?.from) filtered = filtered.filter(o => new Date(o.created_at) >= dateRange.from!);
-    if (dateRange?.to) filtered = filtered.filter(o => new Date(o.created_at) <= dateRange.to!);
+    if (dateRange?.from) filtered = filtered.filter(o => {
+      const date = reachedConfirmedStage(o) ? getConfirmationDate(o) : new Date(o.created_at);
+      return date >= startOfDay(dateRange.from!);
+    });
+    if (dateRange?.to) filtered = filtered.filter(o => {
+      const date = reachedConfirmedStage(o) ? getConfirmationDate(o) : new Date(o.created_at);
+      return date <= endOfDay(dateRange.to!);
+    });
     return filtered;
   }, [orders, sellerFilter, dateRange]);
 
@@ -111,7 +110,7 @@ export default function SellerAnalytics() {
 
   const stats = useMemo(() => {
     const total = filteredOrders.length;
-    const confirmed = filteredOrders.filter(o => o.confirmation_status === "confirmed").length;
+    const confirmed = filteredOrders.filter(reachedConfirmedStage).length;
     // Shipped = all orders that left warehouse (in transit + delivered + returned)
     const shipped = filteredOrders.filter(o => o.delivery_status && shippedStatuses.includes(o.delivery_status)).length;
     // Delivered = successfully received by customer
