@@ -1371,6 +1371,26 @@ export default function WhatsappInbox() {
                   </Button>
                 )}
 
+                {/* Force to Agent — hand the order off to the call-center queue */}
+                {conv?.order_id && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={forceToAgent}
+                    disabled={forcingAgent}
+                    className="h-8 shrink-0 gap-1.5 rounded-full px-3 text-xs font-medium border-orange-500/30 bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 hover:text-orange-700 dark:text-orange-400"
+                    title="Stop AI and send this order to the agent queue"
+                  >
+                    {forcingAgent ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <UserPlus className="h-3.5 w-3.5" />
+                    )}
+                    <span className="hidden md:inline">Force to Agent</span>
+                  </Button>
+                )}
+
                 {/* AI auto-reply toggle */}
                 <Button
                   type="button"
