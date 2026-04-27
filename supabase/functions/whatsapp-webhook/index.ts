@@ -367,11 +367,42 @@ async function resolveRepliedTemplate(replyToMetaMessageId?: string | null): Pro
   return tplId ? String(tplId) : null;
 }
 
+// Module-level helper: validates a stored address looks like a real, detailed,
+// courier-deliverable address. Used by applyOutcome (button confirm gating)
+// AND aiContinueReply (whether to ask the customer for the address).
+// Both city + address are required for a "deliverable" combo.
+export function isAddressDeliverable(addr?: string | null, city?: string | null): boolean {
+  if (!addr) return false;
+  if (city !== undefined) {
+    if (!city || String(city).trim().length === 0) return false;
+  }
+  const raw = String(addr).trim();
+  if (raw.length < 10) return false;
+  const lower = raw.toLowerCase();
+  const fakePattern = /\b(test|testing|tester|fake|dummy|sample|example|n\/?a|none|null|xxx+|asdf+|qwerty|aaaa+|placeholder|abc+|address here|adress|same|here)\b/i;
+  if (fakePattern.test(lower)) return false;
+  const tokens = raw.split(/\s+/).filter((w) => w.length > 1);
+  if (tokens.length < 2) return false;
+  const hasNumber = /\d/.test(raw);
+  const streetKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|near|opposite|main|gali|chowk|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
+  if (!hasNumber && !streetKeyword.test(lower)) return false;
+  return true;
+}
+
 // Apply CRM updates for a button action. Mirrors whatsapp-action logic so
 // behavior stays consistent between manual Inbox actions and automated webhook.
+//
+// ADDRESS-GATING (CRITICAL): when outcome === "confirmed" but the order does
+// NOT have a deliverable address on file, we DO NOT confirm the order. We
+// stash a "pending_button_intent" on the conversation, force AI takeover, and
+// let the AI ask the customer for the full address. The AI flow's
+// tryExtractAndConfirmAddress() will finalize the confirmation once a real
+// address arrives.
 async function applyOutcome(
   order: any,
-  outcome: "confirmed" | "more_info" | "canceled"
+  outcome: "confirmed" | "more_info" | "canceled",
+  conversationId?: string | null,
+  buttonText?: string,
 ) {
   const settings = await getSettings();
   const updates: Record<string, any> = {
@@ -379,7 +410,38 @@ async function applyOutcome(
     whatsapp_last_reply_at: new Date().toISOString(),
   };
 
+  // ── Address-gated confirm path ────────────────────────────────────────────
   if (outcome === "confirmed") {
+    const deliverable = isAddressDeliverable(order.customer_address, order.customer_city);
+    if (!deliverable) {
+      // Stash pending intent so the AI prompt knows the customer already said YES.
+      if (conversationId) {
+        await admin
+          .from("whatsapp_conversations")
+          .update({
+            ai_enabled: true,
+            pending_button_intent: {
+              intent: "confirm",
+              mapped_status: "confirmed",
+              button_text: buttonText || "YES",
+              created_at: new Date().toISOString(),
+            },
+          })
+          .eq("id", conversationId);
+      }
+      // Flag the order but DO NOT change confirmation_status.
+      await admin
+        .from("orders")
+        .update({
+          whatsapp_status: "pending_address",
+          whatsapp_note: `Customer confirmed via WhatsApp — awaiting full delivery address`,
+          whatsapp_last_reply_at: new Date().toISOString(),
+        })
+        .eq("order_id", order.order_id);
+      log("button confirm gated: address incomplete", order.order_id);
+      return;
+    }
+    // Address is deliverable → proceed to normal confirm.
     updates.confirmation_status = "confirmed";
     updates.confirmation_channel = "whatsapp";
     updates.confirmed_at = new Date().toISOString();
