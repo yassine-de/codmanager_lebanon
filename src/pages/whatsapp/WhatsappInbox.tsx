@@ -1002,7 +1002,7 @@ export default function WhatsappInbox() {
             </div>
           </div>
 
-          <div className="p-3 border-b border-border">
+          <div className="p-3 space-y-2 border-b border-border">
             <div className="relative">
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -1011,6 +1011,44 @@ export default function WhatsappInbox() {
                 placeholder="Search by name, phone, or message"
                 className="pl-9 h-9"
               />
+            </div>
+            {/* Compact filter chips inside sidebar */}
+            <div className="flex items-center gap-1 flex-wrap">
+              {([
+                { key: "all", label: "All" },
+                { key: "unread", label: "Unread" },
+                { key: "needs_review", label: "Review", count: needsReviewCount },
+                { key: "ai_on", label: "AI On" },
+                { key: "ai_off", label: "AI Off" },
+                { key: "with_order", label: "Order" },
+                { key: "no_order", label: "No Order" },
+                { key: "window_open", label: "24h" },
+              ] as const).map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(f.key)}
+                  className={cn(
+                    "px-2 py-0.5 rounded-full font-medium border transition-colors text-[10px] inline-flex items-center gap-1",
+                    filter === f.key
+                      ? f.key === "needs_review"
+                        ? "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30"
+                        : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                      : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                  )}
+                >
+                  {f.label}
+                  {"count" in f && f.count > 0 && (
+                    <span className={cn(
+                      "inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full text-[9px] font-semibold",
+                      filter === f.key
+                        ? "bg-sky-500 text-white"
+                        : "bg-sky-500/20 text-sky-600 dark:text-sky-400",
+                    )}>
+                      {f.count > 99 ? "99+" : f.count}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
 
