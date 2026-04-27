@@ -39,6 +39,9 @@ const notifTypeColor = {
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Pages that benefit from full-width layout (no max-width constraint)
+  const isFullWidthRoute = location.pathname.startsWith("/whatsapp/inbox");
   const { authUser, signOut } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const { language, setLanguage, t } = useLanguage();
