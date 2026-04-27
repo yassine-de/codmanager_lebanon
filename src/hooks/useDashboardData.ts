@@ -164,6 +164,8 @@ export function useDashboardData(dateRange?: DateRange) {
       if (error) throw error;
       return (data || []) as DashboardOrder[];
     },
+    refetchInterval: 30_000, // refresh every 30s so chart picks up new confirmations live
+    refetchOnWindowFocus: true,
   });
 
   // Filter by date range on treatment date
