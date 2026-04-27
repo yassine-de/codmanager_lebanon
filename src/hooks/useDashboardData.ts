@@ -147,18 +147,18 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
       const treatDate = getTreatmentDate(o);
       return isAfter(treatDate, date) && !isAfter(treatDate, nextDay);
     });
+    const confirmed = orders.filter((o) => {
+      if (!reachedConfirmedStage(o)) return false;
+      const confirmationDate = getConfirmationEventDate(o);
+      return isAfter(confirmationDate, date) && !isAfter(confirmationDate, nextDay);
+    }).length;
     // Dropped = orders created on this day (based on created_at, not treatment date)
     const dropped = orders.filter((o) => {
       const createdDate = new Date(o.created_at);
       return isAfter(createdDate, date) && !isAfter(createdDate, nextDay);
     }).length;
     const total = dayOrders.length;
-    // Confirmed = any order whose confirmation event happened on this day,
-    // regardless of where it moved next (booked/shipped/in_transit/delivered/...).
-    const confirmed = dayOrders.filter(o =>
-      o.confirmation_status === 'confirmed' ||
-      ['booked', 'shipped', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'].includes(o.delivery_status || '')
-    ).length;
+    // Confirmed = confirmation events that happened on this day, regardless of current delivery status.
     const delivered = dayOrders.filter(o => o.delivery_status === 'delivered').length;
     const shipped = dayOrders.filter(o => ['shipped', 'in_transit', 'with_courier', 'delivered'].includes(o.delivery_status || '')).length;
     return {
