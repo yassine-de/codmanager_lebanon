@@ -104,14 +104,18 @@ function computeKPIs(orders: DashboardOrder[]): DashboardKPIs {
   };
 }
 
+// Treatment date = when an action was last taken on the order.
+// For confirmed orders we ALWAYS use confirmed_at (when the confirmation actually
+// happened — by WhatsApp, agent, or admin). This guarantees the Confirmed chart
+// counts every order that became confirmed on a given day, regardless of channel.
 function getTreatmentDate(o: DashboardOrder): Date {
-  if (o.confirmation_status === 'confirmed' && o.confirmed_at) {
-    return new Date(o.confirmed_at);
-  } else if (o.last_attempt_at) {
-    return new Date(o.last_attempt_at);
-  } else if (o.last_activity_at) {
-    return new Date(o.last_activity_at);
+  if (o.confirmation_status === 'confirmed') {
+    // Prefer confirmed_at; if missing (legacy rows), fall back to updated_at
+    // which is set on the same UPDATE that flipped the status.
+    return new Date(o.confirmed_at || o.updated_at);
   }
+  if (o.last_attempt_at) return new Date(o.last_attempt_at);
+  if (o.last_activity_at) return new Date(o.last_activity_at);
   return new Date(o.updated_at);
 }
 
