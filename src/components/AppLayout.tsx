@@ -3,7 +3,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Settings, LogOut, User, Bell, Globe, Check, ShoppingCart, AlertTriangle, Info, Eye, EyeOff, Sun, Moon, Search } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useLanguage, type Language } from "@/contexts/LanguageContext";
@@ -39,6 +39,9 @@ const notifTypeColor = {
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Pages that benefit from full-width layout (no max-width constraint)
+  const isFullWidthRoute = location.pathname.startsWith("/whatsapp/inbox");
   const { authUser, signOut } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const { language, setLanguage, t } = useLanguage();
@@ -204,7 +207,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           <main className="flex-1 overflow-auto px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-5 2xl:px-8">
-            <div className="mx-auto w-full max-w-[1500px] 2xl:max-w-[1700px]">
+            <div className={cn(
+              "mx-auto w-full",
+              isFullWidthRoute ? "max-w-none" : "max-w-[1500px] 2xl:max-w-[1700px]"
+            )}>
               <SellerAlertsBanner />
               {children}
             </div>
