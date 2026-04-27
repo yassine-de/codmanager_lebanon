@@ -601,16 +601,16 @@ export default function Orders() {
 
   return (
     <TooltipProvider delayDuration={200}>
-    <div className="space-y-5 max-w-7xl">
+    <div className="space-y-3 max-w-[1600px]">
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage all your COD orders</p>
+          <h1 className="text-xl font-bold tracking-tight leading-tight">Orders</h1>
+          <p className="text-muted-foreground text-xs">Manage all your COD orders</p>
         </div>
         {!isAdmin && (
-          <Button size="sm" className="gap-1.5" onClick={() => setShowCreateModal(true)}>
-            <Plus className="w-4 h-4" /> Create Order
+          <Button size="sm" className="gap-1.5 h-8" onClick={() => setShowCreateModal(true)}>
+            <Plus className="w-3.5 h-3.5" /> Create Order
           </Button>
         )}
       </div>
