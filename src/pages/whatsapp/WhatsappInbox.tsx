@@ -1377,6 +1377,27 @@ export default function WhatsappInbox() {
                           </div>
                         );
                       }
+                      if (m.message_type === "reaction") {
+                        const emoji =
+                          (typeof m.body === "string" && m.body.trim()) ||
+                          m.payload?.reaction?.emoji ||
+                          "👍";
+                        return (
+                          <div
+                            key={m.id}
+                            className={cn("flex", isOut ? "justify-end" : "justify-start")}
+                          >
+                            <div
+                              className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 border border-border px-2.5 py-1 text-xs text-muted-foreground shadow-sm"
+                              title={isOut ? "You reacted" : "Customer reacted"}
+                            >
+                              <span className="text-base leading-none">{emoji}</span>
+                              <span className="opacity-70">{isOut ? "You reacted" : "Reacted"}</span>
+                              <span className="opacity-50">· {format(new Date(m.created_at), "HH:mm")}</span>
+                            </div>
+                          </div>
+                        );
+                      }
                       return (
                         <div
                           key={m.id}
