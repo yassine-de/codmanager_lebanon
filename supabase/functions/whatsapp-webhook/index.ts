@@ -620,10 +620,15 @@ async function handleIncoming(value: any) {
       }
 
       const nowIso = new Date().toISOString();
+      // NOTE: last_reply_at is reserved for AI/agent OUTBOUND replies.
+      // We only bump last_message_at here (inbound activity). Bumping
+      // last_reply_at on every inbound caused the sweeper to skip
+      // conversations where the customer sent the final message but the
+      // AI never replied (e.g. address arriving right after a button
+      // confirm) — the conv looked "freshly answered" forever.
       await admin
         .from("whatsapp_conversations")
         .update({
-          last_reply_at: nowIso,
           last_message_at: nowIso,
           updated_at: nowIso,
           status: nextStatus,
