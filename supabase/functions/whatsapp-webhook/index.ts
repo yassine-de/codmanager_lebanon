@@ -1538,12 +1538,79 @@ async function tryExtractAndConfirmAddress(args: {
   // skip-case is: order is confirmed, address looks deliverable, AND no
   // pending intent is awaiting clearing.
   const alreadyDeliverable = isDeliverable(order.customer_address, order.customer_city);
-  const hasPendingIntent = !!(conv as any)?.pending_button_intent;
+  const pendingIntent = (conv as any)?.pending_button_intent ?? null;
+  const hasPendingIntent = !!pendingIntent;
   if (
     order.confirmation_status === "confirmed" &&
     alreadyDeliverable &&
     !hasPendingIntent
   ) {
+    return;
+  }
+
+  // SHORT-CIRCUIT: customer clicked the "Confirm" button AND the stored
+  // address is already deliverable. There is no new address text to extract
+  // (customerText is just the button label). Finalize the existing address
+  // immediately — otherwise the AI extractor returns "incomplete" and the
+  // order is stuck on `new` forever.
+  if (
+    pendingIntent?.intent === "confirm" &&
+    alreadyDeliverable &&
+    order.confirmation_status !== "confirmed"
+  ) {
+    const trackedFields = [
+      "confirmation_status",
+      "delivery_status",
+      "shipping_status",
+    ];
+    const before: Record<string, any> = {};
+    for (const f of trackedFields) before[f] = order[f] ?? null;
+
+    const settings = await getSettings();
+    const confirmUpdate: Record<string, any> = {
+      confirmation_status: "confirmed",
+      confirmation_channel: "whatsapp",
+      confirmed_at: new Date().toISOString(),
+      whatsapp_status: "confirmed",
+      whatsapp_last_reply_at: new Date().toISOString(),
+    };
+    if (settings?.auto_book_shipping) {
+      const ds = String(order.delivery_status ?? "").toLowerCase();
+      const blockBooking = ["booked", "shipped", "in_transit", "delivered", "returned"].includes(ds);
+      if (!blockBooking) {
+        confirmUpdate.delivery_status = "booked";
+        confirmUpdate.shipping_status = "Booked";
+      }
+    }
+    const { error: updErr } = await admin
+      .from("orders")
+      .update(confirmUpdate)
+      .eq("order_id", order.order_id);
+    if (updErr) {
+      errLog("address-extract: stored-address confirm failed", updErr);
+      return;
+    }
+    await admin
+      .from("whatsapp_conversations")
+      .update({
+        status: "confirmed",
+        outcome: "confirmed",
+        pending_button_intent: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", conv.id);
+    await logOrderHistory({
+      orderId: order.order_id,
+      actionType: "ai_confirm",
+      role: "ai",
+      before,
+      after: confirmUpdate,
+      fields: trackedFields,
+    });
+    log("address-extract: stored-address auto-confirmed", {
+      order: order.order_id,
+      city: order.customer_city,
+    });
     return;
   }
 

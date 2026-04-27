@@ -32,6 +32,16 @@ Extraction now skips ONLY when ALL three are true:
 
 If any pending_button_intent exists, extraction always runs (so the badge gets cleared and history gets logged) even on already-confirmed orders.
 
+## Stored-address short-circuit (CRITICAL)
+When the customer clicks "Confirm" and the stored address is ALREADY deliverable, there is no new address text in their next message (the customerText is just the button label). Without a short-circuit the AI extractor returns `complete: false` and the order is stuck on `new` forever (e.g. AB-363).
+
+`tryExtractAndConfirmAddress` short-circuits when ALL of:
+- `pending_button_intent.intent === "confirm"`
+- the stored address is already deliverable
+- the order is not yet confirmed
+
+→ It finalizes the existing address directly: sets `confirmation_status = "confirmed"`, `confirmation_channel = "whatsapp"`, `whatsapp_status = "confirmed"`, clears `pending_button_intent`, optionally books shipping, logs `ai_confirm` history. No OpenAI call needed.
+
 ## Inbox UI
 The conversation list in `WhatsappInbox.tsx` shows a yellow "⏳ Awaiting address" badge next to any conversation whose `pending_button_intent.intent === "confirm"`.
 
