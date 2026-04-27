@@ -611,6 +611,13 @@ async function handleIncoming(value: any) {
         } else {
           bodyText = "[audio]";
         }
+      } else if (m.type === "reaction" && m.reaction) {
+        // Customer reacted with an emoji to one of our messages.
+        // Store the emoji as the body and reference the original message
+        // so the UI can render it as a small reaction badge.
+        bodyText = m.reaction.emoji ?? "";
+        messageType = "reaction";
+        replyToMetaMessageId = m.reaction.message_id ?? replyToMetaMessageId;
       } else {
         bodyText = JSON.stringify(m).slice(0, 500);
       }
