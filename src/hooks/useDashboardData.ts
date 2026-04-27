@@ -51,7 +51,31 @@ export interface DashboardKPIs {
   pendingAmount: number;
 }
 
+const DASHBOARD_ORDER_SELECT = "id, order_id, confirmation_status, delivery_status, total_amount, price, quantity, product_name, seller_id, created_at, confirmed_at, delivered_at, last_attempt_at, last_activity_at, updated_at";
+const DASHBOARD_PAGE_SIZE = 1000;
 const POST_CONFIRM_DELIVERY_STATUSES = ['booked', 'shipped', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'];
+
+async function fetchAllDashboardOrders(): Promise<DashboardOrder[]> {
+  const rows: DashboardOrder[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("orders")
+      .select(DASHBOARD_ORDER_SELECT)
+      .order("created_at", { ascending: false })
+      .range(from, from + DASHBOARD_PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const page = (data || []) as DashboardOrder[];
+    rows.push(...page);
+    if (page.length < DASHBOARD_PAGE_SIZE) break;
+    from += DASHBOARD_PAGE_SIZE;
+  }
+
+  return rows;
+}
 
 function reachedConfirmedStage(o: DashboardOrder): boolean {
   return Boolean(o.confirmed_at) ||
