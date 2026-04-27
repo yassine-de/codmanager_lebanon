@@ -51,6 +51,18 @@ export interface DashboardKPIs {
   pendingAmount: number;
 }
 
+const POST_CONFIRM_DELIVERY_STATUSES = ['booked', 'shipped', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'];
+
+function reachedConfirmedStage(o: DashboardOrder): boolean {
+  return Boolean(o.confirmed_at) ||
+    o.confirmation_status === 'confirmed' ||
+    POST_CONFIRM_DELIVERY_STATUSES.includes(o.delivery_status || '');
+}
+
+function getConfirmationEventDate(o: DashboardOrder): Date {
+  return new Date(o.confirmed_at || o.updated_at);
+}
+
 function computeKPIs(orders: DashboardOrder[]): DashboardKPIs {
   const total = orders.length;
 
@@ -59,11 +71,7 @@ function computeKPIs(orders: DashboardOrder[]): DashboardKPIs {
   // Confirmed = ANY order that reached the confirmed stage in this period.
   // Once an order is confirmed it may move on to shipped/booked/in_transit/delivered/etc.
   // The confirmation event itself still happened — count it.
-  const POST_CONFIRM_DELIVERY = ['booked', 'shipped', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'];
-  const confirmed = orders.filter(o =>
-    o.confirmation_status === 'confirmed' ||
-    POST_CONFIRM_DELIVERY.includes(o.delivery_status || '')
-  ).length;
+  const confirmed = orders.filter(reachedConfirmedStage).length;
   const noAnswer = orders.filter(o => o.confirmation_status === 'no_answer').length;
   const postponed = orders.filter(o => o.confirmation_status === 'postponed').length;
   const cancelled = orders.filter(o => o.confirmation_status === 'cancelled').length;
@@ -116,10 +124,10 @@ function computeKPIs(orders: DashboardOrder[]): DashboardKPIs {
 // happened — by WhatsApp, agent, or admin). This guarantees the Confirmed chart
 // counts every order that became confirmed on a given day, regardless of channel.
 function getTreatmentDate(o: DashboardOrder): Date {
-  if (o.confirmation_status === 'confirmed') {
+  if (reachedConfirmedStage(o)) {
     // Prefer confirmed_at; if missing (legacy rows), fall back to updated_at
     // which is set on the same UPDATE that flipped the status.
-    return new Date(o.confirmed_at || o.updated_at);
+    return getConfirmationEventDate(o);
   }
   if (o.last_attempt_at) return new Date(o.last_attempt_at);
   if (o.last_activity_at) return new Date(o.last_activity_at);
