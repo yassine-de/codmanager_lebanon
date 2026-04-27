@@ -11,6 +11,56 @@ import { DateRange } from "react-day-picker";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";
 import { supabase } from "@/integrations/supabase/client";
 
+type SellerAnalyticsOrder = {
+  id: string;
+  order_id: string;
+  confirmation_status: string;
+  delivery_status: string | null;
+  product_name: string;
+  seller_id: string;
+  price: number;
+  quantity: number;
+  created_at: string;
+  confirmed_at: string | null;
+  delivered_at: string | null;
+  updated_at: string;
+};
+
+const SELLER_ANALYTICS_ORDER_SELECT = "id, order_id, confirmation_status, delivery_status, product_name, seller_id, price, quantity, created_at, confirmed_at, delivered_at, updated_at";
+const PAGE_SIZE = 1000;
+const CONFIRMED_DELIVERY_STATUSES = ["booked", "shipped", "in_transit", "with_courier", "delivered", "paid", "returned"];
+
+async function fetchAllSellerAnalyticsOrders(): Promise<SellerAnalyticsOrder[]> {
+  const rows: SellerAnalyticsOrder[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("orders")
+      .select(SELLER_ANALYTICS_ORDER_SELECT)
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    const page = (data || []) as SellerAnalyticsOrder[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return rows;
+}
+
+function reachedConfirmedStage(order: SellerAnalyticsOrder): boolean {
+  return Boolean(order.confirmed_at) ||
+    order.confirmation_status === "confirmed" ||
+    CONFIRMED_DELIVERY_STATUSES.includes(order.delivery_status || "");
+}
+
+function getConfirmationDate(order: SellerAnalyticsOrder): Date {
+  return new Date(order.confirmed_at || order.updated_at);
+}
+
 export default function SellerAnalytics() {
   const [sellerFilter, setSellerFilter] = useState<string>("all");
   const [datePreset, setDatePreset] = useState<DatePresetValue>("maximum");
