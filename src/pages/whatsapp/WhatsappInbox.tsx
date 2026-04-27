@@ -36,6 +36,7 @@ import {
   CheckCheck,
   AlertCircle,
   Languages,
+  ArrowLeft,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
