@@ -367,11 +367,42 @@ async function resolveRepliedTemplate(replyToMetaMessageId?: string | null): Pro
   return tplId ? String(tplId) : null;
 }
 
+// Module-level helper: validates a stored address looks like a real, detailed,
+// courier-deliverable address. Used by applyOutcome (button confirm gating)
+// AND aiContinueReply (whether to ask the customer for the address).
+// Both city + address are required for a "deliverable" combo.
+export function isAddressDeliverable(addr?: string | null, city?: string | null): boolean {
+  if (!addr) return false;
+  if (city !== undefined) {
+    if (!city || String(city).trim().length === 0) return false;
+  }
+  const raw = String(addr).trim();
+  if (raw.length < 10) return false;
+  const lower = raw.toLowerCase();
+  const fakePattern = /\b(test|testing|tester|fake|dummy|sample|example|n\/?a|none|null|xxx+|asdf+|qwerty|aaaa+|placeholder|abc+|address here|adress|same|here)\b/i;
+  if (fakePattern.test(lower)) return false;
+  const tokens = raw.split(/\s+/).filter((w) => w.length > 1);
+  if (tokens.length < 2) return false;
+  const hasNumber = /\d/.test(raw);
+  const streetKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|near|opposite|main|gali|chowk|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
+  if (!hasNumber && !streetKeyword.test(lower)) return false;
+  return true;
+}
+
 // Apply CRM updates for a button action. Mirrors whatsapp-action logic so
 // behavior stays consistent between manual Inbox actions and automated webhook.
+//
+// ADDRESS-GATING (CRITICAL): when outcome === "confirmed" but the order does
+// NOT have a deliverable address on file, we DO NOT confirm the order. We
+// stash a "pending_button_intent" on the conversation, force AI takeover, and
+// let the AI ask the customer for the full address. The AI flow's
+// tryExtractAndConfirmAddress() will finalize the confirmation once a real
+// address arrives.
 async function applyOutcome(
   order: any,
-  outcome: "confirmed" | "more_info" | "canceled"
+  outcome: "confirmed" | "more_info" | "canceled",
+  conversationId?: string | null,
+  buttonText?: string,
 ) {
   const settings = await getSettings();
   const updates: Record<string, any> = {
@@ -379,7 +410,38 @@ async function applyOutcome(
     whatsapp_last_reply_at: new Date().toISOString(),
   };
 
+  // ── Address-gated confirm path ────────────────────────────────────────────
   if (outcome === "confirmed") {
+    const deliverable = isAddressDeliverable(order.customer_address, order.customer_city);
+    if (!deliverable) {
+      // Stash pending intent so the AI prompt knows the customer already said YES.
+      if (conversationId) {
+        await admin
+          .from("whatsapp_conversations")
+          .update({
+            ai_enabled: true,
+            pending_button_intent: {
+              intent: "confirm",
+              mapped_status: "confirmed",
+              button_text: buttonText || "YES",
+              created_at: new Date().toISOString(),
+            },
+          })
+          .eq("id", conversationId);
+      }
+      // Flag the order but DO NOT change confirmation_status.
+      await admin
+        .from("orders")
+        .update({
+          whatsapp_status: "pending_address",
+          whatsapp_note: `Customer confirmed via WhatsApp — awaiting full delivery address`,
+          whatsapp_last_reply_at: new Date().toISOString(),
+        })
+        .eq("order_id", order.order_id);
+      log("button confirm gated: address incomplete", order.order_id);
+      return;
+    }
+    // Address is deliverable → proceed to normal confirm.
     updates.confirmation_status = "confirmed";
     updates.confirmation_channel = "whatsapp";
     updates.confirmed_at = new Date().toISOString();
@@ -637,7 +699,7 @@ async function handleIncoming(value: any) {
 
       // Trigger CRM update for button actions only — never auto-confirm text.
       if (order && outcome) {
-        await applyOutcome(order, outcome);
+        await applyOutcome(order, outcome, conv?.id ?? null, bodyText);
       } else if (!order && outcome) {
         log("button outcome but no matched order", phone, outcome);
       }
@@ -852,8 +914,17 @@ async function handleIncoming(value: any) {
               const { data: o } = await admin.from("orders").select("*").eq("id", orderId).maybeSingle();
               if (o) freshOrder = o;
             }
+            // Re-fetch conv too — applyOutcome may have stashed pending_button_intent
+            // (gated confirm) or flipped ai_enabled while we were waiting.
+            let freshConv = conv;
+            const { data: c } = await admin
+              .from("whatsapp_conversations")
+              .select("*")
+              .eq("id", convId)
+              .maybeSingle();
+            if (c) freshConv = c;
 
-            await aiContinueReply({ conv, order: freshOrder, customerText: combinedText || bodyText });
+            await aiContinueReply({ conv: freshConv, order: freshOrder, customerText: combinedText || bodyText });
           } catch (e) {
             errLog("ai continuation failed", (e as Error).message);
           }
@@ -1199,7 +1270,7 @@ async function aiContinueReply(args: {
   // for cancel).
   const pendingIntent = (conv as any)?.pending_button_intent ?? null;
   const pendingIntentRule = pendingIntent
-    ? `\n\nPENDING CUSTOMER INTENT (from a button they clicked):\n- The customer pressed "${pendingIntent.button_text}" which means they want to: ${pendingIntent.intent === "confirm" ? "CONFIRM the order. You must validate that we have a complete & deliverable address before the system finalizes the confirmation. If the address is already on file and detailed, just acknowledge and the system will auto-confirm. If not, ask for the missing details politely." : pendingIntent.intent === "cancel" ? "CANCEL the order. Follow the CANCELLATION HANDLING rules above — try to understand WHY and rescue the sale. Do NOT acknowledge the cancellation as final yourself." : "request more INFO. Answer their questions accurately."}`
+    ? `\n\nPENDING CUSTOMER INTENT (from a button they clicked):\n- The customer pressed "${pendingIntent.button_text}" which means they want to: ${pendingIntent.intent === "confirm" ? `CONFIRM the order. \n  CRITICAL ADDRESS GATING: The order is NOT yet finalized. The system will only mark it confirmed once we have a COMPLETE & DELIVERABLE address (city + at least one usable locator like house/street/area/landmark). \n  - If the stored address is already detailed enough → reply with a short warm thank-you, briefly read back the address, and the system will auto-confirm. \n  - If the address is missing, vague (e.g. just "Karachi", "Lahore center", "home", a single landmark with no street/area), fake, or too short → THANK them for confirming the order, then in the SAME short message ask politely (in their language) for the FULL address: house/flat #, street, area/block, nearest landmark, + city. \n  - DO NOT say "your order is being processed", "your order is confirmed", "we will ship now", or anything that implies the order is already finalized. Use phrasing like "to ship your order we just need your full address" instead.\n  - Once the customer sends a real complete address, the system will auto-confirm in the background; THEN you can thank them and say the courier will call on arrival.` : pendingIntent.intent === "cancel" ? "CANCEL the order. Follow the CANCELLATION HANDLING rules above — try to understand WHY and rescue the sale. Do NOT acknowledge the cancellation as final yourself." : "request more INFO. Answer their questions accurately."}`
     : "";
 
   const baseSys = aiSettings.system_prompt || "You are a helpful WhatsApp sales assistant.";

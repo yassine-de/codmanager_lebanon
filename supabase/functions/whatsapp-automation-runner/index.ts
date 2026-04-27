@@ -771,7 +771,36 @@ async function applyButtonAction(opts: {
   const { action, order, conversationId, buttonText } = opts;
   if (!action) return;
 
-  const aiGated = action.ai_gate === "validate";
+  // Address-deliverable check (mirrors webhook's isAddressDeliverable).
+  // Used to FORCE AI gating on confirm buttons when the address is incomplete,
+  // regardless of admin-configured ai_gate setting. This prevents premature
+  // order confirmation when the customer only gave a city / vague text.
+  const isAddressDeliverable = (addr?: string | null, city?: string | null): boolean => {
+    if (!addr) return false;
+    if (!city || String(city).trim().length === 0) return false;
+    const raw = String(addr).trim();
+    if (raw.length < 10) return false;
+    const lower = raw.toLowerCase();
+    const fakePattern = /\b(test|testing|tester|fake|dummy|sample|example|n\/?a|none|null|xxx+|asdf+|qwerty|aaaa+|placeholder|abc+|address here|adress|same|here)\b/i;
+    if (fakePattern.test(lower)) return false;
+    const tokens = raw.split(/\s+/).filter((w) => w.length > 1);
+    if (tokens.length < 2) return false;
+    const hasNumber = /\d/.test(raw);
+    const streetKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|near|opposite|main|gali|chowk|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
+    if (!hasNumber && !streetKeyword.test(lower)) return false;
+    return true;
+  };
+
+  // FORCE address-gating on every confirm-button: even if admin set ai_gate=off,
+  // if the order doesn't yet have a deliverable address we must NOT confirm yet.
+  const wantsConfirm =
+    action.status === "confirmed" ||
+    action.intent_kind === "confirm";
+  const addressOk =
+    !!order && isAddressDeliverable(order.customer_address, order.customer_city);
+  const forceAddressGate = wantsConfirm && !!order && !addressOk;
+
+  const aiGated = action.ai_gate === "validate" || forceAddressGate;
   const wantsTakeover = action.ai_takeover === true || aiGated;
 
   // 1) AI takeover (gated buttons always force takeover so AI drives the convo)
@@ -809,10 +838,14 @@ async function applyButtonAction(opts: {
       .eq("id", conversationId);
 
     // Still flag the order so admins see customer interaction, but DON'T touch status.
+    const noteText = forceAddressGate
+      ? `Customer clicked "${buttonText}" — awaiting full delivery address`
+      : `Customer clicked "${buttonText}" — AI validating (${intentKind})`;
     await admin
       .from("orders")
       .update({
-        whatsapp_note: `Customer clicked "${buttonText}" — AI validating (${intentKind})`,
+        whatsapp_status: forceAddressGate ? "pending_address" : (order.whatsapp_status ?? null),
+        whatsapp_note: noteText,
         whatsapp_last_reply_at: new Date().toISOString(),
       })
       .eq("order_id", order.order_id);

@@ -1,50 +1,60 @@
-## Mochkil
+# Address-Gated Order Confirmation
 
-Seller **Anwar Bounasser** (`AB-INV-001`) ando **218 confirmed** f orders table, walakin l-invoice ka-y3awd ghir **216**. Naqsin: `AB-265` w `AB-266`.
+## Problem
 
-## Sabab
+Fach kayji new order, l-system kaysift template m3a buttons (YES / NO).
+Melli l-customer kayclicki **YES**, l-order automatic kaywoli **confirmed** — hta ila l-address dyalo na9sa wla ghir "Karachi center" wla ghir l-city. Hadchi kaydir mochkil f tawsil l9a l-rider ma 3andoش wein imchi.
 
-L-RPC `get_invoice_summary` ka-y7sab confirmed orders **ghir mn `order_history`** (events bach period dyal l-invoice tkun saحiحa). Walakin:
+Bghina:
+1. Melli customer iclicki YES → l-AI kayverifie l-address l9adim f order.
+2. Ila l-address **kamla w mzyana** → confirme automatic (kif daba).
+3. Ila l-address **na9sa / vague / ghir city / fake** → **MA tconfirmich**, sift WhatsApp message lil-customer (b lougha dyalo) tatlobou full address (house/street/area + landmark).
+4. Melli customer kay-reply b address kamla → l-AI ydir auto-update l `customer_address` w `customer_city`, w 3ad confirme l-order.
 
-1. **`whatsapp-action` edge function** (button "Confirm" mn l-Inbox) ka-y-update `confirmation_status='confirmed'` **bla ma y-écrire f `order_history`** ⇒ kayna 0 events.
-2. **AI auto-confirm path** (f `whatsapp-webhook` ligne 1591-1638) ka-y-skipi l-écriture mli l-order kan déjà confirmed (`wasAlreadyConfirmed=true`), donc helper `logOrderHistory` ka-y-skipi `confirmation_status` field bحal ma kayn delta.
+## Plan
 
-L-orders AB-265 / AB-266 dazo mn dak l-path → 0 history rows li `field_changed='confirmation_status' AND new_value='confirmed'` → ma t7sbouch f l-invoice.
+### 1. Force AI gating on every confirm-button (server-side safety net)
 
-## L-7all
+`supabase/functions/whatsapp-automation-runner/index.ts` → `applyButtonAction()`:
+- Ila l-button `status === "confirmed"` w l-order ma 3ndoش address deliverable (n-checkiw b nafs `isDeliverable` helper li f webhook), **noverridiw** l-action: nstashiw `pending_button_intent = { intent: "confirm", button_text }`, n-set `ai_enabled = true`, `whatsapp_status = "pending_address"`, w **MA n-changeoش** `confirmation_status`. Hadchi kaydir kif `ai_gate=validate` automatic mn ghir maykhass admin yconfiguri walou.
+- Ila address **already deliverable** → confirme normal (mafihaш delay).
 
-### 1. `supabase/functions/whatsapp-action/index.ts`
-Zid call l `logOrderHistory` (nfs l-helper li f `whatsapp-webhook`) bach kol button-confirm/more_info/cancel y-écrire delta f `order_history` b:
-- `action_type: "whatsapp_confirm" | "whatsapp_more_info" | "whatsapp_cancel"`
-- `role: "whatsapp"`
-- `changed_by: SYSTEM_USER_ID` (`00000000-0000-0000-0000-000000000000`)
+`supabase/functions/whatsapp-webhook/index.ts` → `applyOutcome()`:
+- Nfs logic: ila `outcome === "confirmed"` w address ma deliverable, n-skip update l `confirmation_status`, n-set `whatsapp_status = "pending_address"`, w n-set `pending_button_intent` 3la l-conversation bach AI tcontinui.
 
-(Hada howa same code style li f `applyOutcome` dyal webhook — n-shareewh.)
+### 2. AI takes over to ask for the address
 
-### 2. `supabase/functions/whatsapp-webhook/index.ts` — AI auto-confirm
-F `tryExtractAndConfirmAddress` (≈ line 1631), mli `wasAlreadyConfirmed=true` (button qbel address), `confirmUpdate` ma fihch `confirmation_status`. Nzid manually entry f `order_history` bach `confirmation_status: '' → 'confirmed'` y-tracka mn awwl marra (lqaddam, `applyOutcome` ka-y-écrire dik l-row, walakin ila kana via `whatsapp-action`, ma kanetch). 7all più s-saheel: ndmnu `whatsapp-action` y-loggi → mochkil dyal cas hadi yt-7l automatic.
+L-AI `aiContinueReply()` (`whatsapp-webhook/index.ts`) deja kaytعamel m3a `pending_button_intent.intent === "confirm"` w `addressIncomplete` — kayseft message kayrequesti l-address.
 
-### 3. SQL Migration — Backfill
-Migration ghadi:
-- T-detecti tous les orders fin `confirmation_status='confirmed'` w `confirmation_channel IN ('whatsapp','ai')` walakin **kaynach** row f `order_history` b `field_changed='confirmation_status' AND new_value='confirmed'`
-- T-zid row f `order_history` b:
-  - `created_at = COALESCE(orders.confirmed_at, orders.updated_at)`
-  - `action_type='whatsapp_confirm_backfill'`
-  - `changed_by_role='whatsapp'`
-  - `changed_by='00000000-0000-0000-0000-000000000000'`
-  - `field_changed='confirmation_status'`, `old_value='new'`, `new_value='confirmed'`
+Ghadi nزidو:
+- Tswab message kaybda b: "Shukria 🙏 order dyalk confirmed! Bach n-shippiw lik, 3afak عtina l-full delivery address (house/flat #, street, area, landmark + city)."
+- Wakha l-status f DB ma3adش `confirmed`, l-customer ka-yhss bli l-confirmation t-9ablat — only address li khass.
 
-Hadi ghadi t-fixi AB-265, AB-266, w kol order khor f same situation cross all sellers.
+### 3. Auto-confirm after customer sends full address
 
-### 4. Verification
-B3d migration:
-```sql
-SELECT (get_invoice_summary('bd833d8c-d94a-4bbd-99c2-47f2e091cb8f'::uuid))->'counts';
-```
-Khass i-banet `confirmed_count: 218`.
+Logic deja kaykhdem f `tryExtractAndConfirmAddress()`:
+- Kay-runi 3la kol customer text reply.
+- Ila AI extracted complete address → kay-update `customer_address`, `customer_city`, w kay-set `confirmation_status = "confirmed"`, kay-clear `pending_button_intent`.
+- Hna مa khassش tbdil — ghir n-confirmiw bli logic kaykhdem fhal blast li ma kanetش `confirmation_status` confirmed.
 
-## Files
+### 4. Inbox visibility
 
-- `supabase/functions/whatsapp-action/index.ts` — zid logging
-- `supabase/functions/whatsapp-webhook/index.ts` — small fix f AI auto-confirm path
-- `supabase/migrations/<new>.sql` — backfill historique
+Nزidو badge sغir f WhatsApp Inbox conversation list:
+- Ila `pending_button_intent?.intent === "confirm"` → tban "⏳ Awaiting address" badge tahta esm dyal customer.
+- Hadi tكhli admins yshofو bsرعa f7al li customer clicka YES walakin baqi ka-yssناو address.
+
+`src/pages/whatsapp/WhatsappInbox.tsx` → conversation list item render.
+
+## Technical notes
+
+- `isAddressDeliverable` helper deja exists f `aiContinueReply` — n-extractiw m module-level function bach `applyOutcome` w `applyButtonAction` ystaعmlوha.
+- `pending_button_intent` column deja exists 3la `whatsapp_conversations`.
+- `whatsapp_status` value `pending_address` jdida — ghir text flag, ma kat-affectiش schema.
+- `tryExtractAndConfirmAddress` deja handles l-case dyal `wasAlreadyConfirmed === false` — kay-set confirmation_status. Maخassش tbdil.
+- AI prompt block li f line ~1184 (ADDRESS COLLECTION) deja mzyana — ghir n-tweakiw l wording bach تbdaa b "Thanks for confirming! Now we just need your full address" wat l-pending_button_intent block (~1202) yقول l-AI explicitly: "MA tقولش 'order is being processed' hta address tkoun deliverable."
+
+## Files to edit
+
+- `supabase/functions/whatsapp-webhook/index.ts` — extract `isAddressDeliverable` to module scope; gate `applyOutcome` for confirm; tweak AI prompt wording for pending_address case.
+- `supabase/functions/whatsapp-automation-runner/index.ts` — gate `applyButtonAction` confirm path the same way.
+- `src/pages/whatsapp/WhatsappInbox.tsx` — show "⏳ Awaiting address" badge on conversations with `pending_button_intent.intent === "confirm"`.

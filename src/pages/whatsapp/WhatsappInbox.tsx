@@ -68,6 +68,12 @@ type Conv = {
   review_note?: string | null;
   resolved_by?: string | null;
   resolved_at?: string | null;
+  pending_button_intent?: {
+    intent?: string;
+    button_text?: string;
+    mapped_status?: string | null;
+    created_at?: string;
+  } | null;
 };
 
 type Msg = {
@@ -1225,6 +1231,15 @@ export default function WhatsappInbox() {
                     >
                       {statusBadge(conv.status).label}
                     </Badge>
+                    {conv.pending_button_intent?.intent === "confirm" && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] h-4 px-1.5 shrink-0 border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                        title="Customer confirmed via button — waiting for full delivery address"
+                      >
+                        ⏳ Awaiting address
+                      </Badge>
+                    )}
                     <span
                       className={cn(
                         "shrink-0 h-1.5 w-1.5 rounded-full",
