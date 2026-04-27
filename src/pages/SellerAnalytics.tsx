@@ -11,6 +11,56 @@ import { DateRange } from "react-day-picker";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";
 import { supabase } from "@/integrations/supabase/client";
 
+type SellerAnalyticsOrder = {
+  id: string;
+  order_id: string;
+  confirmation_status: string;
+  delivery_status: string | null;
+  product_name: string;
+  seller_id: string;
+  price: number;
+  quantity: number;
+  created_at: string;
+  confirmed_at: string | null;
+  delivered_at: string | null;
+  updated_at: string;
+};
+
+const SELLER_ANALYTICS_ORDER_SELECT = "id, order_id, confirmation_status, delivery_status, product_name, seller_id, price, quantity, created_at, confirmed_at, delivered_at, updated_at";
+const PAGE_SIZE = 1000;
+const CONFIRMED_DELIVERY_STATUSES = ["booked", "shipped", "in_transit", "with_courier", "delivered", "paid", "returned"];
+
+async function fetchAllSellerAnalyticsOrders(): Promise<SellerAnalyticsOrder[]> {
+  const rows: SellerAnalyticsOrder[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("orders")
+      .select(SELLER_ANALYTICS_ORDER_SELECT)
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    const page = (data || []) as SellerAnalyticsOrder[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return rows;
+}
+
+function reachedConfirmedStage(order: SellerAnalyticsOrder): boolean {
+  return Boolean(order.confirmed_at) ||
+    order.confirmation_status === "confirmed" ||
+    CONFIRMED_DELIVERY_STATUSES.includes(order.delivery_status || "");
+}
+
+function getConfirmationDate(order: SellerAnalyticsOrder): Date {
+  return new Date(order.confirmed_at || order.updated_at);
+}
+
 export default function SellerAnalytics() {
   const [sellerFilter, setSellerFilter] = useState<string>("all");
   const [datePreset, setDatePreset] = useState<DatePresetValue>("maximum");
@@ -18,14 +68,7 @@ export default function SellerAnalytics() {
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["seller-analytics-orders"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("id, order_id, confirmation_status, delivery_status, product_name, seller_id, price, quantity, created_at, delivered_at")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: fetchAllSellerAnalyticsOrders,
   });
 
   const { data: profiles = [] } = useQuery({
@@ -51,8 +94,14 @@ export default function SellerAnalytics() {
   const filteredOrders = useMemo(() => {
     let filtered = [...orders];
     if (sellerFilter !== "all") filtered = filtered.filter(o => o.seller_id === sellerFilter);
-    if (dateRange?.from) filtered = filtered.filter(o => new Date(o.created_at) >= dateRange.from!);
-    if (dateRange?.to) filtered = filtered.filter(o => new Date(o.created_at) <= dateRange.to!);
+    if (dateRange?.from) filtered = filtered.filter(o => {
+      const date = reachedConfirmedStage(o) ? getConfirmationDate(o) : new Date(o.created_at);
+      return date >= startOfDay(dateRange.from!);
+    });
+    if (dateRange?.to) filtered = filtered.filter(o => {
+      const date = reachedConfirmedStage(o) ? getConfirmationDate(o) : new Date(o.created_at);
+      return date <= endOfDay(dateRange.to!);
+    });
     return filtered;
   }, [orders, sellerFilter, dateRange]);
 
@@ -61,7 +110,7 @@ export default function SellerAnalytics() {
 
   const stats = useMemo(() => {
     const total = filteredOrders.length;
-    const confirmed = filteredOrders.filter(o => o.confirmation_status === "confirmed").length;
+    const confirmed = filteredOrders.filter(reachedConfirmedStage).length;
     // Shipped = all orders that left warehouse (in transit + delivered + returned)
     const shipped = filteredOrders.filter(o => o.delivery_status && shippedStatuses.includes(o.delivery_status)).length;
     // Delivered = successfully received by customer
