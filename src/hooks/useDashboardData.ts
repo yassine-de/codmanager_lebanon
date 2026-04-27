@@ -164,6 +164,19 @@ function getTreatmentDate(o: DashboardOrder): Date {
   return new Date(o.updated_at);
 }
 
+// Event date helpers — each metric uses its own actual event timestamp so
+// charts reflect WHEN the event happened, not when the order was treated.
+function getDeliveredEventDate(o: DashboardOrder): Date {
+  // delivered_at is set when status flips to delivered; fall back to updated_at
+  return new Date(o.delivered_at || o.updated_at);
+}
+
+function reachedDeliveredStage(o: DashboardOrder): boolean {
+  return o.delivery_status === 'delivered' || o.delivery_status === 'paid';
+}
+
+const SHIPPED_DELIVERY_STATUSES = ['shipped', 'booked', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'];
+
 function computeDailyData(orders: DashboardOrder[], numDays: number) {
   const days = eachDayOfInterval({
     start: startOfDay(subDays(new Date(), numDays - 1)),
@@ -173,32 +186,38 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
   return days.map((date) => {
     const nextDay = new Date(date);
     nextDay.setDate(nextDay.getDate() + 1);
-    const dayOrders = orders.filter((o) => {
-      const treatDate = getTreatmentDate(o);
-      return isInDay(treatDate, date, nextDay);
-    });
+
+    // Dropped = orders CREATED on this day (created_at)
+    const dropped = orders.filter((o) =>
+      isInDay(new Date(o.created_at), date, nextDay)
+    ).length;
+
+    // Confirmed = orders whose confirmation EVENT happened on this day (confirmed_at)
     const confirmed = orders.filter((o) => {
       if (!reachedConfirmedStage(o)) return false;
-      const confirmationDate = getConfirmationEventDate(o);
-      return isInDay(confirmationDate, date, nextDay);
+      return isInDay(getConfirmationEventDate(o), date, nextDay);
     }).length;
-    // Dropped = orders created on this day (based on created_at, not treatment date)
-    const dropped = orders.filter((o) => {
-      const createdDate = new Date(o.created_at);
-      return isInDay(createdDate, date, nextDay);
+
+    // Delivered = orders that were actually DELIVERED on this day (delivered_at)
+    const delivered = orders.filter((o) => {
+      if (!reachedDeliveredStage(o)) return false;
+      return isInDay(getDeliveredEventDate(o), date, nextDay);
     }).length;
-    const total = dayOrders.length;
-    // Confirmed = confirmation events that happened on this day, regardless of current delivery status.
-    const delivered = dayOrders.filter(o => o.delivery_status === 'delivered').length;
-    const shipped = dayOrders.filter(o => ['shipped', 'in_transit', 'with_courier', 'delivered'].includes(o.delivery_status || '')).length;
+
+    // Shipped = orders currently in/past shipping pipeline (uses treatment date for trend visualisation)
+    const shipped = orders.filter((o) => {
+      if (!o.delivery_status || !SHIPPED_DELIVERY_STATUSES.includes(o.delivery_status)) return false;
+      return isInDay(getTreatmentDate(o), date, nextDay);
+    }).length;
+
     return {
       day: `${format(date, "EEE")}\n${format(date, "dd/MM")}`,
-      orders: total,
+      orders: dropped,
       dropped,
       confirmed,
       shipped,
       delivered,
-      confirmationRate: total > 0 ? Math.round((confirmed / total) * 100) : 0,
+      confirmationRate: dropped > 0 ? Math.round((confirmed / dropped) * 100) : 0,
       deliveryRate: shipped > 0 ? Math.round((delivered / shipped) * 100) : 0,
     };
   });
@@ -226,7 +245,9 @@ export function useDashboardData(dateRange?: DateRange) {
   }, [allOrders, dateRange]);
 
   const kpis = useMemo(() => computeKPIs(orders), [orders]);
-  const last7 = useMemo(() => computeDailyData(orders, 7), [orders]);
+  // Daily charts use ALL orders so each metric is bucketed by its own event date
+  // (created_at for dropped, confirmed_at for confirmed, delivered_at for delivered).
+  const last7 = useMemo(() => computeDailyData(allOrders, 7), [allOrders]);
 
   const totals7 = useMemo(() => ({
     orders: last7.reduce((s, d) => s + d.orders, 0),
