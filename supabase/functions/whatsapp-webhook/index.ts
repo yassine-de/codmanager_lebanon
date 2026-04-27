@@ -411,44 +411,38 @@ async function applyOutcome(
   };
 
   // ── Address-gated confirm path ────────────────────────────────────────────
+  // ALWAYS gate confirm-buttons through the AI, regardless of whether the
+  // stored address looks deliverable. Why: imported sheet addresses often
+  // pass the heuristic check ("Mansehra near foji") but are NOT actually
+  // courier-deliverable. We force the AI to re-validate the address with the
+  // customer and only then finalize the confirmation. This guarantees we
+  // never confirm an order before the customer's real address is captured.
   if (outcome === "confirmed") {
-    const deliverable = isAddressDeliverable(order.customer_address, order.customer_city);
-    if (!deliverable) {
-      // Stash pending intent so the AI prompt knows the customer already said YES.
-      if (conversationId) {
-        await admin
-          .from("whatsapp_conversations")
-          .update({
-            ai_enabled: true,
-            pending_button_intent: {
-              intent: "confirm",
-              mapped_status: "confirmed",
-              button_text: buttonText || "YES",
-              created_at: new Date().toISOString(),
-            },
-          })
-          .eq("id", conversationId);
-      }
-      // Flag the order but DO NOT change confirmation_status.
+    if (conversationId) {
       await admin
-        .from("orders")
+        .from("whatsapp_conversations")
         .update({
-          whatsapp_status: "pending_address",
-          whatsapp_note: `Customer confirmed via WhatsApp — awaiting full delivery address`,
-          whatsapp_last_reply_at: new Date().toISOString(),
+          ai_enabled: true,
+          pending_button_intent: {
+            intent: "confirm",
+            mapped_status: "confirmed",
+            button_text: buttonText || "YES",
+            created_at: new Date().toISOString(),
+          },
         })
-        .eq("order_id", order.order_id);
-      log("button confirm gated: address incomplete", order.order_id);
-      return;
+        .eq("id", conversationId);
     }
-    // Address is deliverable → proceed to normal confirm.
-    updates.confirmation_status = "confirmed";
-    updates.confirmation_channel = "whatsapp";
-    updates.confirmed_at = new Date().toISOString();
-    if (settings?.auto_book_shipping) {
-      updates.delivery_status = "booked";
-      updates.shipping_status = "Booked";
-    }
+    // Flag the order but DO NOT change confirmation_status.
+    await admin
+      .from("orders")
+      .update({
+        whatsapp_status: "pending_address",
+        whatsapp_note: `Customer clicked "${buttonText || "YES"}" — AI validating address before confirm`,
+        whatsapp_last_reply_at: new Date().toISOString(),
+      })
+      .eq("order_id", order.order_id);
+    log("button confirm gated (always): awaiting AI address validation", order.order_id);
+    return;
   } else if (outcome === "more_info") {
     updates.confirmation_status = "new";
     updates.confirmation_channel = "agent";
