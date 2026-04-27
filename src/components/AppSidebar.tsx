@@ -199,15 +199,17 @@ export function AppSidebar() {
       const readMap = new Map<string, string | null>();
       convs.forEach((c: any) => readMap.set(c.id, c.last_read_at));
 
-      let count = 0;
+      // Count CONVERSATIONS (contacts) with unread inbound — not total unread messages.
+      const unreadConvs = new Set<string>();
       (msgs || []).forEach((m: any) => {
         if (!readMap.has(m.conversation_id)) return;
+        if (unreadConvs.has(m.conversation_id)) return;
         const lastRead = readMap.get(m.conversation_id);
         if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
-          count++;
+          unreadConvs.add(m.conversation_id);
         }
       });
-      return count;
+      return unreadConvs.size;
     },
     enabled: isAdmin && !!authUser,
     refetchInterval: 10000,
