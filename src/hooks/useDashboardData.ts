@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
-import { format, subDays, startOfDay, endOfDay, eachDayOfInterval, isAfter, isWithinInterval } from "date-fns";
+import { format, subDays, startOfDay, endOfDay, eachDayOfInterval, isWithinInterval } from "date-fns";
 import type { DateRange } from "react-day-picker";
 
 export interface DashboardOrder {
@@ -54,6 +54,10 @@ export interface DashboardKPIs {
 const DASHBOARD_ORDER_SELECT = "id, order_id, confirmation_status, delivery_status, total_amount, price, quantity, product_name, seller_id, created_at, confirmed_at, delivered_at, last_attempt_at, last_activity_at, updated_at";
 const DASHBOARD_PAGE_SIZE = 1000;
 const POST_CONFIRM_DELIVERY_STATUSES = ['booked', 'shipped', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'];
+
+function isInDay(date: Date, start: Date, nextDay: Date): boolean {
+  return date >= start && date < nextDay;
+}
 
 async function fetchAllDashboardOrders(): Promise<DashboardOrder[]> {
   const rows: DashboardOrder[] = [];
@@ -169,17 +173,17 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
     nextDay.setDate(nextDay.getDate() + 1);
     const dayOrders = orders.filter((o) => {
       const treatDate = getTreatmentDate(o);
-      return isAfter(treatDate, date) && !isAfter(treatDate, nextDay);
+      return isInDay(treatDate, date, nextDay);
     });
     const confirmed = orders.filter((o) => {
       if (!reachedConfirmedStage(o)) return false;
       const confirmationDate = getConfirmationEventDate(o);
-      return isAfter(confirmationDate, date) && !isAfter(confirmationDate, nextDay);
+      return isInDay(confirmationDate, date, nextDay);
     }).length;
     // Dropped = orders created on this day (based on created_at, not treatment date)
     const dropped = orders.filter((o) => {
       const createdDate = new Date(o.created_at);
-      return isAfter(createdDate, date) && !isAfter(createdDate, nextDay);
+      return isInDay(createdDate, date, nextDay);
     }).length;
     const total = dayOrders.length;
     // Confirmed = confirmation events that happened on this day, regardless of current delivery status.
