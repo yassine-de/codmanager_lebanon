@@ -996,8 +996,11 @@ export default function WhatsappInbox() {
       </div>
 
       <div className="grid grid-cols-12 gap-0 h-[calc(100dvh-200px)] max-h-[calc(100dvh-160px)] rounded-xl border border-border overflow-hidden bg-card">
-        {/* LEFT PANEL */}
-        <aside className="col-span-12 md:col-span-4 lg:col-span-3 border-r border-border flex flex-col bg-background/40 min-h-0 overflow-hidden">
+        {/* LEFT PANEL — hidden on mobile when a conversation is selected */}
+        <aside className={cn(
+          "col-span-12 md:col-span-4 lg:col-span-3 border-r border-border flex-col bg-background/40 min-h-0 overflow-hidden",
+          selected ? "hidden md:flex" : "flex"
+        )}>
           <div className="px-4 h-12 border-b border-border flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <FilterIcon className="h-4 w-4 text-muted-foreground" />
