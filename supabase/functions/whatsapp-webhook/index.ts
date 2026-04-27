@@ -699,7 +699,7 @@ async function handleIncoming(value: any) {
 
       // Trigger CRM update for button actions only — never auto-confirm text.
       if (order && outcome) {
-        await applyOutcome(order, outcome);
+        await applyOutcome(order, outcome, conv?.id ?? null, bodyText);
       } else if (!order && outcome) {
         log("button outcome but no matched order", phone, outcome);
       }
