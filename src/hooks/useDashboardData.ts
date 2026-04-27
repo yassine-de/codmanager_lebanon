@@ -56,7 +56,14 @@ function computeKPIs(orders: DashboardOrder[]): DashboardKPIs {
 
   // Confirmation status counts
   const newOrders = orders.filter(o => o.confirmation_status === 'new').length;
-  const confirmed = orders.filter(o => o.confirmation_status === 'confirmed').length;
+  // Confirmed = ANY order that reached the confirmed stage in this period.
+  // Once an order is confirmed it may move on to shipped/booked/in_transit/delivered/etc.
+  // The confirmation event itself still happened — count it.
+  const POST_CONFIRM_DELIVERY = ['booked', 'shipped', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'];
+  const confirmed = orders.filter(o =>
+    o.confirmation_status === 'confirmed' ||
+    POST_CONFIRM_DELIVERY.includes(o.delivery_status || '')
+  ).length;
   const noAnswer = orders.filter(o => o.confirmation_status === 'no_answer').length;
   const postponed = orders.filter(o => o.confirmation_status === 'postponed').length;
   const cancelled = orders.filter(o => o.confirmation_status === 'cancelled').length;
