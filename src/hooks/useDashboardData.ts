@@ -137,19 +137,31 @@ function computeKPIs(orders: DashboardOrder[], allOrders?: DashboardOrder[], dat
   const confirmationRate = confirmableTotal > 0 ? Math.round((confirmed / confirmableTotal) * 100) : 0;
   const deliveryRate = confirmed > 0 ? Math.round((delivered / confirmed) * 100) : 0;
 
-  // Financial
-  // Delivered Amount = total of orders with delivery_status 'delivered' OR 'paid'
-  const revenue = orders
-    .filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid')
-    .reduce((s, o) => s + Number(o.total_amount), 0);
-  // Paid Amount = total of orders with delivery_status 'paid'
-  const paidAmount = orders
-    .filter(o => o.delivery_status === 'paid')
-    .reduce((s, o) => s + Number(o.total_amount), 0);
-  // Pending Amount = total of orders with delivery_status 'delivered' (delivered but not yet paid)
-  const pendingAmount = orders
-    .filter(o => o.delivery_status === 'delivered')
-    .reduce((s, o) => s + Number(o.total_amount), 0);
+  // Financial — use delivered_at event date when filtering
+  // Revenue (Delivered Amount) = total of orders delivered/paid in this period
+  const revenue = dateRange
+    ? source
+        .filter(o => reachedDeliveredStage(o) && inRange(getDeliveredEventDate(o)))
+        .reduce((s, o) => s + Number(o.total_amount), 0)
+    : orders
+        .filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid')
+        .reduce((s, o) => s + Number(o.total_amount), 0);
+  // Paid Amount = total of orders with delivery_status 'paid' in this period (by delivered_at event)
+  const paidAmount = dateRange
+    ? source
+        .filter(o => o.delivery_status === 'paid' && inRange(getDeliveredEventDate(o)))
+        .reduce((s, o) => s + Number(o.total_amount), 0)
+    : orders
+        .filter(o => o.delivery_status === 'paid')
+        .reduce((s, o) => s + Number(o.total_amount), 0);
+  // Pending Amount = delivered (not yet paid) in this period
+  const pendingAmount = dateRange
+    ? source
+        .filter(o => o.delivery_status === 'delivered' && inRange(getDeliveredEventDate(o)))
+        .reduce((s, o) => s + Number(o.total_amount), 0)
+    : orders
+        .filter(o => o.delivery_status === 'delivered')
+        .reduce((s, o) => s + Number(o.total_amount), 0);
 
   return {
     total, newOrders, confirmed, noAnswer, postponed, cancelled, doubleOrders, wrongNumber,
