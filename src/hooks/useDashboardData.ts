@@ -91,15 +91,23 @@ function getConfirmationEventDate(o: DashboardOrder): Date {
   return new Date(o.confirmed_at || o.updated_at);
 }
 
-function computeKPIs(orders: DashboardOrder[]): DashboardKPIs {
-  const total = orders.length;
+function computeKPIs(orders: DashboardOrder[], allOrders?: DashboardOrder[], dateRange?: { from: Date; to: Date }): DashboardKPIs {
+  // If date range provided, recompute each metric using its own event date from allOrders.
+  // Otherwise fall back to the pre-filtered orders list (no date filter).
+  const source = allOrders && dateRange ? allOrders : orders;
+  const inRange = (d: Date) => !dateRange || (d >= dateRange.from && d <= dateRange.to);
 
-  // Confirmation status counts
+  // Total Orders = orders CREATED in this period (created_at)
+  const total = dateRange
+    ? source.filter(o => inRange(new Date(o.created_at))).length
+    : orders.length;
+
+  // Confirmation status counts — use treatment-filtered orders for status breakdown
   const newOrders = orders.filter(o => o.confirmation_status === 'new').length;
-  // Confirmed = ANY order that reached the confirmed stage in this period.
-  // Once an order is confirmed it may move on to shipped/booked/in_transit/delivered/etc.
-  // The confirmation event itself still happened — count it.
-  const confirmed = orders.filter(reachedConfirmedStage).length;
+  // Confirmed = orders whose confirmation EVENT happened in this period (confirmed_at)
+  const confirmed = dateRange
+    ? source.filter(o => reachedConfirmedStage(o) && inRange(getConfirmationEventDate(o))).length
+    : orders.filter(reachedConfirmedStage).length;
   const noAnswer = orders.filter(o => o.confirmation_status === 'no_answer').length;
   const postponed = orders.filter(o => o.confirmation_status === 'postponed').length;
   const cancelled = orders.filter(o => o.confirmation_status === 'cancelled').length;
