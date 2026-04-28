@@ -946,6 +946,10 @@ async function handleIncoming(value: any) {
             }
 
             // Dedup: skip if AI already sent an outbound within the dedup window.
+            // EXCEPTION: if the customer's latest inbound is NEWER than that outbound,
+            // the customer asked something after our reply (e.g. clicked YES + asked
+            // for product picture in the same batch — applyOutcome auto-confirmed but
+            // the picture request is still pending). Always answer in that case.
             if (dedupWindowMs > 0) {
               const since = new Date(Date.now() - dedupWindowMs).toISOString();
               const { data: recentOut } = await admin
@@ -958,8 +962,14 @@ async function handleIncoming(value: any) {
                 .limit(1)
                 .maybeSingle();
               if (recentOut) {
-                log("ai-continue: dedup window hit, skipping", convId, recentOut.created_at);
-                return;
+                const latestInTs = latestIn?.created_at ? new Date(latestIn.created_at).getTime() : 0;
+                const recentOutTs = new Date(recentOut.created_at).getTime();
+                if (latestInTs > recentOutTs) {
+                  log("ai-continue: dedup bypassed — customer message newer than last outbound", convId);
+                } else {
+                  log("ai-continue: dedup window hit, skipping", convId, recentOut.created_at);
+                  return;
+                }
               }
             }
 
