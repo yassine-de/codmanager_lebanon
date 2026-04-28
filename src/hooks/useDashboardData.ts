@@ -120,7 +120,10 @@ function computeKPIs(orders: DashboardOrder[], allOrders?: DashboardOrder[], dat
   const shipped = orders.filter(o => ['shipped', 'booked'].includes(o.delivery_status || '')).length;
   const inTransit = orders.filter(o => o.delivery_status === 'in_transit').length;
   const withCourier = orders.filter(o => o.delivery_status === 'with_courier').length;
-  const delivered = orders.filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid').length;
+  // Delivered = orders DELIVERED in this period (delivered_at event date)
+  const delivered = dateRange
+    ? source.filter(o => reachedDeliveredStage(o) && inRange(getDeliveredEventDate(o))).length
+    : orders.filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid').length;
   const paid = orders.filter(o => o.delivery_status === 'paid').length;
   // Returned = 'return' (current) OR 'returned' (legacy) OR 'ready_for_return'
   const returned = orders.filter(o => ['return', 'returned', 'ready_for_return'].includes(o.delivery_status || '')).length;
