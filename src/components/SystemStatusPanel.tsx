@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, CheckCircle2, Clock, ShieldAlert, Package, Activity } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { startOfDay, endOfDay } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import FailedSyncModal from "@/components/FailedSyncModal";
 
 interface StatusItem {
