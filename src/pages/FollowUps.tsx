@@ -731,8 +731,6 @@ function cellClassFor(key: ColumnKey): string {
     case "customer": return "text-xs";
     case "phone": return "text-xs tabular-nums text-muted-foreground";
     case "city": return "text-xs text-muted-foreground";
-    case "seller":
-    case "agent": return "text-xs";
     case "days": return "text-center text-xs tabular-nums font-medium";
     case "created":
     case "updated": return "text-[11px] text-muted-foreground tabular-nums";
