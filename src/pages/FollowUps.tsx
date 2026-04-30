@@ -752,6 +752,7 @@ function renderCell(
   segMeta: (typeof segmentMeta)[keyof typeof segmentMeta] | null,
   savingId: string | null,
   handleStatusChange: (id: string, status: string) => void,
+  handleNoteSave: (id: string, note: string) => void,
   navigate: (to: string) => void,
   setHistoryOrder: (v: { id: string; customer: string } | null) => void,
   setTrackingTarget: (v: { orioId: number; sellerId: string } | null) => void,
