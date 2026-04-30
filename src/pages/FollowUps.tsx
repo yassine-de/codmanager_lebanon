@@ -432,6 +432,10 @@ export default function FollowUps() {
       if (error) throw error;
       toast.success("Follow-up updated");
       refetch();
+      // Open note dialog after status change
+      const row = enriched.find((r) => r.order_id === orderId);
+      setNoteText(row?.follow_up_note ?? "");
+      setNoteDialog({ orderId, currentNote: row?.follow_up_note ?? "", fromStatusChange: true });
     } catch (err: any) {
       toast.error(err.message || "Failed to update");
     } finally {
@@ -448,10 +452,16 @@ export default function FollowUps() {
         .eq("order_id", orderId);
       if (error) throw error;
       toast.success("Note saved");
+      setNoteDialog(null);
       refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to save note");
     }
+  }
+
+  function openNoteDialog(orderId: string, currentNote: string) {
+    setNoteText(currentNote);
+    setNoteDialog({ orderId, currentNote });
   }
 
   if (!authLoading && authUser && authUser.role !== "admin" && authUser.role !== "agent" && authUser.role !== "follow_up") {
