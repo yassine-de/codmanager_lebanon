@@ -769,7 +769,6 @@ function renderCell(
     case "phone": return row.customer_phone || "—";
     case "city": return row.customer_city || "—";
     case "delivery": return <StatusPill value={row.delivery_status} styleMap={deliveryStatusStyle} />;
-    case "delivery": return <StatusPill value={row.delivery_status} styleMap={deliveryStatusStyle} />;
     case "days": return row.days_since_shipped ?? "—";
     case "segment":
       return (
