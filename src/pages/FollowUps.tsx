@@ -834,19 +834,28 @@ function renderCell(
           </SelectContent>
         </Select>
       );
-    case "note":
+    case "note": {
+      const hasNote = !!row.follow_up_note?.trim();
       return (
-        <input
-          type="text"
-          defaultValue={row.follow_up_note ?? ""}
-          placeholder="Add note…"
-          onBlur={(e) => {
-            const v = e.target.value.trim();
-            if (v !== (row.follow_up_note ?? "")) handleNoteSave(row.order_id, v);
-          }}
-          className="h-7 text-xs px-2 rounded-md border border-input bg-background w-full min-w-[140px] focus:outline-none focus:ring-1 focus:ring-primary"
-        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => openNoteDialog(row.order_id, row.follow_up_note ?? "")}
+              className={`inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors active:scale-95 ${
+                hasNote
+                  ? "bg-[hsl(45,90%,55%)]/15 text-[hsl(45,90%,55%)] hover:bg-[hsl(45,90%,55%)]/25"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <StickyNote className="w-3.5 h-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[220px]">
+            <p className="text-xs">{hasNote ? row.follow_up_note : "Add note…"}</p>
+          </TooltipContent>
+        </Tooltip>
       );
+    }
     case "created": return format(new Date(row.order_created_at), "dd MMM HH:mm");
     case "updated": return format(new Date(row.order_updated_at), "dd MMM HH:mm");
     case "actions":
