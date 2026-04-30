@@ -129,6 +129,8 @@ interface FollowUpRow {
   seller_name: string | null;
   agent_id: string | null;
   agent_name: string | null;
+  follow_up_assigned_to: string | null;
+  follow_up_note: string | null;
 }
 
 function computeSegment(row: FollowUpRow): "failed_attempt" | "delayed" | "on_going" | null {
