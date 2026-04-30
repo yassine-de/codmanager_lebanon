@@ -131,6 +131,8 @@ interface FollowUpRow {
   agent_name: string | null;
   follow_up_assigned_to: string | null;
   follow_up_note: string | null;
+  product_name: string | null;
+  total_amount: number | null;
 }
 
 function computeSegment(row: FollowUpRow): "failed_attempt" | "delayed" | "on_going" | null {
@@ -201,6 +203,8 @@ type ColumnKey =
   | "customer"
   | "phone"
   | "city"
+  | "product"
+  | "price"
   | "delivery"
   | "segment"
   | "days"
@@ -216,6 +220,8 @@ const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "customer", label: "Customer" },
   { key: "phone", label: "Phone" },
   { key: "city", label: "City" },
+  { key: "product", label: "Product" },
+  { key: "price", label: "Price" },
   { key: "delivery", label: "Delivery" },
   { key: "segment", label: "Sub Status" },
   { key: "days", label: "Days" },
@@ -226,7 +232,7 @@ const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "actions", label: "Actions" },
 ];
 
-const STORAGE_KEY = "follow-ups:column-config:v3";
+const STORAGE_KEY = "follow-ups:column-config:v4";
 
 type ColumnConfig = { key: ColumnKey; visible: boolean };
 
