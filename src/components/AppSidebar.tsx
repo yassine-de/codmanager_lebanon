@@ -79,6 +79,7 @@ export function AppSidebar() {
   const { t } = useLanguage();
   const isSeller = authUser?.role === "seller";
   const isAgent = authUser?.role === "agent";
+  const isFollowUp = authUser?.role === "follow_up";
 
   const { data: orderCount = 0 } = useQuery({
     queryKey: ["sidebar-order-count"],
