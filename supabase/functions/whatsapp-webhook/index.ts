@@ -1707,31 +1707,36 @@ async function tryExtractAndConfirmAddress(args: {
     return;
   }
 
-  const extractPrompt = `You are an address-extraction assistant for a courier in Pakistan. Pakistan has BIG cities (Karachi, Lahore, Islamabad, Rawalpindi, Faisalabad, Multan, Peshawar, etc.) AND many SMALL towns / villages / tehsils (Batagram, Layyah, Tank, Wari, Shahdad Kot, Dera Ismail Khan, etc.). Address quality expectations are different for each.
+  const extractPrompt = `You are an address-extraction assistant for a courier in Pakistan. Your job is to ensure the address is DETAILED ENOUGH for a courier to find the exact location without calling the customer.
 
 A "deliverable" address requires:
 1) A city OR town OR tehsil OR village name (anywhere in Pakistan), AND
-2) AT LEAST ONE locator that helps the rider find the spot. Any ONE of these is enough:
-   - a house / flat / plot / shop / office number, OR
-   - a specific street / lane / road / gali name or number (e.g. "Ajmera Road", "Street 4", "Main Bazaar Road"), OR
-   - a neighborhood / area / colony / block / sector / phase / mohalla / town name (e.g. "Gulshan-e-Iqbal Block 7", "DHA Phase 5", "Saddar", "G-9/4", "Johar Town"), OR
-   - a recognizable named landmark with proximity wording (e.g. "near Allahdin Hotel", "near Adalat Stop", "Fuara Chowk", "near UBL Bank Zarobi", "opposite XYZ Masjid"). Small-town landmarks like a chowk, a named stop, a small bank branch, or a small hotel ARE enough — the rider knows the town and can ask locally.
+2) SPECIFIC location details — "near [landmark]" ALONE is NOT enough. The customer must provide at least ONE of:
+   - a house / flat / plot / shop / office NUMBER (e.g. "House 45", "Plot 12", "Shop 3"), OR
+   - a specific street / lane / road / gali NAME or number (e.g. "Ajmera Road", "Street 4", "Gali 3"), OR
+   - a neighborhood / area / colony / block / sector / phase / mohalla name (e.g. "Gulshan-e-Iqbal Block 7", "DHA Phase 5", "Saddar", "Johar Town", "Mohalla Islamia"), OR
+   - a COMBINATION of landmark + street/area (e.g. "near Allahdin Hotel, Main Bazaar Road" — NOT just "near Allahdin Hotel" alone)
 
-Only REJECT when the address gives the rider NOTHING to go on:
-- Just a city name with no other detail (e.g. "Lahore" alone).
-- Single vague words: "home", "here", "same", "send it".
-- Obvious fake / test / placeholder values: "test", "fake", "dummy", "sample", "abc", "xyz", "n/a", "asdf", random keyboard mashing.
-- A standalone giant institution with no street/area context AND no proximity wording (e.g. just "CM Secretariat" with nothing else).
+REJECT these as incomplete (complete=false):
+- "Near Allahdin Hotel" (landmark only, no street/area/number)
+- "Chowk Fawara" (landmark only)
+- "opposite XYZ Masjid" (landmark only, no area)
+- Just a city name (e.g. "Lahore" alone)
+- Single vague words: "home", "here", "same", "send it"
+- Fake / test / placeholder values
 
-In big metro cities (Karachi, Lahore, Islamabad, Rawalpindi, Faisalabad, Multan, Peshawar, Hyderabad, Quetta, Gujranwala, Sialkot) prefer at least an area/block/sector/town in addition to the locator when possible — but if the customer gave a clear shop/street + landmark + city, accept it.
-
-In small towns / villages / tehsils, a road / chowk / named landmark + the town name IS enough. Do NOT demand a formal block/sector/phase that does not exist there.
+ACCEPT these as complete (complete=true):
+- "House 12 Street 4 Gulshan-e-Iqbal" (has number + street + area)
+- "Near Allahdin Hotel Main Bazaar Road" (landmark + street)
+- "Mohalla Islamia Gali 2" (area + street)
+- "Plot 7 near UBL Bank" (has number + landmark)
+- "DHA Phase 5 Block D" (area + block)
 
 Return JSON ONLY in this exact schema:
 { "complete": boolean, "full_address": string, "city": string }
 
 Rules:
-- "complete" = true if the address has a city/town + at least one usable locator from the list above. When in doubt for SMALL towns, lean toward true. When in doubt for BIG metros with no area at all, lean toward false.
+- "complete" = true ONLY if the address has a city/town + a house/plot number OR a street/gali name OR an area/mohalla/block/sector. A landmark alone (near X, opposite X, chowk X) without any of these is NOT complete.
 - "full_address" must be a single line containing all the detail parts the customer provided (house/flat, street, block/sector/phase, area, landmark) — DO NOT include the city.
 - "city" must be the city/town/village name in English/Latin script (e.g. "Karachi", "Lahore", "Peshawar", "Batagram", "Layyah").
 - For obvious fake/test/placeholder values or single vague words, return complete=false.
