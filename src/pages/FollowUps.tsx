@@ -739,7 +739,7 @@ const columnWidths: Record<ColumnKey, string> = {
   segment: "100px",
   days: "45px",
   follow_up: "100px",
-  note: "130px",
+  note: "50px",
   created: "85px",
   updated: "85px",
   actions: "60px",
