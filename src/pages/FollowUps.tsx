@@ -280,7 +280,7 @@ export default function FollowUps() {
       if (error) throw error;
       return (data ?? []) as FollowUpRow[];
     },
-    enabled: !!authUser && (authUser.role === "admin" || authUser.role === "agent"),
+    enabled: !!authUser && (authUser.role === "admin" || authUser.role === "agent" || authUser.role === "follow_up"),
     refetchInterval: 30000,
   });
 
