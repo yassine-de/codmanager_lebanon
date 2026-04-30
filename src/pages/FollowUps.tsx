@@ -281,6 +281,8 @@ export default function FollowUps() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [historyOrder, setHistoryOrder] = useState<{ id: string; customer: string } | null>(null);
   const [trackingTarget, setTrackingTarget] = useState<{ orioId: number; sellerId: string } | null>(null);
+  const [noteDialog, setNoteDialog] = useState<{ orderId: string; currentNote: string; fromStatusChange?: boolean } | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => loadColumnConfig());
 
