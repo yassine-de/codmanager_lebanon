@@ -201,14 +201,11 @@ type ColumnKey =
   | "customer"
   | "phone"
   | "city"
-  | "seller"
-  | "agent"
   | "delivery"
-  | "days"
   | "segment"
+  | "days"
   | "follow_up"
   | "note"
-  | "assigned_to"
   | "created"
   | "updated"
   | "actions";
@@ -219,20 +216,17 @@ const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "customer", label: "Customer" },
   { key: "phone", label: "Phone" },
   { key: "city", label: "City" },
-  { key: "seller", label: "Seller" },
-  { key: "agent", label: "Agent" },
   { key: "delivery", label: "Delivery" },
+  { key: "segment", label: "Sub Status" },
   { key: "days", label: "Days" },
-  { key: "segment", label: "Segment" },
   { key: "follow_up", label: "Follow Up" },
   { key: "note", label: "FU Note" },
-  { key: "assigned_to", label: "FU Agent" },
   { key: "created", label: "Created" },
   { key: "updated", label: "Updated" },
   { key: "actions", label: "Actions" },
 ];
 
-const STORAGE_KEY = "follow-ups:column-config:v2";
+const STORAGE_KEY = "follow-ups:column-config:v3";
 
 type ColumnConfig = { key: ColumnKey; visible: boolean };
 
