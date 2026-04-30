@@ -658,7 +658,7 @@ export default function FollowUps() {
                       <TableHead
                         key={col.key}
                         style={{ width: columnWidths[col.key] }}
-                        className={`text-[10px] uppercase tracking-wider px-1.5 ${isCenter ? "text-center" : ""}`}
+                        className={`text-xs font-medium uppercase tracking-wider text-muted-foreground px-3 py-3 ${isCenter ? "text-center" : ""}`}
                       >
                         {meta.label}
                       </TableHead>
