@@ -868,7 +868,7 @@ function renderCell(
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium leading-none truncate max-w-[140px] ${cls}`}>
+              <span className={`block rounded-full border px-2.5 py-0.5 text-xs font-medium leading-5 truncate max-w-full ${cls}`}>
                 {label}
               </span>
             </TooltipTrigger>
