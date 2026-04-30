@@ -648,7 +648,7 @@ export default function FollowUps() {
         {/* Table */}
         <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
               <thead>
                 <tr className="border-b bg-muted/40">
                   {visibleColumns.map((col) => {
@@ -657,7 +657,8 @@ export default function FollowUps() {
                     return (
                       <th
                         key={col.key}
-                        className={`text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider ${isCenter ? "text-center" : ""}`}
+                        style={{ width: columnWidths[col.key] }}
+                        className={`text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider ${isCenter ? "text-center" : ""} overflow-hidden`}
                       >
                         {meta.label}
                       </th>
@@ -690,7 +691,7 @@ export default function FollowUps() {
                         {visibleColumns.map((col) => (
                           <td
                             key={col.key}
-                            className={`py-2.5 ${cellClassFor(col.key)}`}
+                            className={`py-2.5 overflow-hidden ${cellClassFor(col.key)}`}
                           >
                             {renderCell(col.key, row, segMeta, savingId, handleStatusChange, handleNoteSave, navigate, setHistoryOrder, setTrackingTarget, openNoteDialog)}
                           </td>
@@ -825,10 +826,21 @@ function renderCell(
       const name = row.customer_name || "—";
       const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join("");
       return (
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-semibold text-muted-foreground">{initials}</span>
-          <span className="truncate">{name}</span>
-        </div>
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 min-w-0 max-w-[120px]">
+                <span className="shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-semibold text-muted-foreground">{initials}</span>
+                <span className="truncate">{name}</span>
+              </div>
+            </TooltipTrigger>
+            {name.length > 14 && (
+              <TooltipContent side="top" className="max-w-[250px] text-xs">
+                {name}
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       );
     }
     case "phone": return row.customer_phone || "—";
