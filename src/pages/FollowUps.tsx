@@ -626,17 +626,17 @@ export default function FollowUps() {
         {/* Table */}
         <Card className="overflow-hidden">
           <div className="overflow-auto">
-            <Table>
+            <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
                   {visibleColumns.map((col) => {
                     const meta = ALL_COLUMNS.find((c) => c.key === col.key)!;
                     const isCenter = col.key === "days";
-                    const minW = col.key === "follow_up" ? "min-w-[180px]" : "";
                     return (
                       <TableHead
                         key={col.key}
-                        className={`text-xs uppercase tracking-wider ${isCenter ? "text-center" : ""} ${minW}`}
+                        style={{ width: columnWidths[col.key] }}
+                        className={`text-[11px] uppercase tracking-wider px-2 ${isCenter ? "text-center" : ""}`}
                       >
                         {meta.label}
                       </TableHead>
