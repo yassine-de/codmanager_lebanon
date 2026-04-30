@@ -40,6 +40,7 @@ const roleConfig: Record<string, { label: string; icon: typeof Shield; color: st
   admin: { label: "Admin", icon: Shield, color: "bg-primary/10 text-primary border-primary/20" },
   seller: { label: "Seller", icon: Store, color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
   agent: { label: "Agent", icon: Headphones, color: "bg-amber-500/10 text-amber-600 border-amber-500/20" },
+  follow_up: { label: "Follow Up", icon: Headphones, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
   custom: { label: "Custom", icon: UserCog, color: "bg-purple-500/10 text-purple-600 border-purple-500/20" },
 };
 
@@ -333,6 +334,7 @@ const Users = () => {
             <SelectItem value="admin" className="text-xs">Admin</SelectItem>
             <SelectItem value="seller" className="text-xs">Seller</SelectItem>
             <SelectItem value="agent" className="text-xs">Agent</SelectItem>
+            <SelectItem value="follow_up" className="text-xs">Follow Up</SelectItem>
             <SelectItem value="custom" className="text-xs">Custom</SelectItem>
           </SelectContent>
         </Select>
@@ -474,6 +476,7 @@ const Users = () => {
                     <SelectItem value="admin" className="text-xs">Admin</SelectItem>
                     <SelectItem value="seller" className="text-xs">Seller</SelectItem>
                     <SelectItem value="agent" className="text-xs">Agent</SelectItem>
+                    <SelectItem value="follow_up" className="text-xs">Follow Up</SelectItem>
                     <SelectItem value="custom" className="text-xs">Custom</SelectItem>
                   </SelectContent>
                 </Select>

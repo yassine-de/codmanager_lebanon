@@ -80,6 +80,7 @@ function getRolePermissions(role: string, allPermissionKeys: string[], customPer
   if (role === "admin") return allPermissionKeys;
   if (role === "seller") return sellerPermissions;
   if (role === "agent") return agentPermissions;
+  if (role === "follow_up") return [];
   return customPermissions || [];
 }
 
@@ -121,7 +122,7 @@ async function ensureProfile(
 async function ensureRole(
   supabaseAdmin: ReturnType<typeof createClient>,
   userId: string,
-  role: "admin" | "seller" | "agent" | "custom",
+  role: "admin" | "seller" | "agent" | "follow_up" | "custom",
 ) {
   const { data: existingRole, error: roleLookupError } = await supabaseAdmin
     .from("user_roles")
