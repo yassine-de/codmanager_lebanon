@@ -201,14 +201,11 @@ type ColumnKey =
   | "customer"
   | "phone"
   | "city"
-  | "seller"
-  | "agent"
   | "delivery"
-  | "days"
   | "segment"
+  | "days"
   | "follow_up"
   | "note"
-  | "assigned_to"
   | "created"
   | "updated"
   | "actions";
@@ -219,20 +216,17 @@ const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "customer", label: "Customer" },
   { key: "phone", label: "Phone" },
   { key: "city", label: "City" },
-  { key: "seller", label: "Seller" },
-  { key: "agent", label: "Agent" },
   { key: "delivery", label: "Delivery" },
+  { key: "segment", label: "Sub Status" },
   { key: "days", label: "Days" },
-  { key: "segment", label: "Segment" },
   { key: "follow_up", label: "Follow Up" },
   { key: "note", label: "FU Note" },
-  { key: "assigned_to", label: "FU Agent" },
   { key: "created", label: "Created" },
   { key: "updated", label: "Updated" },
   { key: "actions", label: "Actions" },
 ];
 
-const STORAGE_KEY = "follow-ups:column-config:v2";
+const STORAGE_KEY = "follow-ups:column-config:v3";
 
 type ColumnConfig = { key: ColumnKey; visible: boolean };
 
@@ -557,30 +551,6 @@ export default function FollowUps() {
               </SelectContent>
             </Select>
 
-            <Select value={filterSeller} onValueChange={setFilterSeller}>
-              <SelectTrigger className="h-9 text-xs min-w-0">
-                <SelectValue placeholder="Seller" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sellers</SelectItem>
-                {filterOptions.sellers.map(([id, name]) => (
-                  <SelectItem key={id} value={id}>{name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={filterAgent} onValueChange={setFilterAgent}>
-              <SelectTrigger className="h-9 text-xs min-w-0">
-                <SelectValue placeholder="Agent" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Agents</SelectItem>
-                {filterOptions.agents.map(([id, name]) => (
-                  <SelectItem key={id} value={id}>{name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             <Select value={filterFollowUp} onValueChange={setFilterFollowUp}>
               <SelectTrigger className="h-9 text-xs min-w-0">
                 <SelectValue placeholder="Follow Up Status" />
@@ -737,8 +707,6 @@ function cellClassFor(key: ColumnKey): string {
     case "customer": return "text-xs";
     case "phone": return "text-xs tabular-nums text-muted-foreground";
     case "city": return "text-xs text-muted-foreground";
-    case "seller":
-    case "agent": return "text-xs";
     case "days": return "text-center text-xs tabular-nums font-medium";
     case "created":
     case "updated": return "text-[11px] text-muted-foreground tabular-nums";
@@ -776,8 +744,6 @@ function renderCell(
     case "customer": return row.customer_name || "—";
     case "phone": return row.customer_phone || "—";
     case "city": return row.customer_city || "—";
-    case "seller": return row.seller_name || "—";
-    case "agent": return row.agent_name || "—";
     case "delivery": return <StatusPill value={row.delivery_status} styleMap={deliveryStatusStyle} />;
     case "days": return row.days_since_shipped ?? "—";
     case "segment":
@@ -829,12 +795,6 @@ function renderCell(
           }}
           className="h-7 text-xs px-2 rounded-md border border-input bg-background w-full min-w-[140px] focus:outline-none focus:ring-1 focus:ring-primary"
         />
-      );
-    case "assigned_to":
-      return row.follow_up_assigned_to ? (
-        <span className="text-[11px] font-mono text-muted-foreground">{row.follow_up_assigned_to.slice(0, 8)}</span>
-      ) : (
-        <span className="text-muted-foreground text-xs">Unassigned</span>
       );
     case "created": return format(new Date(row.order_created_at), "dd MMM HH:mm");
     case "updated": return format(new Date(row.order_updated_at), "dd MMM HH:mm");
