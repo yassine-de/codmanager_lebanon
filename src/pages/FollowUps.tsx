@@ -648,7 +648,7 @@ export default function FollowUps() {
         {/* Table */}
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
-            <Table style={{ minWidth: "1100px" }}>
+            <Table className="table-fixed" style={{ width: "1300px" }}>
               <TableHeader>
                 <TableRow>
                   {visibleColumns.map((col) => {
