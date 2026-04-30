@@ -768,8 +768,7 @@ function renderCell(
     case "customer": return row.customer_name || "—";
     case "phone": return row.customer_phone || "—";
     case "city": return row.customer_city || "—";
-    case "seller": return row.seller_name || "—";
-    case "agent": return row.agent_name || "—";
+    case "delivery": return <StatusPill value={row.delivery_status} styleMap={deliveryStatusStyle} />;
     case "delivery": return <StatusPill value={row.delivery_status} styleMap={deliveryStatusStyle} />;
     case "days": return row.days_since_shipped ?? "—";
     case "segment":
