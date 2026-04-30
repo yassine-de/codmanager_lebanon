@@ -648,7 +648,7 @@ export default function FollowUps() {
         {/* Table */}
         <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
               <thead>
                 <tr className="border-b bg-muted/40">
                   {visibleColumns.map((col) => {
@@ -657,7 +657,8 @@ export default function FollowUps() {
                     return (
                       <th
                         key={col.key}
-                        className={`text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider ${isCenter ? "text-center" : ""}`}
+                        style={{ width: columnWidths[col.key] }}
+                        className={`text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider ${isCenter ? "text-center" : ""} overflow-hidden`}
                       >
                         {meta.label}
                       </th>
