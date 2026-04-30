@@ -52,7 +52,16 @@ import {
   CalendarIcon,
   Eye,
   EyeOff,
+  StickyNote,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import OrderHistoryModal from "@/components/OrderHistoryModal";
@@ -272,6 +281,8 @@ export default function FollowUps() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [historyOrder, setHistoryOrder] = useState<{ id: string; customer: string } | null>(null);
   const [trackingTarget, setTrackingTarget] = useState<{ orioId: number; sellerId: string } | null>(null);
+  const [noteDialog, setNoteDialog] = useState<{ orderId: string; currentNote: string; fromStatusChange?: boolean } | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => loadColumnConfig());
 
@@ -421,6 +432,10 @@ export default function FollowUps() {
       if (error) throw error;
       toast.success("Follow-up updated");
       refetch();
+      // Open note dialog after status change
+      const row = enriched.find((r) => r.order_id === orderId);
+      setNoteText(row?.follow_up_note ?? "");
+      setNoteDialog({ orderId, currentNote: row?.follow_up_note ?? "", fromStatusChange: true });
     } catch (err: any) {
       toast.error(err.message || "Failed to update");
     } finally {
@@ -437,17 +452,24 @@ export default function FollowUps() {
         .eq("order_id", orderId);
       if (error) throw error;
       toast.success("Note saved");
+      setNoteDialog(null);
       refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to save note");
     }
   }
 
+  function openNoteDialog(orderId: string, currentNote: string) {
+    setNoteText(currentNote);
+    setNoteDialog({ orderId, currentNote });
+  }
+
   if (!authLoading && authUser && authUser.role !== "admin" && authUser.role !== "agent" && authUser.role !== "follow_up") {
     return <Navigate to="/" replace />;
   }
 
-  const visibleColumns = columns.filter((c) => c.visible);
+  const isSeller = authUser?.role === "seller";
+  const visibleColumns = columns.filter((c) => c.visible && !(isSeller && c.key === "note"));
 
   return (
     <TooltipProvider>
@@ -671,7 +693,7 @@ export default function FollowUps() {
                             key={col.key}
                             className={cellClassFor(col.key)}
                           >
-                            {renderCell(col.key, row, segMeta, savingId, handleStatusChange, handleNoteSave, navigate, setHistoryOrder, setTrackingTarget)}
+                            {renderCell(col.key, row, segMeta, savingId, handleStatusChange, handleNoteSave, navigate, setHistoryOrder, setTrackingTarget, openNoteDialog)}
                           </TableCell>
                         ))}
                       </TableRow>
@@ -701,6 +723,38 @@ export default function FollowUps() {
             onClose={() => setTrackingTarget(null)}
           />
         )}
+
+        {/* Note Dialog */}
+        <Dialog open={!!noteDialog} onOpenChange={(o) => !o && setNoteDialog(null)}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle className="text-sm flex items-center gap-2">
+                <StickyNote className="w-4 h-4 text-[hsl(45,90%,55%)]" />
+                {noteDialog?.fromStatusChange ? "Add a Follow-Up Note" : "Follow-Up Note"}
+              </DialogTitle>
+            </DialogHeader>
+            <Textarea
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Write your note here…"
+              className="min-h-[100px] text-sm"
+              autoFocus
+            />
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" size="sm" onClick={() => setNoteDialog(null)}>
+                {noteDialog?.fromStatusChange ? "Skip" : "Cancel"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (noteDialog) handleNoteSave(noteDialog.orderId, noteText.trim());
+                }}
+              >
+                Save Note
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );
@@ -718,7 +772,7 @@ const columnWidths: Record<ColumnKey, string> = {
   segment: "100px",
   days: "45px",
   follow_up: "100px",
-  note: "130px",
+  note: "50px",
   created: "85px",
   updated: "85px",
   actions: "60px",
@@ -750,6 +804,7 @@ function renderCell(
   navigate: (to: string) => void,
   setHistoryOrder: (v: { id: string; customer: string } | null) => void,
   setTrackingTarget: (v: { orioId: number; sellerId: string } | null) => void,
+  openNoteDialog: (orderId: string, currentNote: string) => void,
 ) {
   switch (key) {
     case "order_id": return row.order_id;
@@ -812,19 +867,28 @@ function renderCell(
           </SelectContent>
         </Select>
       );
-    case "note":
+    case "note": {
+      const hasNote = !!row.follow_up_note?.trim();
       return (
-        <input
-          type="text"
-          defaultValue={row.follow_up_note ?? ""}
-          placeholder="Add note…"
-          onBlur={(e) => {
-            const v = e.target.value.trim();
-            if (v !== (row.follow_up_note ?? "")) handleNoteSave(row.order_id, v);
-          }}
-          className="h-7 text-xs px-2 rounded-md border border-input bg-background w-full min-w-[140px] focus:outline-none focus:ring-1 focus:ring-primary"
-        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => openNoteDialog(row.order_id, row.follow_up_note ?? "")}
+              className={`inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors active:scale-95 ${
+                hasNote
+                  ? "bg-[hsl(45,90%,55%)]/15 text-[hsl(45,90%,55%)] hover:bg-[hsl(45,90%,55%)]/25"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <StickyNote className="w-3.5 h-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[220px]">
+            <p className="text-xs">{hasNote ? row.follow_up_note : "Add note…"}</p>
+          </TooltipContent>
+        </Tooltip>
       );
+    }
     case "created": return format(new Date(row.order_created_at), "dd MMM HH:mm");
     case "updated": return format(new Date(row.order_updated_at), "dd MMM HH:mm");
     case "actions":
