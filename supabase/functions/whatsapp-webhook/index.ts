@@ -377,16 +377,21 @@ export function isAddressDeliverable(addr?: string | null, city?: string | null)
     if (!city || String(city).trim().length === 0) return false;
   }
   const raw = String(addr).trim();
-  if (raw.length < 10) return false;
+  if (raw.length < 15) return false; // Stricter min length — "Near X Hotel" is too short
   const lower = raw.toLowerCase();
   const fakePattern = /\b(test|testing|tester|fake|dummy|sample|example|n\/?a|none|null|xxx+|asdf+|qwerty|aaaa+|placeholder|abc+|address here|adress|same|here)\b/i;
   if (fakePattern.test(lower)) return false;
   const tokens = raw.split(/\s+/).filter((w) => w.length > 1);
-  if (tokens.length < 2) return false;
+  if (tokens.length < 3) return false; // Need at least 3 meaningful words
   const hasNumber = /\d/.test(raw);
-  const streetKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|near|opposite|main|gali|chowk|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
-  if (!hasNumber && !streetKeyword.test(lower)) return false;
-  return true;
+  // "near/opposite X" alone is NOT enough — need a second detail (street, area, block, etc.)
+  const preciseKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|gali|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
+  const landmarkOnly = /\b(near|opposite|chowk|main)\b/i;
+  if (hasNumber) return true; // Has a house/plot/street number → good enough
+  if (preciseKeyword.test(lower)) return true; // Has a street/block/area keyword → good
+  // "near X" or "opposite X" alone is too vague for reliable delivery
+  if (landmarkOnly.test(lower) && !preciseKeyword.test(lower)) return false;
+  return false; // No number, no precise keyword → not deliverable
 }
 
 // Apply CRM updates for a button action. Mirrors whatsapp-action logic so
@@ -423,16 +428,17 @@ async function applyOutcome(
       const city = order.customer_city;
       if (!addr || !city) return false;
       const raw = String(addr).trim();
-      if (raw.length < 10) return false;
+      if (raw.length < 15) return false;
       const lower = raw.toLowerCase();
       const fakePattern = /\b(test|testing|tester|fake|dummy|sample|example|n\/?a|none|null|xxx+|asdf+|qwerty|aaaa+|placeholder|abc+|address here|adress|same|here)\b/i;
       if (fakePattern.test(lower)) return false;
       const tokens = raw.split(/\s+/).filter((w) => w.length > 1);
-      if (tokens.length < 2) return false;
+      if (tokens.length < 3) return false;
       const hasNumber = /\d/.test(raw);
-      const streetKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|near|opposite|main|gali|chowk|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
-      if (!hasNumber && !streetKeyword.test(lower)) return false;
-      return true;
+      const preciseKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|gali|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
+      if (hasNumber) return true;
+      if (preciseKeyword.test(lower)) return true;
+      return false;
     })();
 
     if (addrLooksDeliverable && order.confirmation_status !== "confirmed") {
@@ -1311,20 +1317,17 @@ async function aiContinueReply(args: {
   const isAddressDeliverable = (addr?: string | null): boolean => {
     if (!addr) return false;
     const raw = String(addr).trim();
-    if (raw.length < 10) return false;
+    if (raw.length < 15) return false;
     const lower = raw.toLowerCase();
-    // Reject common fake / test / placeholder patterns
     const fakePattern = /\b(test|testing|tester|fake|dummy|sample|example|n\/?a|none|null|xxx+|asdf+|qwerty|aaaa+|placeholder|abc+|address here|adress|same|here)\b/i;
     if (fakePattern.test(lower)) return false;
-    // Need at least 2 distinct word tokens (avoid single-word addresses)
     const tokens = raw.split(/\s+/).filter((w) => w.length > 1);
-    if (tokens.length < 2) return false;
-    // Detail signal: either contains a digit (house/flat/plot/street #) OR
-    // contains a recognizable street/area keyword. One of these is enough.
+    if (tokens.length < 3) return false;
     const hasNumber = /\d/.test(raw);
-    const streetKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|near|opposite|main|gali|chowk|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
-    if (!hasNumber && !streetKeyword.test(lower)) return false;
-    return true;
+    const preciseKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|gali|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
+    if (hasNumber) return true;
+    if (preciseKeyword.test(lower)) return true;
+    return false;
   };
   const hasStoredAddress =
     !!order &&
@@ -1332,7 +1335,7 @@ async function aiContinueReply(args: {
     !!order.customer_city &&
     String(order.customer_city).trim().length > 0;
   const addressRule = order && !hasStoredAddress
-    ? `\n\nIMPORTANT — ADDRESS COLLECTION: The customer's delivery address is MISSING, FAKE, TEST data, or NOT detailed enough for a courier to find (current value: "${order.customer_address ?? "(none)"}", city: "${order.customer_city ?? "(none)"}").\n\nA deliverable address requires:\n1) A city OR town OR tehsil OR village name (anywhere in Pakistan), AND\n2) AT LEAST ONE locator that helps the rider find the spot. Any ONE of these is enough:\n   - a house/flat/plot/shop/office number, OR\n   - a specific street / lane / road / gali name (e.g. "Ajmera Road", "Street 4"), OR\n   - a neighborhood / area / colony / block / sector / phase / mohalla / town name (e.g. "Gulshan-e-Iqbal Block 7", "DHA Phase 5", "Saddar", "Johar Town"), OR\n   - a recognizable named landmark with proximity wording (e.g. "near Allahdin Hotel", "near Adalat Stop", "Fuara Chowk", "near UBL Bank Zarobi"). In SMALL towns / villages a chowk + town name is enough — the rider knows the town and asks locally.\n\nIn big metros (Karachi, Lahore, Islamabad, Rawalpindi, Faisalabad, Multan, Peshawar) try to also get an area/block/sector/town when possible.\nIn small towns / villages / tehsils, do NOT demand a formal block/sector/phase that doesn't exist — accept a road/chowk/landmark + town.\n\nRules:\n- Do NOT confirm delivery to a vague, single-word, test, or placeholder address.\n- Do NOT accept just a city name with no other detail.\n- Reject "test", "fake", "same", "here" or random keyboard mashing.\n- Politely (in the customer's language) acknowledge what they gave you. If a usable locator + city are present, read it back briefly and the system will auto-confirm. If anything is missing, ask ONE friendly question for the missing piece (e.g. "Aap ne CM Secretariat bataya — please nazdeek ki street ya landmark bhi share karein.").\n\nOnce the customer provides a real address (city + at least one usable locator), thank them briefly and confirm the order will be delivered. The system will auto-confirm in the background.`
+    ? `\n\nIMPORTANT — ADDRESS COLLECTION: The customer's delivery address is MISSING, FAKE, TEST data, or NOT detailed enough for a courier to find (current value: "${order.customer_address ?? "(none)"}", city: "${order.customer_city ?? "(none)"}").\n\nA deliverable address MUST have ENOUGH DETAIL for a courier to find the exact location. It requires:\n1) A city OR town OR tehsil OR village name (anywhere in Pakistan), AND\n2) A SPECIFIC locator — "near [landmark]" ALONE is NOT enough. The customer must provide at least ONE of:\n   - a house/flat/plot/shop/office NUMBER (e.g. "House 45", "Plot 12"), OR\n   - a specific street / lane / road / gali NAME or number (e.g. "Ajmera Road", "Street 4", "Gali 3"), OR\n   - a neighborhood / area / colony / block / sector / phase / mohalla name (e.g. "Gulshan-e-Iqbal Block 7", "DHA Phase 5", "Saddar", "Johar Town"), OR\n   - a COMBINATION of landmark + area/street (e.g. "near Allahdin Hotel, Main Bazaar Road" — NOT just "near Allahdin Hotel" alone)\n\nEXAMPLES of GOOD addresses: "House 12 Street 4 Gulshan-e-Iqbal", "Plot 7 near UBL Bank Main Road Batagram", "Mohalla Islamia Gali 2 Layyah"\nEXAMPLES of BAD addresses (REJECT): "Near Allahdin Hotel" (no street/area/number), "Chowk Fawara" (no area detail), "Lahore" (just city)\n\nRules:\n- Do NOT confirm delivery to a vague address. "Near [landmark]" without any street, area, or house number is NOT specific enough.\n- Do NOT accept just a city name with no other detail.\n- Reject "test", "fake", "same", "here" or random keyboard mashing.\n- Politely (in the customer's language) ask for the EXACT address with house/plot number, street/gali, and area/mohalla. Example: "Please share your complete address — house/plot number, street/gali, area/mohalla — so the courier can reach you easily 🏠"\n- Keep asking until you get a house number OR street name OR area/mohalla — not just a landmark.\n\nOnce the customer provides a detailed address (city + house/street/area, not just a landmark), thank them briefly and confirm the order will be delivered. The system will auto-confirm in the background.`
     : order && hasStoredAddress
     ? `\n\nIMPORTANT: The customer ALREADY has a detailed delivery address on file:\n  📍 ${order.customer_address}, ${order.customer_city}\n\nDo NOT ask the customer for their address again. Instead:\n- Confirm the existing address by reading it back briefly and ask if it is correct (e.g. "Should we deliver to: <address>, <city>? Reply YES to confirm or send a new address.").\n- If the customer replies with affirmation (yes / ok / sahi / 7aja / na3am / oui / ✅ / thumbs up / "send it" / "deliver" etc.) OR sends only a city name that matches the stored city, treat the existing address as confirmed and tell them their order is being processed for delivery. The system will auto-confirm in the background.\n- Only ask for a new address if the customer explicitly says the stored address is wrong or sends new address details.`
     : "";
@@ -1599,16 +1602,17 @@ async function tryExtractAndConfirmAddress(args: {
   const isDeliverable = (addr?: string | null, city?: string | null): boolean => {
     if (!addr || !city) return false;
     const raw = String(addr).trim();
-    if (raw.length < 10) return false;
+    if (raw.length < 15) return false;
     const lower = raw.toLowerCase();
     const fakePattern = /\b(test|testing|tester|fake|dummy|sample|example|n\/?a|none|null|xxx+|asdf+|qwerty|aaaa+|placeholder|abc+|address here|adress|same|here)\b/i;
     if (fakePattern.test(lower)) return false;
     const tokens = raw.split(/\s+/).filter((w) => w.length > 1);
-    if (tokens.length < 2) return false;
+    if (tokens.length < 3) return false;
     const hasNumber = /\d/.test(raw);
-    const streetKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|near|opposite|main|gali|chowk|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
-    if (!hasNumber && !streetKeyword.test(lower)) return false;
-    return true;
+    const preciseKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|gali|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
+    if (hasNumber) return true;
+    if (preciseKeyword.test(lower)) return true;
+    return false;
   };
 
   // We always run extraction when there is a pending_button_intent (customer
@@ -1703,31 +1707,36 @@ async function tryExtractAndConfirmAddress(args: {
     return;
   }
 
-  const extractPrompt = `You are an address-extraction assistant for a courier in Pakistan. Pakistan has BIG cities (Karachi, Lahore, Islamabad, Rawalpindi, Faisalabad, Multan, Peshawar, etc.) AND many SMALL towns / villages / tehsils (Batagram, Layyah, Tank, Wari, Shahdad Kot, Dera Ismail Khan, etc.). Address quality expectations are different for each.
+  const extractPrompt = `You are an address-extraction assistant for a courier in Pakistan. Your job is to ensure the address is DETAILED ENOUGH for a courier to find the exact location without calling the customer.
 
 A "deliverable" address requires:
 1) A city OR town OR tehsil OR village name (anywhere in Pakistan), AND
-2) AT LEAST ONE locator that helps the rider find the spot. Any ONE of these is enough:
-   - a house / flat / plot / shop / office number, OR
-   - a specific street / lane / road / gali name or number (e.g. "Ajmera Road", "Street 4", "Main Bazaar Road"), OR
-   - a neighborhood / area / colony / block / sector / phase / mohalla / town name (e.g. "Gulshan-e-Iqbal Block 7", "DHA Phase 5", "Saddar", "G-9/4", "Johar Town"), OR
-   - a recognizable named landmark with proximity wording (e.g. "near Allahdin Hotel", "near Adalat Stop", "Fuara Chowk", "near UBL Bank Zarobi", "opposite XYZ Masjid"). Small-town landmarks like a chowk, a named stop, a small bank branch, or a small hotel ARE enough — the rider knows the town and can ask locally.
+2) SPECIFIC location details — "near [landmark]" ALONE is NOT enough. The customer must provide at least ONE of:
+   - a house / flat / plot / shop / office NUMBER (e.g. "House 45", "Plot 12", "Shop 3"), OR
+   - a specific street / lane / road / gali NAME or number (e.g. "Ajmera Road", "Street 4", "Gali 3"), OR
+   - a neighborhood / area / colony / block / sector / phase / mohalla name (e.g. "Gulshan-e-Iqbal Block 7", "DHA Phase 5", "Saddar", "Johar Town", "Mohalla Islamia"), OR
+   - a COMBINATION of landmark + street/area (e.g. "near Allahdin Hotel, Main Bazaar Road" — NOT just "near Allahdin Hotel" alone)
 
-Only REJECT when the address gives the rider NOTHING to go on:
-- Just a city name with no other detail (e.g. "Lahore" alone).
-- Single vague words: "home", "here", "same", "send it".
-- Obvious fake / test / placeholder values: "test", "fake", "dummy", "sample", "abc", "xyz", "n/a", "asdf", random keyboard mashing.
-- A standalone giant institution with no street/area context AND no proximity wording (e.g. just "CM Secretariat" with nothing else).
+REJECT these as incomplete (complete=false):
+- "Near Allahdin Hotel" (landmark only, no street/area/number)
+- "Chowk Fawara" (landmark only)
+- "opposite XYZ Masjid" (landmark only, no area)
+- Just a city name (e.g. "Lahore" alone)
+- Single vague words: "home", "here", "same", "send it"
+- Fake / test / placeholder values
 
-In big metro cities (Karachi, Lahore, Islamabad, Rawalpindi, Faisalabad, Multan, Peshawar, Hyderabad, Quetta, Gujranwala, Sialkot) prefer at least an area/block/sector/town in addition to the locator when possible — but if the customer gave a clear shop/street + landmark + city, accept it.
-
-In small towns / villages / tehsils, a road / chowk / named landmark + the town name IS enough. Do NOT demand a formal block/sector/phase that does not exist there.
+ACCEPT these as complete (complete=true):
+- "House 12 Street 4 Gulshan-e-Iqbal" (has number + street + area)
+- "Near Allahdin Hotel Main Bazaar Road" (landmark + street)
+- "Mohalla Islamia Gali 2" (area + street)
+- "Plot 7 near UBL Bank" (has number + landmark)
+- "DHA Phase 5 Block D" (area + block)
 
 Return JSON ONLY in this exact schema:
 { "complete": boolean, "full_address": string, "city": string }
 
 Rules:
-- "complete" = true if the address has a city/town + at least one usable locator from the list above. When in doubt for SMALL towns, lean toward true. When in doubt for BIG metros with no area at all, lean toward false.
+- "complete" = true ONLY if the address has a city/town + a house/plot number OR a street/gali name OR an area/mohalla/block/sector. A landmark alone (near X, opposite X, chowk X) without any of these is NOT complete.
 - "full_address" must be a single line containing all the detail parts the customer provided (house/flat, street, block/sector/phase, area, landmark) — DO NOT include the city.
 - "city" must be the city/town/village name in English/Latin script (e.g. "Karachi", "Lahore", "Peshawar", "Batagram", "Layyah").
 - For obvious fake/test/placeholder values or single vague words, return complete=false.
