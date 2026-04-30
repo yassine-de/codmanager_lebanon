@@ -383,6 +383,9 @@ export default function WhatsappInbox() {
   const [recording, setRecording] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [orderInfoOpen, setOrderInfoOpen] = useState(false);
+  const [editConfStatus, setEditConfStatus] = useState("");
+  const [editDelStatus, setEditDelStatus] = useState("");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolveNote, setResolveNote] = useState("");
   const [resolving, setResolving] = useState(false);
@@ -2013,7 +2016,13 @@ export default function WhatsappInbox() {
       />
 
       {/* Customer & Order Info Dialog */}
-      <Dialog open={orderInfoOpen} onOpenChange={setOrderInfoOpen}>
+      <Dialog open={orderInfoOpen} onOpenChange={(o) => {
+        setOrderInfoOpen(o);
+        if (o && order) {
+          setEditConfStatus(order.confirmation_status || "new");
+          setEditDelStatus(order.delivery_status || "pending");
+        }
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
@@ -2119,53 +2128,55 @@ export default function WhatsappInbox() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
-                  <div>
-                    <div className="text-[11px] text-muted-foreground mb-1">Confirmation</div>
-                    <Select
-                      value={order.confirmation_status || "new"}
-                      onValueChange={async (v) => {
-                        await supabase.from("orders").update({ confirmation_status: v, updated_at: new Date().toISOString() }).eq("order_id", order.order_id);
-                        qc.invalidateQueries({ queryKey: ["wts-order", order.order_id] });
-                        toast.success("Confirmation status updated");
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {["new","confirmed","no_answer","postponed","cancelled","wrong_number","double"].map(s => (
-                          <SelectItem key={s} value={s} className="text-xs">{s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-muted-foreground mb-1">Delivery</div>
-                    <Select
-                      value={order.delivery_status || "pending"}
-                      onValueChange={async (v) => {
-                        await supabase.from("orders").update({ delivery_status: v, updated_at: new Date().toISOString() }).eq("order_id", order.order_id);
-                        qc.invalidateQueries({ queryKey: ["wts-order", order.order_id] });
-                        toast.success("Delivery status updated");
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {["pending","booked","shipped","in_transit","with_courier","delivered","returned","cancelled","no_answer","postponed","failed_attempt","ready_for_return","rejected","return"].map(s => (
-                          <SelectItem key={s} value={s} className="text-xs">{s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {order.shipping_status && (
-                    <div className="col-span-2">
-                      <Badge variant="outline" className="text-[11px]">
-                        Ship: {order.shipping_status.replace(/_/g, " ")}
-                      </Badge>
+                <div className="space-y-3 pt-2 border-t border-border">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-[11px] text-muted-foreground mb-1">Confirmation</div>
+                      <Select value={editConfStatus || order.confirmation_status || "new"} onValueChange={setEditConfStatus}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {["new","confirmed","no_answer","postponed","cancelled","wrong_number","double"].map(s => (
+                            <SelectItem key={s} value={s} className="text-xs">{s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
+                    <div>
+                      <div className="text-[11px] text-muted-foreground mb-1">Delivery</div>
+                      <Select value={editDelStatus || order.delivery_status || "pending"} onValueChange={setEditDelStatus}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {["pending","booked","shipped","in_transit","with_courier","delivered","returned","cancelled","no_answer","postponed","failed_attempt","ready_for_return","rejected","return"].map(s => (
+                            <SelectItem key={s} value={s} className="text-xs">{s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {((editConfStatus && editConfStatus !== (order.confirmation_status || "new")) || (editDelStatus && editDelStatus !== (order.delivery_status || "pending"))) && (
+                    <Button
+                      size="sm"
+                      className="w-full h-8 text-xs"
+                      disabled={updatingStatus}
+                      onClick={async () => {
+                        setUpdatingStatus(true);
+                        const updates: { updated_at: string; confirmation_status?: string; delivery_status?: string } = { updated_at: new Date().toISOString() };
+                        if (editConfStatus && editConfStatus !== (order.confirmation_status || "new")) updates.confirmation_status = editConfStatus;
+                        if (editDelStatus && editDelStatus !== (order.delivery_status || "pending")) updates.delivery_status = editDelStatus;
+                        await supabase.from("orders").update(updates).eq("order_id", order.order_id);
+                        qc.invalidateQueries({ queryKey: ["wts-order", order.order_id] });
+                        toast.success("Status updated");
+                        setUpdatingStatus(false);
+                      }}
+                    >
+                      {updatingStatus ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                      Update Status
+                    </Button>
+                  )}
+                  {order.shipping_status && (
+                    <Badge variant="outline" className="text-[11px]">
+                      Ship: {order.shipping_status.replace(/_/g, " ")}
+                    </Badge>
                   )}
                 </div>
               </div>
