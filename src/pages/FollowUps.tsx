@@ -646,62 +646,61 @@ export default function FollowUps() {
         </Card>
 
         {/* Table */}
-        <Card className="overflow-hidden">
+        <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
-            <Table className="table-fixed" style={{ width: "1300px" }}>
-              <TableHeader>
-                <TableRow>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40">
                   {visibleColumns.map((col) => {
                     const meta = ALL_COLUMNS.find((c) => c.key === col.key)!;
                     const isCenter = col.key === "days";
                     return (
-                      <TableHead
+                      <th
                         key={col.key}
-                        style={{ width: columnWidths[col.key] }}
-                        className={`text-xs font-medium uppercase tracking-wider text-muted-foreground px-3 py-3 ${isCenter ? "text-center" : ""}`}
+                        className={`text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider ${isCenter ? "text-center" : ""}`}
                       >
                         {meta.label}
-                      </TableHead>
+                      </th>
                     );
                   })}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                </tr>
+              </thead>
+              <tbody>
                 {isLoading ? (
                   Array.from({ length: 6 }).map((_, i) => (
-                    <TableRow key={i}>
+                    <tr key={i} className="border-b">
                       {visibleColumns.map((c) => (
-                        <TableCell key={c.key}>
+                        <td key={c.key} className="py-2.5 px-4">
                           <Skeleton className="h-4 w-full" />
-                        </TableCell>
+                        </td>
                       ))}
-                    </TableRow>
+                    </tr>
                   ))
                 ) : filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground py-12">
+                  <tr>
+                    <td colSpan={visibleColumns.length} className="text-center text-muted-foreground py-12">
                       No follow-ups found
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ) : (
                   filtered.map((row) => {
                     const segMeta = row.segment ? segmentMeta[row.segment] : null;
                     return (
-                      <TableRow key={row.order_id} className="hover:bg-muted/40">
+                      <tr key={row.order_id} className="border-b last:border-0 hover:bg-muted/40 transition-colors duration-150">
                         {visibleColumns.map((col) => (
-                          <TableCell
+                          <td
                             key={col.key}
-                            className={`py-3 ${cellClassFor(col.key)}`}
+                            className={`py-2.5 ${cellClassFor(col.key)}`}
                           >
                             {renderCell(col.key, row, segMeta, savingId, handleStatusChange, handleNoteSave, navigate, setHistoryOrder, setTrackingTarget, openNoteDialog)}
-                          </TableCell>
+                          </td>
                         ))}
-                      </TableRow>
+                      </tr>
                     );
                   })
                 )}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
         </Card>
 
