@@ -691,7 +691,7 @@ export default function FollowUps() {
                         {visibleColumns.map((col) => (
                           <td
                             key={col.key}
-                            className={`py-2.5 ${cellClassFor(col.key)}`}
+                            className={`py-2.5 overflow-hidden ${cellClassFor(col.key)}`}
                           >
                             {renderCell(col.key, row, segMeta, savingId, handleStatusChange, handleNoteSave, navigate, setHistoryOrder, setTrackingTarget, openNoteDialog)}
                           </td>
