@@ -820,12 +820,6 @@ function renderCell(
           className="h-7 text-xs px-2 rounded-md border border-input bg-background w-full min-w-[140px] focus:outline-none focus:ring-1 focus:ring-primary"
         />
       );
-    case "assigned_to":
-      return row.follow_up_assigned_to ? (
-        <span className="text-[11px] font-mono text-muted-foreground">{row.follow_up_assigned_to.slice(0, 8)}</span>
-      ) : (
-        <span className="text-muted-foreground text-xs">Unassigned</span>
-      );
     case "created": return format(new Date(row.order_created_at), "dd MMM HH:mm");
     case "updated": return format(new Date(row.order_updated_at), "dd MMM HH:mm");
     case "actions":
