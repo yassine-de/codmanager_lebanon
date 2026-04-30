@@ -702,7 +702,7 @@ export default function FollowUps() {
               </tbody>
             </table>
           </div>
-        </Card>
+        </div>
 
         {historyOrder && (
           <OrderHistoryModal
