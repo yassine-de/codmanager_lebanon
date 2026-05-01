@@ -177,6 +177,29 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
 
   return (
     <>
+      {whatsappPaymentFailures > 0 && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-3 animate-slide-up flex items-start gap-3">
+          <div className="p-2 rounded-lg bg-red-500/20 shrink-0">
+            <CreditCard className="w-5 h-5 text-red-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-bold text-red-600 dark:text-red-400">
+              WhatsApp Delivery Blocked — Payment Issue
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              {whatsappPaymentFailures} message{whatsappPaymentFailures > 1 ? "s" : ""} failed in the last 24h due to a Meta Business payment problem. Update your payment method in Meta Business Manager → Billing & Payments to resume WhatsApp confirmations.
+            </p>
+            <a
+              href="https://business.facebook.com/billing_hub/payment_settings"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:underline"
+            >
+              Open Meta Billing →
+            </a>
+          </div>
+        </div>
+      )}
       <div
         className="bg-card rounded-xl border shadow-soft animate-slide-up overflow-hidden"
         style={{ animationDelay: "120ms" }}
