@@ -134,6 +134,14 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
     refetchInterval: 60_000,
   });
 
+  // Reset dismissal when problem is resolved (count back to 0)
+  useEffect(() => {
+    if (whatsappPaymentFailures === 0 && dismissedAtCount > 0) {
+      localStorage.removeItem("wa_payment_warning_dismissed_count");
+      setDismissedAtCount(0);
+    }
+  }, [whatsappPaymentFailures, dismissedAtCount]);
+
   const items: StatusItem[] = [
     {
       id: "whatsapp-payment",
