@@ -88,6 +88,43 @@ type Msg = {
   payload?: any;
 };
 
+const getFreshAccessToken = async () => {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  let session = data.session;
+
+  const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : 0;
+  if (session && expiresAtMs && expiresAtMs - Date.now() < 120_000) {
+    const refreshed = await supabase.auth.refreshSession();
+    if (refreshed.error) throw refreshed.error;
+    session = refreshed.data.session;
+  }
+
+  if (!session?.access_token) throw new Error("Session expired — please login again");
+  return session.access_token;
+};
+
+const getFunctionHeaders = async (json = false) => {
+  const token = await getFreshAccessToken();
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  return {
+    Authorization: `Bearer ${token}`,
+    ...(key ? { apikey: key } : {}),
+    ...(json ? { "Content-Type": "application/json" } : {}),
+  };
+};
+
+const invokeProtectedFunction = async <T,>(name: string, body: unknown): Promise<T> => {
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`, {
+    method: "POST",
+    headers: await getFunctionHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error || data?.message || `Edge Function failed (${response.status})`);
+  return data as T;
+};
+
 function getAudioPayload(msg: Msg) {
   const audio = msg.payload?.audio ?? null;
   const rawUrl = audio?.link || audio?.url || null;
