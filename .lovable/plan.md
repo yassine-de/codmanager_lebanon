@@ -1,61 +1,52 @@
-# WhatsApp Inbox — Maximize Message Area & Compact Composer
+## Cause (root cause confirmed)
 
-## Problem (from screenshot)
+L-bug f cron job `tickPendingIntentHandoff` dyal `whatsapp-automation-runner` (kayrun kol daqiqa).
 
-Two issues waste vertical space and shrink the visible messages area:
+Had l-job kayqelleb 3la conversations WhatsApp li ba9i fihom `pending_button_intent` qadim (>60 min) o kaydir handoff l agent — kaybadel `confirmation_status -> 'new'`. Lakin kan **ma kayfiltrich** orders li déjà treaté: confirmed, booked, shipped, cancelled, no_answer, wrong_number…
 
-1. **Empty black strip below the inbox card** — The chat container uses a hardcoded desktop height `h-[calc(100dvh-200px)]` even though the AppLayout main has `overflow-auto` and small padding. On a 1106×680 viewport (and similar laptop sizes), this leaves ~120–180px of unused space under the card.
-2. **Bulky composer** — The reply area takes ~3 stacked rows: Reply/Note tabs row + 2-row textarea + a separate full-width icon toolbar row (emoji, camera, paperclip, mic, AI, template, quick replies) + Send button. This squeezes the messages list, so only ~3 bubbles are visible at once.
+Recently zedna guard (`protectedStatuses`), walakin **kabel ma t-deploya** (qbel 09:24 dyal 01/05), wahd run wahed dar handoff l 170 order, mn binathom **107 ka deja confirmed** o ba3d minhom kano `booked/shipped` (ORIO synced).
 
-## Goal
+### Summary dyal lli rja3 `new` o ba9i corrupted daba:
 
-Make the inbox feel like WhatsApp Web / Respond.io: the chat fills the full viewport height, the composer is compact (one row with inline icons + textarea + Send), and the messages area gets maximum vertical room.
+| 7ala asliya | 3dad orders ba9yin corrupted |
+|---|---|
+| confirmed | 63 |
+| no_answer | 23 |
+| cancelled | 16 |
+| wrong_number | 5 |
+| **Total** | **107** |
 
-## Changes (single file: `src/pages/whatsapp/WhatsappInbox.tsx`)
+Mn dakshi: **dezzin** dyal orders 3endhom `delivery_status = booked/shipped` walakin `confirmation_status = new` — system-incoherent.
 
-### 1. Stretch container to true full height
+---
 
-Replace the hardcoded desktop height so the card consumes whatever vertical space is available, eliminating the empty strip below.
+## Plan dyal l-fix
 
-- Current: `md:h-[calc(100dvh-200px)] md:max-h-[calc(100dvh-160px)]`
-- New: `md:h-[calc(100dvh-140px)] md:max-h-[calc(100dvh-140px)]`
-  - 140px accounts for: 56px topbar + ~32px page padding + ~40px filters bar + a small breathing margin.
-- Also reduce the `mb-2` on the filters bar to `mb-1.5` to claw back a few more pixels.
+### 1. Hardning code (final fix)
+F `supabase/functions/whatsapp-automation-runner/index.ts` (function `tickPendingIntentHandoff`):
 
-### 2. Compact the composer
+- Reverse the logic: instead of a small "protected" list, allow handoff **only** if `confirmation_status IN ('new_wts','pending_address')`. Ay status akhor → just clear l `pending_button_intent` mn conversation o skip order.
+- Zid guard f update DB itself: `.in('confirmation_status', ['new_wts','pending_address'])` bash hatta race condition mat3awedch had l-bug.
+- Improve logs bash kol skip y-bayyen old status.
 
-Restructure the Reply tab so the textarea, all action icons, and the Send button live on **one horizontal row** (WhatsApp-style), with tabs above as a slim header.
+### 2. Repair dyal 107 orders corrupted (data migration)
 
-```text
-┌──────────────────────────────────────────────────────────┐
-│ [Reply] [Note]                       Last reply 9m ago   │  ← slim tabs row, mb-2 → mb-1.5
-├──────────────────────────────────────────────────────────┤
-│ 😊 📷 📎 🎤 ✨ 📄 💬 │ Type a reply…           │ [Send] │  ← single row
-└──────────────────────────────────────────────────────────┘
-```
+L kol order f had l-list, restore `confirmation_status` mn `order_history.old_value` dyal akher `whatsapp_auto_handoff`:
 
-Specifically:
-- Wrap icon toolbar + textarea + Send in `flex items-end gap-2` instead of stacking them.
-- Icon toolbar: keep all 7 buttons but shrink to `h-8 w-8` (was `h-9 w-9`) and group inside a `flex items-center gap-0.5 shrink-0` block on the **left** of the textarea.
-- Textarea: change `rows={2}` → `rows={1}` with `min-h-[40px] max-h-[120px]` so it auto-grows up to a cap but starts compact. Keep `resize-none`.
-- Send button stays on the right with `shrink-0` and matches textarea bottom alignment.
-- Tabs row: reduce `mb-3` → `mb-2`, button padding `px-4 py-2` → `px-3 py-1.5`, font slightly smaller.
-- Container padding: `p-3` → `px-3 py-2`.
-- Note tab: same compact single-row treatment (textarea + Save button only — already minimal, just shrink padding/rows to match).
+- **63 orders → confirmed**: restore `confirmation_status='confirmed'`, `confirmation_channel='whatsapp'`, `whatsapp_status='confirmed'`. Khalli `delivery_status`, `orio_*`, `confirmed_at` kima homa.
+- **23 → no_answer**: restore `confirmation_status='no_answer'` only. Khalli `original_agent_id` (hia mawjouda) bash y-claimah agent original.
+- **16 → cancelled**: restore `confirmation_status='cancelled'`.
+- **5 → wrong_number**: restore `confirmation_status='wrong_number'`.
 
-### 3. AI suggestions chips
+Zid log f `order_history` action_type='auto_repair' bash audit y-bayyen rja3na ghalat dyal system.
 
-The violet AI suggestions panel (when present) stays above the composer row but use `p-1.5` instead of `p-2` and chips `py-1` instead of `py-1.5` to keep them compact.
+### 3. Verification queries ba3d repair
+- 0 orders f `delivery_status IN ('booked','shipped','delivered')` 3endhom `confirmation_status='new'` causée par handoff.
+- LL-273, AB-682, AB-666, AB-500 etc. kollhom rj3o l-7alat-hom s-7i7a.
 
-## Net visual result
+### 4. Memory update
+N-update `mem://features/whatsapp-pending-intent-handoff` bash y-document l-allowlist (only `new_wts`/`pending_address`), o nzid description f index.
 
-- Empty space below the card disappears — card extends to near the bottom of the viewport.
-- Composer height drops from ~165px to ~95px → roughly **70 extra pixels** of visible messages (≈2 more bubbles on a typical laptop).
-- All existing actions (emoji, image, file, voice, AI suggest, template, quick replies) remain accessible — just inline next to the textarea instead of stacked below.
-- No behavior/logic changes: send/note/AI/upload handlers untouched.
+---
 
-## Out of scope
-
-- No backend / Supabase changes.
-- No changes to message bubble rendering, conversation list, or 24h-window banner logic.
-- No changes to mobile layout (mobile already uses full-screen `h-[calc(100dvh-80px)]` which is fine).
+Wash n-execute had l-fix kamel (code hardening + data repair dyal 107 orders + verification)?

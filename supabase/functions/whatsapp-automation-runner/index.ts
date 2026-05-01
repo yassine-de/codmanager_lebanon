@@ -1208,30 +1208,40 @@ async function tickPendingIntentHandoff(): Promise<number> {
           .eq("order_id", c.order_id)
           .maybeSingle();
         if (ord) {
-          // SAFETY: never downgrade an already-confirmed/cancelled/postponed
-          // order back to "new". The handoff is ONLY meant for orders that
-          // are still pending after the AI gave up on collecting an address.
-          // Without this guard, a successfully auto-confirmed order would be
-          // wiped by the sweeper if its conversation still had a stale
-          // pending_button_intent (e.g. AB-682 / AB-666).
-          const protectedStatuses = ["confirmed", "cancelled", "canceled", "postponed", "double", "wrong_number"];
+          // SAFETY (allowlist): only orders still in WhatsApp initial states
+          // (`new_wts` / `pending_address`) may be handed off to the agent
+          // queue. Any other status — including confirmed, cancelled,
+          // no_answer, postponed, wrong_number, unreachable, or already
+          // routed `new` — must NEVER be overwritten back to `new` by this
+          // sweeper. Without this guard a single run wiped 170+ treated
+          // orders (incident 2026-05-01).
+          const allowedStatuses = ["new_wts", "pending_address"];
           const before = ord.confirmation_status;
-          if (protectedStatuses.includes(String(before))) {
+          if (!allowedStatuses.includes(String(before))) {
             // Just clear the conversation pending intent and skip the order.
-            log("pending-intent: skipping handoff — order already finalized", {
+            log("pending-intent: skipping handoff — order not in allowed state", {
               conv: c.id, order: c.order_id, status: before,
             });
           } else {
-            await admin.from("orders").update({
-              confirmation_channel: "agent",
-              confirmation_status: "new",
-              agent_id: null,
-              assigned_at: null,
-              whatsapp_status: "handed_to_agent",
-              whatsapp_note: "Auto-routed to agent — customer never replied to AI address request",
-              last_activity_at: new Date().toISOString(),
-            }).eq("order_id", c.order_id);
-            if (before !== "new") {
+            // Update with DB-side guard to prevent races: if status changed
+            // between read and write, the update is a no-op.
+            const { data: updated, error: updErr } = await admin
+              .from("orders")
+              .update({
+                confirmation_channel: "agent",
+                confirmation_status: "new",
+                agent_id: null,
+                assigned_at: null,
+                whatsapp_status: "handed_to_agent",
+                whatsapp_note: "Auto-routed to agent — customer never replied to AI address request",
+                last_activity_at: new Date().toISOString(),
+              })
+              .eq("order_id", c.order_id)
+              .in("confirmation_status", allowedStatuses)
+              .select("order_id");
+            if (updErr) {
+              errLog("pending-intent: handoff update failed", c.order_id, updErr.message);
+            } else if (updated && updated.length > 0) {
               await admin.from("order_history").insert({
                 order_id: c.order_id,
                 action_type: "whatsapp_auto_handoff",
@@ -1240,6 +1250,10 @@ async function tickPendingIntentHandoff(): Promise<number> {
                 field_changed: "confirmation_status",
                 old_value: before ?? null,
                 new_value: "new",
+              });
+            } else {
+              log("pending-intent: handoff skipped — status changed mid-flight", {
+                conv: c.id, order: c.order_id, status: before,
               });
             }
           }
