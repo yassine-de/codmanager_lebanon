@@ -81,34 +81,65 @@ Deno.serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a translator. Translate the user's message to clear, natural English. If the message is already in English, return it unchanged. Output ONLY the translation, no quotes, no explanations, no language labels.",
-          },
-          { role: "user", content: body },
-        ],
-        temperature: 0.2,
-        max_tokens: 400,
-      }),
-    });
+    const callGateway = async () => {
+      return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a translator. Translate the user's message to clear, natural English. If the message is already in English, return it unchanged. Output ONLY the translation, no quotes, no explanations, no language labels.",
+            },
+            { role: "user", content: body },
+          ],
+          temperature: 0.2,
+          max_tokens: 400,
+        }),
+      });
+    };
+
+    let r = await callGateway();
+    // Retry once on rate-limit / transient 5xx after a short backoff
+    if (r.status === 429 || (r.status >= 500 && r.status < 600)) {
+      await new Promise((res) => setTimeout(res, 1500));
+      try {
+        const retry = await callGateway();
+        r = retry;
+      } catch (_) {
+        // keep original r
+      }
+    }
 
     if (!r.ok) {
-      const t = await r.text();
-      if (r.status === 429) throw new Error("Rate limited, try again later");
-      if (r.status === 402) throw new Error("AI credits exhausted");
-      throw new Error(`AI gateway error ${r.status}: ${t}`);
+      const t = await r.text().catch(() => "");
+      const reason =
+        r.status === 429
+          ? "Translation service is busy. Try again in a few seconds."
+          : r.status === 402
+          ? "AI credits exhausted. Please top up to use translation."
+          : `AI gateway error ${r.status}`;
+      console.error("[wa-translate] gateway failure", { status: r.status, body: t.slice(0, 200) });
+      // Return 200 with ok:false so the client can read the structured reason
+      return new Response(
+        JSON.stringify({ ok: false, error: reason, status: r.status }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
+
     const j = await r.json();
     const translation = (j.choices?.[0]?.message?.content || "").trim();
 
-    if (message_id && translation) {
+    if (!translation) {
+      return new Response(
+        JSON.stringify({ ok: false, error: "Empty translation returned" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (message_id) {
       await admin
         .from("whatsapp_messages")
         .update({ payload: { ...existingPayload, _translation_en: translation } })
@@ -119,9 +150,11 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: (e as Error).message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("[wa-translate] unexpected error", e);
+    // Return 200 so the SDK doesn't swallow the message under "non-2xx status code"
+    return new Response(
+      JSON.stringify({ ok: false, error: (e as Error).message || "Translation failed" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 });
