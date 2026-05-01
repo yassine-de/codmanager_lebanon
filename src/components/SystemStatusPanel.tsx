@@ -112,7 +112,32 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
     refetchInterval: 30_000,
   });
 
+  // WhatsApp payment failures (Meta billing issues)
+  const { data: whatsappPaymentFailures = 0 } = useQuery({
+    queryKey: ["system-whatsapp-payment-failures"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { count, error } = await supabase
+        .from("whatsapp_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "failed")
+        .gte("created_at", since)
+        .or("error_message.ilike.%payment%,error_message.ilike.%billing%");
+      if (error) throw error;
+      return count || 0;
+    },
+    refetchInterval: 60_000,
+  });
+
   const items: StatusItem[] = [
+    {
+      id: "whatsapp-payment",
+      label: "WhatsApp Payment Issue",
+      count: whatsappPaymentFailures,
+      severity: whatsappPaymentFailures > 0 ? "error" : "ok",
+      icon: <CreditCard className="w-4 h-4" />,
+      onClick: () => navigate("/whatsapp/settings"),
+    },
     {
       id: "sync-errors",
       label: "Shipping Sync Errors",
