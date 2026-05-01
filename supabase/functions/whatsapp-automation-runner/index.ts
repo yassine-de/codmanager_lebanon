@@ -779,16 +779,18 @@ async function applyButtonAction(opts: {
     if (!addr) return false;
     if (!city || String(city).trim().length === 0) return false;
     const raw = String(addr).trim();
-    if (raw.length < 15) return false;
+    if (raw.length < 12) return false;
     const lower = raw.toLowerCase();
     const fakePattern = /\b(test|testing|tester|fake|dummy|sample|example|n\/?a|none|null|xxx+|asdf+|qwerty|aaaa+|placeholder|abc+|address here|adress|same|here)\b/i;
     if (fakePattern.test(lower)) return false;
     const tokens = raw.split(/\s+/).filter((w) => w.length > 1);
     if (tokens.length < 3) return false;
     const hasNumber = /\d/.test(raw);
-    const preciseKeyword = /\b(house|flat|plot|street|road|st\.?|rd\.?|lane|block|sector|phase|town|colony|mohalla|gali|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر)\b/i;
+    const preciseKeyword = /\b(house|flat|plot|shop|office|store|street|road|st\.?|rd\.?|lane|block|sector|phase|town|village|colony|mohalla|mahalla|gali|bazar|bazaar|market|society|villa|apartment|building|floor|park|stop|stand|gate|tower|plaza|center|centre|care|hotel|masjid|mosque|school|college|university|hospital|clinic|bank|station|chowk|square|more|tehsil|tehseel|ward|union|abad|pura|nagar|kot|gunj|ganj|garh|wala|پور|آباد|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر|چوک|تحصیل|دکان)\b/i;
+    const landmarkIndicator = /\b(near|opposite|behind|front|side|adjacent|main|stop)\b/i;
     if (hasNumber) return true;
     if (preciseKeyword.test(lower)) return true;
+    if (landmarkIndicator.test(lower) && tokens.length >= 4) return true;
     return false;
   };
 
