@@ -1,21 +1,24 @@
 ---
 name: WhatsApp confirm-button address gate
-description: Customer YES button auto-confirms when stored address is deliverable; otherwise AI takes over to validate the delivery address with the customer, then auto-confirms.
+description: Customer YES button OR text reply auto-confirms when stored address is deliverable; otherwise AI takes over to validate the delivery address with the customer, then auto-confirms.
 type: feature
 ---
 
-When a customer clicks a confirm button (YES / Confirmer / "Confirm my order") on any WhatsApp template — whether it goes through `whatsapp-webhook.applyOutcome` or the automation-runner `applyButtonAction` — we evaluate the **stored** address:
+When a customer engages with the order on WhatsApp — whether by clicking a confirm button (YES / Confirmer / "Confirm my order") OR by replying with any text to the template / AI — we evaluate the **stored** address:
 
-- **Stored address is ALREADY deliverable** → confirm immediately. We set `confirmation_status="confirmed"`, `confirmation_channel="whatsapp"`, `whatsapp_status="confirmed"`, `confirmed_at=now()`, optionally book shipping. We do NOT wait for a follow-up text from the customer.
-- **Stored address is missing/weak** → gate through the AI: stash `pending_button_intent`, set `whatsapp_status="pending_address"`, force AI takeover, ask the customer for their full address, finalize via `tryExtractAndConfirmAddress` once they reply.
+- **Stored address is ALREADY deliverable** → confirm immediately. We set `confirmation_status="confirmed"`, `confirmation_channel="whatsapp"`, `whatsapp_status="confirmed"`, `confirmed_at=now()`, optionally book shipping. We do NOT wait for the AI extractor to find new address details — there are none.
+- **Stored address is missing/weak** → gate through the AI: stash `pending_button_intent` (button path) OR keep status `new` (text path), force AI takeover, ask the customer for their full address, finalize via `tryExtractAndConfirmAddress` once they reply with usable detail.
 
-## Why this two-path logic
-Original "always-gate" version (post AB-348) caused AB-369 to be stuck forever in `pending_address`: the customer's stored sheet-import address was already valid, the AI asked for the address again, but the customer never replied (button click contained no text and they had nothing more to add). Without a follow-up text, `tryExtractAndConfirmAddress` never ran, so the order stayed `confirmation_status="new"` indefinitely.
+## Why the broadened short-circuit (AB-718 fix)
+Originally the stored-address short-circuit inside `tryExtractAndConfirmAddress` only fired when `pending_button_intent.intent === "confirm"` (button path). For orders where the sheet-imported address was ALREADY deliverable but the customer replied to the template with TEXT (e.g. "Ok", "Original chahi ya", "Delivery open") instead of clicking the button:
+- The AI continuation generated a "Your order is confirmed" reply (correct UX).
+- The extractor ran on the customer's generic text → returned `complete=false` → no DB update.
+- Order stayed `confirmation_status="new"` forever even though the customer was told it was confirmed.
 
-Now: deliverable address → confirm now (no AI ping). Weak address → gate through AI as before.
+Now: **any** customer engagement (button OR text) on an order with a deliverable stored address auto-confirms via the stored-address branch. Only orders with weak/missing stored addresses still need the AI extractor to mine new address detail from the customer's text.
 
 ## isAddressDeliverable heuristic (shared)
-Rejects: too short (<10 chars), <2 tokens, fake/test/placeholder words, addresses with no number AND no street keyword. Accepts addresses with a number OR a street keyword (house, street, road, lane, block, sector, mohalla, near, chowk, etc., including Urdu equivalents) AND a non-empty city.
+Rejects: too short (<10 chars), <2 tokens, fake/test/placeholder words, addresses with no number AND no street keyword. Accepts addresses with a number OR a street keyword (house, street, road, lane, block, sector, mohalla, near, chowk, station, etc., including Urdu equivalents) AND a non-empty city.
 
 ## tryExtractAndConfirmAddress skip-rule
 Extraction (called inside `aiContinueReply` on inbound text) skips ONLY when ALL three are true:
@@ -25,8 +28,8 @@ Extraction (called inside `aiContinueReply` on inbound text) skips ONLY when ALL
 
 If any pending_button_intent exists, extraction always runs (so the badge gets cleared and history gets logged) even on already-confirmed orders.
 
-## Stored-address short-circuit inside extraction (legacy, still used)
-If the customer DID reply with text after the button click but the stored address was already deliverable, `tryExtractAndConfirmAddress` short-circuits and finalizes the existing address without calling OpenAI.
+## Stored-address short-circuit (the broadened branch)
+Inside `tryExtractAndConfirmAddress`, BEFORE calling OpenAI, if `isAddressDeliverable(stored) && confirmation_status !== "confirmed"`, we finalize the existing address: update orders + conversation, log `ai_confirm` history, optionally trigger auto-book. We never call OpenAI and never overwrite the stored address.
 
 ## CRITICAL — Customer-only history when extracting (AB-687 fix)
 `tryExtractAndConfirmAddress` feeds ONLY messages with `role === "user"` (customer turns) to the OpenAI extractor. Including assistant turns previously caused the AI to read back the address the bot had echoed (e.g. "Should we deliver to: <stored address>?") and treat it as customer-provided, so a bare "YES" reply looked like a complete address and auto-confirmed the order. The extractor prompt also explicitly REJECTS bare affirmations ("yes", "ok", "haan", "confirm", "cash on delivery", "COD", "send karo", "deliver kar do", "thik hai") as incomplete addresses, even when prior messages contained one.
@@ -44,6 +47,6 @@ The AI continuation pipeline applies a dedup window (`ai_dedup_window_seconds`, 
 The conversation list in `WhatsappInbox.tsx` shows a yellow "⏳ Awaiting address" badge next to any conversation whose `pending_button_intent.intent === "confirm"`.
 
 ## Files
-- `supabase/functions/whatsapp-webhook/index.ts` — `applyOutcome` confirms immediately when stored address is deliverable, else gates; `tryExtractAndConfirmAddress` runs whenever a `pending_button_intent` exists; extractor uses customer-only history.
+- `supabase/functions/whatsapp-webhook/index.ts` — `applyOutcome` confirms immediately when stored address is deliverable, else gates; `tryExtractAndConfirmAddress` short-circuit auto-confirms on ANY engagement (button OR text) when the stored address is already deliverable; extractor uses customer-only history.
 - `supabase/functions/whatsapp-automation-runner/index.ts` — `applyButtonAction` sets `forceAddressGate = wantsConfirm && !!order && !storedAddrDeliverable` (gate skipped when address is good).
 - `src/pages/whatsapp/WhatsappInbox.tsx` — "⏳ Awaiting address" pill in conversation list.
