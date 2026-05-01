@@ -402,6 +402,7 @@ export default function WhatsappInbox() {
   // Per-message English translations (internal only)
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [translatingId, setTranslatingId] = useState<string | null>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
