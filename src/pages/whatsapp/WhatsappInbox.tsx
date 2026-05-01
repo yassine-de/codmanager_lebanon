@@ -221,7 +221,7 @@ function AudioMessagePlayer({ message }: { message: Msg }) {
  * WhatsApp's lookaside.fbsbx.com URLs require a Bearer token, so we cannot use them
  * as <img src> directly — we proxy + blob URL instead.
  */
-function MediaImage({ message, directUrl, alt = "attachment", className }: { message: Msg; directUrl?: string | null; alt?: string; className?: string }) {
+function MediaImage({ message, directUrl, alt = "attachment", className, onOpen }: { message: Msg; directUrl?: string | null; alt?: string; className?: string; onOpen?: (src: string) => void }) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const isTemporary = typeof directUrl === "string" && directUrl.includes("lookaside.fbsbx.com");
@@ -289,7 +289,14 @@ function MediaImage({ message, directUrl, alt = "attachment", className }: { mes
     );
   }
 
-  return <img src={src} alt={alt} className={className} />;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={cn(className, "cursor-zoom-in transition-opacity hover:opacity-90")}
+      onClick={() => onOpen?.(src)}
+    />
+  );
 }
 
 const statusBadge = (s: string) => {
