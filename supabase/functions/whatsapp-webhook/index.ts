@@ -1668,6 +1668,20 @@ async function tryExtractAndConfirmAddress(args: {
   // would return "incomplete" on a generic reply ("ok", "haan", "thanks") and
   // the order would stay on `new` forever even though the bot already told the
   // customer "your order is confirmed". Finalize using the stored address.
+  // GUARD: never auto-confirm via the stored-address shortcut if the customer's
+  // latest text shows denial, doubt, cancellation, or any negative intent. The
+  // shortcut should only fire on positive engagement (or on a pending button
+  // intent already captured separately). AB-790 fix.
+  const txt = String(customerText || "").toLowerCase().trim();
+  const negativeIntentRe = /\b(cancel|annul|annuler|don'?t know|do not know|didn'?t order|did not order|wrong order|not mine|not me|i don'?t want|i do not want|don'?t want it|stop|refuse|return|refund|mistake|by mistake|nahi chahiye|nahin chahiye|nahi chaahiye|mat bhejo|mat bhejna|nahi karna|nahin karna|rahne do|cancel kar do|cancel karo|cancel karna|nahi pata|nahin pata|nai pata|maloom nahi|pata nahi|maine order nahi kiya|order nahi kiya|order nai kiya|galat order|mera order nahi|ghalat|mujhe nahi chahiye|mujhe nahin chahiye|kuch nahi chahiye|paise nahi|paisay nahi|free|muft|mufat|نہیں چاہیے|الغاء|إلغاء|ما بغيتش|لا أريد|لا اريد|نہیں|نہی|پتہ نہیں|پتا نہیں|غلط)\b/i;
+  if (negativeIntentRe.test(txt)) {
+    log("address-extract: skipped stored-address shortcut (negative intent)", {
+      order: order.order_id,
+      sample: txt.slice(0, 80),
+    });
+    return;
+  }
+
   if (
     alreadyDeliverable &&
     order.confirmation_status !== "confirmed"
