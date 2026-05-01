@@ -385,6 +385,9 @@ export default function WhatsappInbox() {
   const [orderInfoOpen, setOrderInfoOpen] = useState(false);
   const [editConfStatus, setEditConfStatus] = useState("");
   const [editDelStatus, setEditDelStatus] = useState("");
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [addressDraft, setAddressDraft] = useState("");
+  const [savingAddress, setSavingAddress] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolveNote, setResolveNote] = useState("");
