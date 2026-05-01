@@ -591,10 +591,11 @@ export default function WhatsappInbox() {
       autoTranslatedRef.current.add(m.id);
       void (async () => {
         try {
-          const { data, error } = await supabase.functions.invoke("whatsapp-translate", {
-            body: { message_id: m.id, text: m.body },
+          const data = await invokeProtectedFunction<{ ok: boolean; translation?: string }>("whatsapp-translate", {
+            message_id: m.id,
+            text: m.body,
           });
-          if (error || !data?.ok) return;
+          if (!data?.ok || !data.translation) return;
           setTranslations((prev) => ({ ...prev, [m.id]: data.translation }));
         } catch {
           // silent — staff-only feature, no toast spam
@@ -865,10 +866,11 @@ export default function WhatsappInbox() {
     if (!m.body || translations[m.id]) return;
     setTranslatingId(m.id);
     try {
-      const { data, error } = await supabase.functions.invoke("whatsapp-translate", {
-        body: { message_id: m.id, text: m.body },
+      const data = await invokeProtectedFunction<{ ok: boolean; translation?: string; error?: string }>("whatsapp-translate", {
+        message_id: m.id,
+        text: m.body,
       });
-      if (error || !data?.ok) throw new Error(error?.message || data?.error || "Translation failed");
+      if (!data?.ok || !data.translation) throw new Error(data?.error || "Translation failed");
       setTranslations((prev) => ({ ...prev, [m.id]: data.translation }));
     } catch (e: any) {
       toast.error(e.message || "Translation failed");
