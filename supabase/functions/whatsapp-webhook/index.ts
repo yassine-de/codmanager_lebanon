@@ -1353,6 +1353,24 @@ async function aiContinueReply(args: {
     toolList.push({
       type: "function",
       function: {
+        name: "handoff_to_agent",
+        description: "Transfer this conversation to a human agent and stop the AI. Call this whenever you cannot answer with certainty (missing product spec, technical detail, warranty/return question you don't know, customer insists on speaking to a human, complaint, or any case where you would otherwise say 'let me check / hold on / I'll get back to you'). NEVER tell the customer to 'wait while I check' without calling this tool.",
+        parameters: {
+          type: "object",
+          properties: {
+            reason: {
+              type: "string",
+              description: "Short English reason why a human agent is needed (max 120 chars).",
+            },
+          },
+          required: ["reason"],
+          additionalProperties: false,
+        },
+      },
+    });
+    toolList.push({
+      type: "function",
+      function: {
         name: "flag_for_human_discount",
         description: "Flag this conversation so a human agent will follow up to negotiate a price/discount. Call this ONLY when the customer wants to cancel or hesitates clearly because of PRICE / 'too expensive' / 'ghali' / 'mahnga' and would buy with a discount. Never offer a discount yourself; the human agent decides the amount.",
         parameters: {
