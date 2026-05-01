@@ -221,7 +221,7 @@ function AudioMessagePlayer({ message }: { message: Msg }) {
  * WhatsApp's lookaside.fbsbx.com URLs require a Bearer token, so we cannot use them
  * as <img src> directly — we proxy + blob URL instead.
  */
-function MediaImage({ message, directUrl, alt = "attachment", className }: { message: Msg; directUrl?: string | null; alt?: string; className?: string }) {
+function MediaImage({ message, directUrl, alt = "attachment", className, onOpen }: { message: Msg; directUrl?: string | null; alt?: string; className?: string; onOpen?: (src: string) => void }) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const isTemporary = typeof directUrl === "string" && directUrl.includes("lookaside.fbsbx.com");
@@ -289,7 +289,14 @@ function MediaImage({ message, directUrl, alt = "attachment", className }: { mes
     );
   }
 
-  return <img src={src} alt={alt} className={className} />;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={cn(className, "cursor-zoom-in transition-opacity hover:opacity-90")}
+      onClick={() => onOpen?.(src)}
+    />
+  );
 }
 
 const statusBadge = (s: string) => {
@@ -395,6 +402,7 @@ export default function WhatsappInbox() {
   // Per-message English translations (internal only)
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [translatingId, setTranslatingId] = useState<string | null>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -1536,6 +1544,7 @@ export default function WhatsappInbox() {
                                       message={m}
                                       directUrl={mediaUrl}
                                       className="rounded-lg max-w-full max-h-64 object-cover mb-1"
+                                      onOpen={(s) => setLightboxSrc(s)}
                                     />
                                     {caption && <div className="whitespace-pre-wrap break-words">{caption}</div>}
                                   </div>
@@ -2286,6 +2295,30 @@ export default function WhatsappInbox() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image lightbox — click any image in chat to view full-size */}
+      <Dialog open={!!lightboxSrc} onOpenChange={(o) => !o && setLightboxSrc(null)}>
+        <DialogContent className="max-w-5xl p-0 bg-transparent border-0 shadow-none">
+          {lightboxSrc && (
+            <div className="flex flex-col items-center gap-3">
+              <img
+                src={lightboxSrc}
+                alt="attachment full size"
+                className="max-h-[85vh] max-w-full rounded-lg object-contain"
+              />
+              <a
+                href={lightboxSrc}
+                download
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-white/80 hover:text-white underline underline-offset-2"
+              >
+                Open in new tab
+              </a>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>
