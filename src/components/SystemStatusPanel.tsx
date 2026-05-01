@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, CheckCircle2, Clock, ShieldAlert, Package, Activity, CreditCard } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { startOfDay, endOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
