@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertTriangle, CheckCircle2, Clock, ShieldAlert, Package, Activity } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, ShieldAlert, Package, Activity, CreditCard } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { startOfDay, endOfDay } from "date-fns";
@@ -112,7 +112,32 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
     refetchInterval: 30_000,
   });
 
+  // WhatsApp payment failures (Meta billing issues)
+  const { data: whatsappPaymentFailures = 0 } = useQuery({
+    queryKey: ["system-whatsapp-payment-failures"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { count, error } = await supabase
+        .from("whatsapp_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "failed")
+        .gte("created_at", since)
+        .or("error_message.ilike.%payment%,error_message.ilike.%billing%");
+      if (error) throw error;
+      return count || 0;
+    },
+    refetchInterval: 60_000,
+  });
+
   const items: StatusItem[] = [
+    {
+      id: "whatsapp-payment",
+      label: "WhatsApp Payment Issue",
+      count: whatsappPaymentFailures,
+      severity: whatsappPaymentFailures > 0 ? "error" : "ok",
+      icon: <CreditCard className="w-4 h-4" />,
+      onClick: () => navigate("/whatsapp/settings"),
+    },
     {
       id: "sync-errors",
       label: "Shipping Sync Errors",
@@ -152,6 +177,29 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
 
   return (
     <>
+      {whatsappPaymentFailures > 0 && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-3 animate-slide-up flex items-start gap-3">
+          <div className="p-2 rounded-lg bg-red-500/20 shrink-0">
+            <CreditCard className="w-5 h-5 text-red-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-bold text-red-600 dark:text-red-400">
+              WhatsApp Delivery Blocked — Payment Issue
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              {whatsappPaymentFailures} message{whatsappPaymentFailures > 1 ? "s" : ""} failed in the last 24h due to a Meta Business payment problem. Update your payment method in Meta Business Manager → Billing & Payments to resume WhatsApp confirmations.
+            </p>
+            <a
+              href="https://business.facebook.com/billing_hub/payment_settings"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:underline"
+            >
+              Open Meta Billing →
+            </a>
+          </div>
+        </div>
+      )}
       <div
         className="bg-card rounded-xl border shadow-soft animate-slide-up overflow-hidden"
         style={{ animationDelay: "120ms" }}
