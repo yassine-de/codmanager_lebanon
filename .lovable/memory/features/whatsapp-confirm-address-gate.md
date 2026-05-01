@@ -28,6 +28,15 @@ If any pending_button_intent exists, extraction always runs (so the badge gets c
 ## Stored-address short-circuit inside extraction (legacy, still used)
 If the customer DID reply with text after the button click but the stored address was already deliverable, `tryExtractAndConfirmAddress` short-circuits and finalizes the existing address without calling OpenAI.
 
+## CRITICAL — Customer-only history when extracting (AB-687 fix)
+`tryExtractAndConfirmAddress` feeds ONLY messages with `role === "user"` (customer turns) to the OpenAI extractor. Including assistant turns previously caused the AI to read back the address the bot had echoed (e.g. "Should we deliver to: <stored address>?") and treat it as customer-provided, so a bare "YES" reply looked like a complete address and auto-confirmed the order. The extractor prompt also explicitly REJECTS bare affirmations ("yes", "ok", "haan", "confirm", "cash on delivery", "COD", "send karo", "deliver kar do", "thik hai") as incomplete addresses, even when prior messages contained one.
+
+## CRITICAL — Bot must not push YES gate on info questions (AB-687 fix)
+The `aiContinueReply` system prompt for orders WITH a stored address now instructs the AI:
+- DO NOT proactively send "Should we deliver to <address>? Reply YES" unless the customer is clearly trying to confirm in this very message (used words like "confirm", "ship it", "send it", "haan bhej do", "deliver kar do").
+- If the customer is asking an info question (price, payment method like "cash on delivery", color, delivery time, return policy), JUST answer naturally. Do NOT prompt with the stored address.
+- A bare "yes / ok / sahi" reply only counts as confirmation if the bot's IMMEDIATELY PREVIOUS message asked them to confirm.
+
 ## Dedup-bypass when customer message is newer than last outbound (AB-395)
 The AI continuation pipeline applies a dedup window (`ai_dedup_window_seconds`, default 30s) to avoid double-replies. Previously, when a customer clicked YES + sent a follow-up question (e.g. "send me the product picture") in the same webhook batch, `applyOutcome` would auto-send the "order confirmed" template, then the AI continuation got blocked by dedup and the picture request was dropped. Now: if the latest inbound message is newer than the most recent outbound, dedup is bypassed so the AI always answers the pending customer question.
 
@@ -35,6 +44,6 @@ The AI continuation pipeline applies a dedup window (`ai_dedup_window_seconds`, 
 The conversation list in `WhatsappInbox.tsx` shows a yellow "⏳ Awaiting address" badge next to any conversation whose `pending_button_intent.intent === "confirm"`.
 
 ## Files
-- `supabase/functions/whatsapp-webhook/index.ts` — `applyOutcome` confirms immediately when stored address is deliverable, else gates; `tryExtractAndConfirmAddress` runs whenever a `pending_button_intent` exists.
+- `supabase/functions/whatsapp-webhook/index.ts` — `applyOutcome` confirms immediately when stored address is deliverable, else gates; `tryExtractAndConfirmAddress` runs whenever a `pending_button_intent` exists; extractor uses customer-only history.
 - `supabase/functions/whatsapp-automation-runner/index.ts` — `applyButtonAction` sets `forceAddressGate = wantsConfirm && !!order && !storedAddrDeliverable` (gate skipped when address is good).
 - `src/pages/whatsapp/WhatsappInbox.tsx` — "⏳ Awaiting address" pill in conversation list.
