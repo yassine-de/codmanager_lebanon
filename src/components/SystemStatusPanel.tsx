@@ -41,9 +41,9 @@ const severityConfig = {
 export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange }) {
   const navigate = useNavigate();
   const [syncModalOpen, setSyncModalOpen] = useState(false);
-  const [dismissedAtCount, setDismissedAtCount] = useState<number | null>(() => {
+  const [dismissedAtCount, setDismissedAtCount] = useState<number>(() => {
     const v = localStorage.getItem("wa_payment_warning_dismissed_count");
-    return v ? Number(v) : null;
+    return v ? Number(v) : 0;
   });
 
   const fromIso = dateRange?.from ? startOfDay(dateRange.from).toISOString() : null;
@@ -134,6 +134,14 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
     refetchInterval: 60_000,
   });
 
+  // Reset dismissal when problem is resolved (count back to 0)
+  useEffect(() => {
+    if (whatsappPaymentFailures === 0 && dismissedAtCount > 0) {
+      localStorage.removeItem("wa_payment_warning_dismissed_count");
+      setDismissedAtCount(0);
+    }
+  }, [whatsappPaymentFailures, dismissedAtCount]);
+
   const items: StatusItem[] = [
     {
       id: "whatsapp-payment",
@@ -182,7 +190,7 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
 
   return (
     <>
-      {whatsappPaymentFailures > 0 && dismissedAtCount !== whatsappPaymentFailures && (
+      {whatsappPaymentFailures > 0 && whatsappPaymentFailures > dismissedAtCount && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-3 animate-slide-up flex items-start gap-3 relative">
           <div className="p-2 rounded-lg bg-red-500/20 shrink-0">
             <CreditCard className="w-5 h-5 text-red-500" />
