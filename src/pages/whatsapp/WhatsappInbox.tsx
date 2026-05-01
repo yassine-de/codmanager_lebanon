@@ -88,6 +88,43 @@ type Msg = {
   payload?: any;
 };
 
+const getFreshAccessToken = async () => {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  let session = data.session;
+
+  const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : 0;
+  if (session && expiresAtMs && expiresAtMs - Date.now() < 120_000) {
+    const refreshed = await supabase.auth.refreshSession();
+    if (refreshed.error) throw refreshed.error;
+    session = refreshed.data.session;
+  }
+
+  if (!session?.access_token) throw new Error("Session expired — please login again");
+  return session.access_token;
+};
+
+const getFunctionHeaders = async (json = false) => {
+  const token = await getFreshAccessToken();
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  return {
+    Authorization: `Bearer ${token}`,
+    ...(key ? { apikey: key } : {}),
+    ...(json ? { "Content-Type": "application/json" } : {}),
+  };
+};
+
+const invokeProtectedFunction = async <T,>(name: string, body: unknown): Promise<T> => {
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`, {
+    method: "POST",
+    headers: await getFunctionHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error || data?.message || `Edge Function failed (${response.status})`);
+  return data as T;
+};
+
 function getAudioPayload(msg: Msg) {
   const audio = msg.payload?.audio ?? null;
   const rawUrl = audio?.link || audio?.url || null;
@@ -128,13 +165,9 @@ function AudioMessagePlayer({ message }: { message: Msg }) {
       setFailed(false);
       setSrc(null);
       try {
-        const { data } = await supabase.auth.getSession();
-        const token = data.session?.access_token;
-        if (!token) throw new Error("Missing session");
-
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-media-proxy?messageId=${message.id}`;
         const response = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: await getFunctionHeaders(),
         });
 
         if (!response.ok) {
@@ -238,13 +271,9 @@ function MediaImage({ message, directUrl, alt = "attachment", className, onOpen 
 
     const load = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const token = data.session?.access_token;
-        if (!token) throw new Error("Missing session");
-
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-media-proxy?messageId=${message.id}`;
         const response = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: await getFunctionHeaders(),
         });
 
         const contentType = response.headers.get("Content-Type") || "";
@@ -562,10 +591,11 @@ export default function WhatsappInbox() {
       autoTranslatedRef.current.add(m.id);
       void (async () => {
         try {
-          const { data, error } = await supabase.functions.invoke("whatsapp-translate", {
-            body: { message_id: m.id, text: m.body },
+          const data = await invokeProtectedFunction<{ ok: boolean; translation?: string }>("whatsapp-translate", {
+            message_id: m.id,
+            text: m.body,
           });
-          if (error || !data?.ok) return;
+          if (!data?.ok || !data.translation) return;
           setTranslations((prev) => ({ ...prev, [m.id]: data.translation }));
         } catch {
           // silent — staff-only feature, no toast spam
@@ -836,10 +866,11 @@ export default function WhatsappInbox() {
     if (!m.body || translations[m.id]) return;
     setTranslatingId(m.id);
     try {
-      const { data, error } = await supabase.functions.invoke("whatsapp-translate", {
-        body: { message_id: m.id, text: m.body },
+      const data = await invokeProtectedFunction<{ ok: boolean; translation?: string; error?: string }>("whatsapp-translate", {
+        message_id: m.id,
+        text: m.body,
       });
-      if (error || !data?.ok) throw new Error(error?.message || data?.error || "Translation failed");
+      if (!data?.ok || !data.translation) throw new Error(data?.error || "Translation failed");
       setTranslations((prev) => ({ ...prev, [m.id]: data.translation }));
     } catch (e: any) {
       toast.error(e.message || "Translation failed");
