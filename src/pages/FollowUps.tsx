@@ -60,6 +60,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   format, isWithinInterval, startOfDay, endOfDay,
   subDays, startOfMonth, endOfMonth, startOfYesterday, endOfYesterday,
+  isSameDay,
 } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import OrderHistoryModal from "@/components/OrderHistoryModal";
@@ -507,94 +508,12 @@ export default function FollowUps() {
           </Select>
 
           {/* Date range */}
-          <div className="flex gap-1">
-            <Select value={dateField} onValueChange={(v) => setDateField(v as DateField)}>
-              <SelectTrigger className="h-8 text-xs w-[86px] px-2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="created">Created</SelectItem>
-                <SelectItem value="updated">Updated</SelectItem>
-              </SelectContent>
-            </Select>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`h-8 text-xs px-2 gap-1.5 ${dateRange?.from ? "" : "text-muted-foreground"}`}
-                >
-                  <CalendarIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="hidden sm:inline">
-                    {dateRange?.from
-                      ? dateRange.to
-                        ? `${format(dateRange.from, "dd MMM")} – ${format(dateRange.to, "dd MMM")}`
-                        : format(dateRange.from, "dd MMM")
-                      : "Date"}
-                  </span>
-                  {dateRange?.from && (
-                    <X className="h-3 w-3" onClick={(e) => { e.stopPropagation(); setDateRange(undefined); }} />
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                {/* Quick presets */}
-                <div className="border-b p-2 grid grid-cols-2 gap-1">
-                  {[
-                    {
-                      label: "Today",
-                      range: { from: startOfDay(new Date()), to: endOfDay(new Date()) },
-                    },
-                    {
-                      label: "Yesterday",
-                      range: { from: startOfYesterday(), to: endOfYesterday() },
-                    },
-                    {
-                      label: "Last 7 days",
-                      range: { from: startOfDay(subDays(new Date(), 6)), to: endOfDay(new Date()) },
-                    },
-                    {
-                      label: "This month",
-                      range: { from: startOfMonth(new Date()), to: endOfMonth(new Date()) },
-                    },
-                    {
-                      label: "Last month",
-                      range: (() => {
-                        const last = subDays(startOfMonth(new Date()), 1);
-                        return { from: startOfMonth(last), to: endOfMonth(last) };
-                      })(),
-                    },
-                  ].map(({ label, range }) => {
-                    const active =
-                      dateRange?.from?.toDateString() === range.from.toDateString() &&
-                      dateRange?.to?.toDateString() === range.to.toDateString();
-                    return (
-                      <button
-                        key={label}
-                        onClick={() => setDateRange(range)}
-                        className={`text-left rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                          active
-                            ? "bg-primary text-primary-foreground"
-                            : "hover:bg-muted text-foreground"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {/* Calendar */}
-                <Calendar
-                  mode="range"
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  numberOfMonths={typeof window !== "undefined" && window.innerWidth < 640 ? 1 : 2}
-                  initialFocus
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+          <DateRangePicker
+            dateField={dateField}
+            onDateFieldChange={setDateField}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+          />
 
           <div className="ml-auto flex items-center gap-2">
             {activeFilterCount > 0 && (
@@ -784,6 +703,197 @@ function cellClassFor(key: ColumnKey): string {
 }
 
 /* ── No-answer attempt + status picker ── */
+/* ── Date Range Picker with sidebar presets ── */
+const DATE_PRESETS = [
+  {
+    label: "Today",
+    shortLabel: "Today",
+    getRange: () => ({ from: startOfDay(new Date()), to: endOfDay(new Date()) }),
+  },
+  {
+    label: "Yesterday",
+    shortLabel: "Yesterday",
+    getRange: () => ({ from: startOfYesterday(), to: endOfYesterday() }),
+  },
+  {
+    label: "Last 7 days",
+    shortLabel: "Last 7d",
+    getRange: () => ({ from: startOfDay(subDays(new Date(), 6)), to: endOfDay(new Date()) }),
+  },
+  {
+    label: "Last 30 days",
+    shortLabel: "Last 30d",
+    getRange: () => ({ from: startOfDay(subDays(new Date(), 29)), to: endOfDay(new Date()) }),
+  },
+  {
+    label: "This month",
+    shortLabel: "This month",
+    getRange: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }),
+  },
+  {
+    label: "Last month",
+    shortLabel: "Last month",
+    getRange: () => {
+      const last = subDays(startOfMonth(new Date()), 1);
+      return { from: startOfMonth(last), to: endOfMonth(last) };
+    },
+  },
+];
+
+function getActivePreset(dateRange: DateRange | undefined) {
+  if (!dateRange?.from || !dateRange?.to) return null;
+  for (const p of DATE_PRESETS) {
+    const r = p.getRange();
+    if (isSameDay(dateRange.from, r.from) && isSameDay(dateRange.to, r.to)) return p;
+  }
+  return null;
+}
+
+function DateRangePicker({
+  dateField,
+  onDateFieldChange,
+  dateRange,
+  onDateRangeChange,
+}: {
+  dateField: DateField;
+  onDateFieldChange: (v: DateField) => void;
+  dateRange: DateRange | undefined;
+  onDateRangeChange: (r: DateRange | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const activePreset = getActivePreset(dateRange);
+  const hasRange = !!dateRange?.from;
+
+  const triggerLabel = activePreset
+    ? activePreset.shortLabel
+    : hasRange
+    ? dateRange!.to
+      ? `${format(dateRange!.from!, "dd MMM")} – ${format(dateRange!.to, "dd MMM")}`
+      : format(dateRange!.from!, "dd MMM")
+    : "All dates";
+
+  return (
+    <div className="flex gap-1">
+      {/* Field toggle */}
+      <Select value={dateField} onValueChange={(v) => onDateFieldChange(v as DateField)}>
+        <SelectTrigger className="h-8 text-xs w-[86px] px-2">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="created">Created</SelectItem>
+          <SelectItem value="updated">Updated</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Date picker trigger */}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={`h-8 text-xs px-2.5 gap-1.5 min-w-[110px] justify-start font-medium transition-all ${
+              hasRange
+                ? "border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <CalendarIcon className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="flex-1 text-left truncate">{triggerLabel}</span>
+            {hasRange && (
+              <span
+                role="button"
+                onClick={(e) => { e.stopPropagation(); onDateRangeChange(undefined); }}
+                className="ml-auto flex-shrink-0 rounded-full hover:bg-primary/20 p-0.5 transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </span>
+            )}
+          </Button>
+        </PopoverTrigger>
+
+        <PopoverContent
+          className="w-auto p-0 overflow-hidden shadow-xl border"
+          align="start"
+          sideOffset={4}
+        >
+          <div className="flex">
+            {/* Left sidebar — presets */}
+            <div className="w-[130px] border-r bg-muted/30 flex flex-col py-1.5">
+              <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Quick select
+              </p>
+              <div className="space-y-0.5 px-1.5">
+                {DATE_PRESETS.map((p) => {
+                  const isActive = activePreset?.label === p.label;
+                  return (
+                    <button
+                      key={p.label}
+                      onClick={() => {
+                        onDateRangeChange(p.getRange());
+                        setOpen(false);
+                      }}
+                      className={`w-full text-left rounded-md px-2.5 py-2 text-xs font-medium transition-all ${
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Clear button at the bottom */}
+              {hasRange && (
+                <div className="mt-auto px-1.5 pb-1.5 pt-3 border-t mt-3">
+                  <button
+                    onClick={() => { onDateRangeChange(undefined); setOpen(false); }}
+                    className="w-full flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Right — calendar */}
+            <div className="p-0">
+              {/* Selected range summary */}
+              {hasRange && (
+                <div className="flex items-center gap-2 px-4 pt-3 pb-1">
+                  <div className="flex-1 text-center">
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">From</p>
+                    <p className="text-sm font-semibold mt-0.5">
+                      {format(dateRange!.from!, "dd MMM yyyy")}
+                    </p>
+                  </div>
+                  <div className="w-4 h-px bg-border flex-shrink-0" />
+                  <div className="flex-1 text-center">
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">To</p>
+                    <p className="text-sm font-semibold mt-0.5">
+                      {dateRange!.to ? format(dateRange!.to, "dd MMM yyyy") : "—"}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={onDateRangeChange}
+                numberOfMonths={1}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 const FU_MAX_ATTEMPTS = 5;
 
 function FollowUpStatusCell({
