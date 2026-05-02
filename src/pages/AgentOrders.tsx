@@ -608,6 +608,9 @@ const AgentOrders = () => {
         // Auto-close as unreachable at 9 attempts
         if (newAttemptCount >= NO_ANSWER_MAX_ATTEMPTS) {
           updateData.confirmation_status = "unreachable";
+          // Keep agent_id assigned — unreachable is a terminal state, no need to release the lock,
+          // and this avoids RLS WITH CHECK failure for agents handling orphaned orders.
+          updateData.agent_id = authUser.id;
         }
       }
 
