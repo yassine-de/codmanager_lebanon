@@ -488,6 +488,20 @@ async function executeFlow(args: {
         const customPrompt = String(node.data?.prompt ?? "").trim();
         if (!normalizedPhone) throw new Error("Customer phone invalid");
 
+        // SHORT-CIRCUIT (AB-861 fix): if this AI step's job is to collect a
+        // delivery address but the order ALREADY has a deliverable address on
+        // file AND has been auto-confirmed by applyOutcome, do NOT send a
+        // redundant "please send your full detailed address" message. The
+        // customer was just told the order is confirmed — asking for the
+        // address again contradicts that and confuses them.
+        const orderAlreadyConfirmed = order?.confirmation_status === "confirmed";
+        const storedAddrOk = !!order && isAddressDeliverable(order.customer_address, order.customer_city);
+        if (orderAlreadyConfirmed && storedAddrOk) {
+          await appendLog(runId, { type: "ai_step", node_id: node.id, skipped: "order_confirmed_with_deliverable_address" });
+          currentId = findNextNode(edges, node.id)?.target ?? null;
+          continue;
+        }
+
         // Load AI settings + key + history for context
         const { data: aiSettings } = await admin
           .from("whatsapp_ai_settings")
