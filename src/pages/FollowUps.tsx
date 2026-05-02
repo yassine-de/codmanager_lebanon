@@ -815,72 +815,102 @@ function FollowUpStatusCell({
   savingId: string | null;
   onStatusChange: (id: string, status: string, attempt?: number) => void;
 }) {
-  const [pickingAttempt, setPickingAttempt] = useState(false);
-  const nextAttempt = (row.fu_no_answer_count ?? 0) + 1;
+  const [open, setOpen] = useState(false);
+  const [attemptOpen, setAttemptOpen] = useState(false);
+  const doneCount = row.fu_no_answer_count ?? 0;
+  const nextAttempt = doneCount + 1;
 
-  if (pickingAttempt) {
-    return (
-      <div className="flex items-center gap-1 flex-wrap">
-        <span className="text-[10px] text-muted-foreground whitespace-nowrap">Attempt:</span>
-        {Array.from({ length: FU_MAX_ATTEMPTS }, (_, i) => i + 1).map((n) => {
-          const disabled = n !== nextAttempt;
-          return (
-            <button
-              key={n}
-              disabled={disabled}
-              onClick={() => {
-                onStatusChange(row.order_id, "no_answer", n);
-                setPickingAttempt(false);
-              }}
-              className={`h-6 w-6 rounded-full text-[11px] font-semibold border transition-colors ${
-                disabled
-                  ? "opacity-30 cursor-not-allowed bg-muted text-muted-foreground border-border"
-                  : "bg-[hsl(0,65%,52%)]/15 text-[hsl(0,65%,52%)] border-[hsl(0,65%,52%)]/40 hover:bg-[hsl(0,65%,52%)]/30 cursor-pointer"
-              }`}
-            >
-              {n}
-            </button>
-          );
-        })}
-        <button
-          onClick={() => setPickingAttempt(false)}
-          className="h-5 w-5 rounded-full bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center text-[11px]"
-        >
-          <X className="h-3 w-3" />
-        </button>
-      </div>
-    );
-  }
-
-  const displayLabel = row.follow_up_status === "no_answer" && row.fu_no_answer_count > 0
-    ? `No Answer · ${row.fu_no_answer_count}`
-    : (FOLLOW_UP_STATUSES.find((s) => s.value === row.follow_up_status)?.label ?? row.follow_up_status);
+  const displayLabel =
+    row.follow_up_status === "no_answer" && doneCount > 0
+      ? `No Answer · ${doneCount}`
+      : (FOLLOW_UP_STATUSES.find((s) => s.value === row.follow_up_status)?.label ?? row.follow_up_status);
 
   return (
-    <Select
-      value={row.follow_up_status}
-      onValueChange={(v) => {
-        if (v === "no_answer") {
-          setPickingAttempt(true);
-        } else {
-          onStatusChange(row.order_id, v);
-        }
-      }}
-      disabled={savingId === row.order_id}
-    >
-      <SelectTrigger className={`h-7 text-xs border rounded-full px-2.5 py-0 w-fit min-w-0 gap-1 [&>span]:truncate ${followUpStatusStyle[row.follow_up_status] ?? ""}`}>
-        <span className="truncate">{displayLabel}</span>
-      </SelectTrigger>
-      <SelectContent>
-        {FOLLOW_UP_STATUSES.map((s) => (
-          <SelectItem key={s.value} value={s.value} className="text-xs">
-            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${followUpStatusStyle[s.value] ?? ""}`}>
-              {s.label}
-            </span>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="flex items-center gap-1.5">
+      {/* Main status select */}
+      <Select
+        open={open}
+        onOpenChange={setOpen}
+        value={row.follow_up_status}
+        onValueChange={(v) => {
+          setOpen(false);
+          if (v === "no_answer") {
+            setAttemptOpen(true);
+          } else {
+            onStatusChange(row.order_id, v);
+          }
+        }}
+        disabled={savingId === row.order_id}
+      >
+        <SelectTrigger className={`h-7 text-xs border rounded-full px-2.5 py-0 w-fit min-w-0 gap-1 [&>span]:truncate ${followUpStatusStyle[row.follow_up_status] ?? ""}`}>
+          <span className="truncate">{displayLabel}</span>
+        </SelectTrigger>
+        <SelectContent>
+          {FOLLOW_UP_STATUSES.map((s) => (
+            <SelectItem key={s.value} value={s.value} className="text-xs">
+              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${followUpStatusStyle[s.value] ?? ""}`}>
+                {s.label}
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Attempt picker popover */}
+      <Popover open={attemptOpen} onOpenChange={setAttemptOpen}>
+        <PopoverTrigger asChild>
+          <span />
+        </PopoverTrigger>
+        <PopoverContent side="bottom" align="start" className="w-56 p-3">
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-foreground">No Answer — Select Attempt</p>
+              <button
+                onClick={() => setAttemptOpen(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-5 gap-1.5">
+              {Array.from({ length: FU_MAX_ATTEMPTS }, (_, i) => i + 1).map((n) => {
+                const isDone = n < nextAttempt;
+                const isNext = n === nextAttempt;
+                const isLocked = n > nextAttempt;
+                return (
+                  <button
+                    key={n}
+                    disabled={!isNext}
+                    onClick={() => {
+                      onStatusChange(row.order_id, "no_answer", n);
+                      setAttemptOpen(false);
+                    }}
+                    className={`
+                      relative flex flex-col items-center justify-center h-9 rounded-lg border text-[11px] font-bold transition-all
+                      ${isDone ? "bg-[hsl(0,65%,52%)]/8 border-[hsl(0,65%,52%)]/20 text-[hsl(0,65%,52%)]/50 cursor-default" : ""}
+                      ${isNext ? "bg-[hsl(0,65%,52%)]/15 border-[hsl(0,65%,52%)]/50 text-[hsl(0,65%,52%)] hover:bg-[hsl(0,65%,52%)]/25 shadow-sm cursor-pointer ring-1 ring-[hsl(0,65%,52%)]/30" : ""}
+                      ${isLocked ? "bg-muted/40 border-border/50 text-muted-foreground/40 cursor-not-allowed" : ""}
+                    `}
+                  >
+                    {isDone && (
+                      <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[hsl(0,65%,52%)]/70 flex items-center justify-center">
+                        <span className="text-white text-[7px] leading-none">✓</span>
+                      </span>
+                    )}
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-muted-foreground text-center">
+              {doneCount === 0
+                ? "First attempt"
+                : `${doneCount} attempt${doneCount > 1 ? "s" : ""} done · next: #${nextAttempt}`}
+            </p>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
 
