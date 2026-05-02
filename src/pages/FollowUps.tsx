@@ -57,7 +57,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import {
+  format, isWithinInterval, startOfDay, endOfDay,
+  subDays, startOfMonth, endOfMonth, startOfYesterday, endOfYesterday,
+} from "date-fns";
 import type { DateRange } from "react-day-picker";
 import OrderHistoryModal from "@/components/OrderHistoryModal";
 import OrioTrackingModal from "@/components/OrioTrackingModal";
@@ -535,6 +538,52 @@ export default function FollowUps() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
+                {/* Quick presets */}
+                <div className="border-b p-2 grid grid-cols-2 gap-1">
+                  {[
+                    {
+                      label: "Today",
+                      range: { from: startOfDay(new Date()), to: endOfDay(new Date()) },
+                    },
+                    {
+                      label: "Yesterday",
+                      range: { from: startOfYesterday(), to: endOfYesterday() },
+                    },
+                    {
+                      label: "Last 7 days",
+                      range: { from: startOfDay(subDays(new Date(), 6)), to: endOfDay(new Date()) },
+                    },
+                    {
+                      label: "This month",
+                      range: { from: startOfMonth(new Date()), to: endOfMonth(new Date()) },
+                    },
+                    {
+                      label: "Last month",
+                      range: (() => {
+                        const last = subDays(startOfMonth(new Date()), 1);
+                        return { from: startOfMonth(last), to: endOfMonth(last) };
+                      })(),
+                    },
+                  ].map(({ label, range }) => {
+                    const active =
+                      dateRange?.from?.toDateString() === range.from.toDateString() &&
+                      dateRange?.to?.toDateString() === range.to.toDateString();
+                    return (
+                      <button
+                        key={label}
+                        onClick={() => setDateRange(range)}
+                        className={`text-left rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                          active
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-muted text-foreground"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Calendar */}
                 <Calendar
                   mode="range"
                   selected={dateRange}
