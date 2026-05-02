@@ -91,6 +91,7 @@ const FOLLOW_UP_STATUSES = [
   { value: "contacted_client", label: "Contacted Client" },
   { value: "client_confirmed", label: "Client Confirmed" },
   { value: "resent_to_courier", label: "Resent to Courier" },
+  { value: "no_answer", label: "No Answer" },
   { value: "closed", label: "Closed" },
 ];
 
@@ -100,6 +101,7 @@ const followUpStatusStyle: Record<string, string> = {
   contacted_client: "bg-[hsl(200,65%,50%)]/12 text-[hsl(200,65%,50%)] border-[hsl(200,65%,50%)]/25",
   client_confirmed: "bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)] border-[hsl(155,50%,42%)]/25",
   resent_to_courier: "bg-[hsl(270,50%,55%)]/12 text-[hsl(270,50%,55%)] border-[hsl(270,50%,55%)]/25",
+  no_answer: "bg-[hsl(0,65%,52%)]/12 text-[hsl(0,65%,52%)] border-[hsl(0,65%,52%)]/25",
   closed: "bg-[hsl(155,50%,42%)]/15 text-[hsl(155,50%,42%)] border-[hsl(155,50%,42%)]/30 font-semibold",
 };
 
@@ -142,6 +144,7 @@ interface FollowUpRow {
   follow_up_note: string | null;
   product_name: string | null;
   total_amount: number | null;
+  fu_no_answer_count: number;
 }
 
 function computeSegment(row: FollowUpRow): "failed_attempt" | "delayed" | "on_going" | null {
@@ -422,20 +425,24 @@ export default function FollowUps() {
     setDateRange(undefined);
   }
 
-  async function handleStatusChange(orderId: string, newStatus: string) {
+  async function handleStatusChange(orderId: string, newStatus: string, noAnswerAttempt?: number) {
     if (!authUser) return;
     setSavingId(orderId);
     try {
+      const upsertData: Record<string, unknown> = {
+        order_id: orderId,
+        follow_up_status: newStatus,
+        updated_by: authUser.id,
+      };
+      if (newStatus === "no_answer" && noAnswerAttempt !== undefined) {
+        upsertData.fu_no_answer_count = noAnswerAttempt;
+      }
       const { error } = await supabase
         .from("order_follow_ups")
-        .upsert(
-          { order_id: orderId, follow_up_status: newStatus, updated_by: authUser.id },
-          { onConflict: "order_id" }
-        );
+        .upsert(upsertData as any, { onConflict: "order_id" });
       if (error) throw error;
       toast.success("Follow-up updated");
       refetch();
-      // Open note dialog after status change
       const row = enriched.find((r) => r.order_id === orderId);
       setNoteText(row?.follow_up_note ?? "");
       setNoteDialog({ orderId, currentNote: row?.follow_up_note ?? "", fromStatusChange: true });
@@ -797,12 +804,92 @@ function cellClassFor(key: ColumnKey): string {
   }
 }
 
+const FU_MAX_ATTEMPTS = 5;
+
+function FollowUpStatusCell({
+  row,
+  savingId,
+  onStatusChange,
+}: {
+  row: FollowUpRow & { segment: "failed_attempt" | "delayed" | "on_going" | null };
+  savingId: string | null;
+  onStatusChange: (id: string, status: string, attempt?: number) => void;
+}) {
+  const [pickingAttempt, setPickingAttempt] = useState(false);
+  const nextAttempt = (row.fu_no_answer_count ?? 0) + 1;
+
+  if (pickingAttempt) {
+    return (
+      <div className="flex items-center gap-1 flex-wrap">
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">Attempt:</span>
+        {Array.from({ length: FU_MAX_ATTEMPTS }, (_, i) => i + 1).map((n) => {
+          const disabled = n !== nextAttempt;
+          return (
+            <button
+              key={n}
+              disabled={disabled}
+              onClick={() => {
+                onStatusChange(row.order_id, "no_answer", n);
+                setPickingAttempt(false);
+              }}
+              className={`h-6 w-6 rounded-full text-[11px] font-semibold border transition-colors ${
+                disabled
+                  ? "opacity-30 cursor-not-allowed bg-muted text-muted-foreground border-border"
+                  : "bg-[hsl(0,65%,52%)]/15 text-[hsl(0,65%,52%)] border-[hsl(0,65%,52%)]/40 hover:bg-[hsl(0,65%,52%)]/30 cursor-pointer"
+              }`}
+            >
+              {n}
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setPickingAttempt(false)}
+          className="h-5 w-5 rounded-full bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center text-[11px]"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
+  const displayLabel = row.follow_up_status === "no_answer" && row.fu_no_answer_count > 0
+    ? `No Answer · ${row.fu_no_answer_count}`
+    : (FOLLOW_UP_STATUSES.find((s) => s.value === row.follow_up_status)?.label ?? row.follow_up_status);
+
+  return (
+    <Select
+      value={row.follow_up_status}
+      onValueChange={(v) => {
+        if (v === "no_answer") {
+          setPickingAttempt(true);
+        } else {
+          onStatusChange(row.order_id, v);
+        }
+      }}
+      disabled={savingId === row.order_id}
+    >
+      <SelectTrigger className={`h-7 text-xs border rounded-full px-2.5 py-0 w-fit min-w-0 gap-1 [&>span]:truncate ${followUpStatusStyle[row.follow_up_status] ?? ""}`}>
+        <span className="truncate">{displayLabel}</span>
+      </SelectTrigger>
+      <SelectContent>
+        {FOLLOW_UP_STATUSES.map((s) => (
+          <SelectItem key={s.value} value={s.value} className="text-xs">
+            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${followUpStatusStyle[s.value] ?? ""}`}>
+              {s.label}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function renderCell(
   key: ColumnKey,
   row: FollowUpRow & { segment: "failed_attempt" | "delayed" | "on_going" | null },
   segMeta: (typeof segmentMeta)[keyof typeof segmentMeta] | null,
   savingId: string | null,
-  handleStatusChange: (id: string, status: string) => void,
+  handleStatusChange: (id: string, status: string, attempt?: number) => void,
   handleNoteSave: (id: string, note: string) => void,
   navigate: (to: string) => void,
   setHistoryOrder: (v: { id: string; customer: string } | null) => void,
@@ -886,24 +973,11 @@ function renderCell(
     }
     case "follow_up":
       return (
-        <Select
-          value={row.follow_up_status}
-          onValueChange={(v) => handleStatusChange(row.order_id, v)}
-          disabled={savingId === row.order_id}
-        >
-          <SelectTrigger className={`h-7 text-xs border rounded-full px-2.5 py-0 w-fit min-w-0 gap-1 [&>span]:truncate ${followUpStatusStyle[row.follow_up_status] ?? ""}`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {FOLLOW_UP_STATUSES.map((s) => (
-              <SelectItem key={s.value} value={s.value} className="text-xs">
-                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${followUpStatusStyle[s.value] ?? ""}`}>
-                  {s.label}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FollowUpStatusCell
+          row={row}
+          savingId={savingId}
+          onStatusChange={handleStatusChange}
+        />
       );
     case "note": {
       const hasNote = !!row.follow_up_note?.trim();
