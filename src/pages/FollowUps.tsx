@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -225,7 +225,7 @@ const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "actions",   label: "Actions"    },
 ];
 
-const STORAGE_KEY = "follow-ups:column-config:v4";
+const STORAGE_KEY = "follow-ups:column-config:v5";
 type ColumnConfig = { key: ColumnKey; visible: boolean };
 
 function loadColumnConfig(): ColumnConfig[] {
@@ -263,7 +263,10 @@ export default function FollowUps() {
   const [noteText, setNoteText]         = useState("");
   const [columns, setColumns]           = useState<ColumnConfig[]>(() => loadColumnConfig());
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(columns)); }, [columns]);
+  const saveColumns = useCallback((next: ColumnConfig[]) => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+    setColumns(next);
+  }, []);
 
   const { data: rows = [], isLoading, isFetching, refetch } = useQuery({
     queryKey: ["follow-ups-data"],
@@ -604,7 +607,7 @@ export default function FollowUps() {
                 Clear ({activeFilterCount})
               </Button>
             )}
-            <ColumnsManager columns={columns} onChange={setColumns} />
+            <ColumnsManager columns={columns} onChange={saveColumns} />
             {!isLoading && (
               <span className="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap hidden md:inline">
                 {filtered.length.toLocaleString()} / {enriched.length.toLocaleString()}
