@@ -12,7 +12,7 @@ import {
   PhoneCall,
   Sparkles,
 } from "lucide-react";
-import { format, startOfDay, endOfDay, subDays } from "date-fns";
+import { formatPKT as format, startOfDayPKT as startOfDay, endOfDayPKT as endOfDay, subDaysPKT as subDays } from "@/lib/timezone";
 import {
   BarChart,
   Bar,

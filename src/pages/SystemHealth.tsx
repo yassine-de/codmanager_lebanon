@@ -11,7 +11,8 @@ import {
   Loader2, Package, RefreshCw, Server, ShieldAlert, Truck, XCircle, Zap
 } from "lucide-react";
 import { toast } from "sonner";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { formatPKT as format } from "@/lib/timezone";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */

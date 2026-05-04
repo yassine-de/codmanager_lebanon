@@ -744,6 +744,34 @@ async function startNewRuns(triggerType: string, orderId: string) {
     const targetIds = new Set(edges.map((e) => e.target));
     const entry = nodes.find((n) => !targetIds.has(n.id)) ?? nodes[0];
 
+    // ── Deduplication guard ──────────────────────────────────────────────────
+    // Check for an existing non-failed run for this order + automation BEFORE
+    // inserting. This prevents double sends caused by:
+    //   • concurrent pg_net invocations (race condition on INSERT trigger)
+    //   • batch re-imports creating a second row with the same text order_id
+    //   • retries from the edge-function infrastructure
+    // We skip any status except "failed" so that a failed previous run can
+    // still be retried manually via a different code path.
+    const { data: existingRun } = await admin
+      .from("whatsapp_automation_runs")
+      .select("id, status")
+      .eq("automation_id", a.id)
+      .eq("order_id", order.order_id)
+      .neq("status", "failed")
+      .limit(1)
+      .maybeSingle();
+
+    if (existingRun) {
+      log("dedup: active run already exists, skipping", {
+        automation: a.id,
+        order: order.order_id,
+        existingRunId: existingRun.id,
+        existingStatus: existingRun.status,
+      });
+      continue;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const { data: run, error } = await admin
       .from("whatsapp_automation_runs")
       .insert({

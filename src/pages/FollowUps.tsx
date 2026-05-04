@@ -59,11 +59,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { isWithinInterval, isSameDay, formatDistanceToNow } from "date-fns";
 import {
-  format, isWithinInterval, startOfDay, endOfDay,
-  subDays, startOfMonth, endOfMonth, startOfYesterday, endOfYesterday,
-  isSameDay, formatDistanceToNow,
-} from "date-fns";
+  formatPKT as format,
+  startOfDayPKT as startOfDay, endOfDayPKT as endOfDay,
+  subDaysPKT as subDays, startOfMonthPKT as startOfMonth, endOfMonthPKT as endOfMonth,
+} from "@/lib/timezone";
+// startOfYesterday / endOfYesterday expressed in PKT
+import { subDaysPKT } from "@/lib/timezone";
+const startOfYesterday = () => startOfDay(subDaysPKT(new Date(), 1));
+const endOfYesterday   = () => endOfDay(subDaysPKT(new Date(), 1));
 import type { DateRange } from "react-day-picker";
 import OrderHistoryModal from "@/components/OrderHistoryModal";
 import OrioTrackingModal from "@/components/OrioTrackingModal";
@@ -250,12 +255,15 @@ export default function FollowUps() {
 
   const [segment, setSegment]           = useState<Segment>("all");
   const [search, setSearch]             = useState("");
-  const [filterDelivery, setFilterDelivery] = useState<string>("all");
-  const [filterSeller, setFilterSeller] = useState<string>("all");
-  const [filterAgent, setFilterAgent]   = useState<string>("all");
-  const [filterFollowUp, setFilterFollowUp] = useState<string>("all");
+  const [filterDelivery, setFilterDelivery]     = useState<string>("all");
+  const [filterSubStatus, setFilterSubStatus]   = useState<string>("all");
+  const [filterSeller, setFilterSeller]         = useState<string>("all");
+  const [filterAgent, setFilterAgent]           = useState<string>("all");
+  const [filterFollowUp, setFilterFollowUp]     = useState<string>("all");
   const [dateField, setDateField]       = useState<DateField>("created");
   const [dateRange, setDateRange]       = useState<DateRange | undefined>();
+  const [pageSize, setPageSize]         = useState<number>(50);
+  const [page, setPage]                 = useState<number>(1);
   const [savingId, setSavingId]         = useState<string | null>(null);
   const [historyOrder, setHistoryOrder] = useState<{ id: string; customer: string } | null>(null);
   const [trackingTarget, setTrackingTarget] = useState<{ orioId: number; sellerId: string } | null>(null);
@@ -341,8 +349,9 @@ export default function FollowUps() {
       else if (segment === "no_answer")    { if (r.follow_up_status !== "no_answer")    return false; }
       else if (r.segment !== segment) return false;
     }
-    if (filterDelivery !== "all" && r.delivery_status !== filterDelivery) return false;
-    if (filterSeller   !== "all" && r.seller_id       !== filterSeller)   return false;
+    if (filterDelivery   !== "all" && r.delivery_status !== filterDelivery)   return false;
+    if (filterSubStatus  !== "all" && r.segment         !== filterSubStatus)  return false;
+    if (filterSeller     !== "all" && r.seller_id       !== filterSeller)     return false;
     if (filterAgent    !== "all" && r.agent_id        !== filterAgent)    return false;
     if (filterFollowUp !== "all" && r.follow_up_status !== filterFollowUp) return false;
     if (dateRange?.from) {
@@ -372,15 +381,22 @@ export default function FollowUps() {
       if (!hay.includes(q)) return false;
     }
     return true;
-  }), [enriched, segment, filterDelivery, filterSeller, filterAgent, filterFollowUp, search, dateRange, dateField]);
+  }), [enriched, segment, filterDelivery, filterSubStatus, filterSeller, filterAgent, filterFollowUp, search, dateRange, dateField]);
+
+  // Reset to page 1 whenever filtered result set changes
+  useEffect(() => { setPage(1); }, [filtered]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const activeFilterCount =
     (segment !== "all" ? 1 : 0) + (filterDelivery !== "all" ? 1 : 0) +
+    (filterSubStatus !== "all" ? 1 : 0) +
     (filterSeller !== "all" ? 1 : 0) + (filterAgent !== "all" ? 1 : 0) +
     (filterFollowUp !== "all" ? 1 : 0) + (dateRange?.from ? 1 : 0) + (search.trim() ? 1 : 0);
 
   function clearFilters() {
-    setSegment("all"); setFilterDelivery("all"); setFilterSeller("all");
+    setSegment("all"); setFilterDelivery("all"); setFilterSubStatus("all"); setFilterSeller("all");
     setFilterAgent("all"); setFilterFollowUp("all"); setSearch(""); setDateRange(undefined);
   }
 
@@ -597,6 +613,18 @@ export default function FollowUps() {
             </SelectContent>
           </Select>
 
+          <Select value={filterSubStatus} onValueChange={setFilterSubStatus}>
+            <SelectTrigger className="h-8 text-xs w-[140px]">
+              <SelectValue placeholder="Sub Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sub Status</SelectItem>
+              <SelectItem value="on_going">On Going</SelectItem>
+              <SelectItem value="delayed">Delayed</SelectItem>
+              <SelectItem value="failed_attempt">Failed Attempt</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Select value={filterFollowUp} onValueChange={setFilterFollowUp}>
             <SelectTrigger className="h-8 text-xs w-[140px]">
               <SelectValue placeholder="Follow Up" />
@@ -632,6 +660,57 @@ export default function FollowUps() {
             )}
           </div>
         </div>
+
+        {/* ── Pagination ── */}
+        {!isLoading && filtered.length > 0 && (
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Rows per page</span>
+              <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+                <SelectTrigger className="h-7 text-xs w-[70px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[20, 50, 100, 300].map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} of {filtered.length.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline" size="sm"
+                className="h-7 w-7 p-0 text-xs"
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+              >«</Button>
+              <Button
+                variant="outline" size="sm"
+                className="h-7 w-7 p-0 text-xs"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >‹</Button>
+              <span className="text-xs tabular-nums px-2 text-muted-foreground">
+                {page} / {totalPages}
+              </span>
+              <Button
+                variant="outline" size="sm"
+                className="h-7 w-7 p-0 text-xs"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >›</Button>
+              <Button
+                variant="outline" size="sm"
+                className="h-7 w-7 p-0 text-xs"
+                onClick={() => setPage(totalPages)}
+                disabled={page === totalPages}
+              >»</Button>
+            </div>
+          </div>
+        )}
 
         {/* ── Table ── */}
         <div className="rounded-xl border overflow-hidden bg-card shadow-soft relative">
@@ -694,7 +773,7 @@ export default function FollowUps() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((row) => {
+                  paginated.map((row) => {
                     const segMeta = row.segment ? segmentMeta[row.segment] : null;
                     return (
                       <tr

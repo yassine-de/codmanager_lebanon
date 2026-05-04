@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, Clock, ShieldAlert, Package, Activity, Cre
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { startOfDay, endOfDay } from "date-fns";
+import { startOfDayPKT as startOfDay, endOfDayPKT as endOfDay } from "@/lib/timezone";
 import type { DateRange } from "react-day-picker";
 import FailedSyncModal from "@/components/FailedSyncModal";
 

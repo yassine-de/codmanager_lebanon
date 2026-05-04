@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { formatPKT as format } from "@/lib/timezone";
 import { Package2, Plus, Check, X, ExternalLink, Loader2, ImageIcon, Pencil } from "lucide-react";
 import { SourcingVariantsBadge } from "@/components/SourcingVariantsBadge";
 import { supabase } from "@/integrations/supabase/client";

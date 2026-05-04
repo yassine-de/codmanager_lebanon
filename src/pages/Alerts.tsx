@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertTriangle, Bell, Info, Plus, Pencil, Trash2, Calendar } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { formatPKT as format } from "@/lib/timezone";
 
 type Alert = {
   id: string;

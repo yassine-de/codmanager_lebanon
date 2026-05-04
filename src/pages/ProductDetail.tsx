@@ -5,7 +5,8 @@ import { ArrowLeft, ShoppingCart, CheckCircle2, Truck, Package, TrendingUp, Imag
 import { Button } from "@/components/ui/button";
 import { mockProducts, type Product } from "@/lib/products-data";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
-import { format, subDays, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { formatPKT as format, subDaysPKT as subDays } from "@/lib/timezone";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";

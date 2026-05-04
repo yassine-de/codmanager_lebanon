@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format } from "date-fns";
+import { formatPKT as format } from "@/lib/timezone";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Loader2, Package, ArrowDownCircle, ArrowUpCircle, ArrowUpDown,

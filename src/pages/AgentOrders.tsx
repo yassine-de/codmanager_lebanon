@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { CitySelect } from "@/components/CitySelect";
-import { format } from "date-fns";
+import { formatPKT as format } from "@/lib/timezone";
 import { toast } from "sonner";
 import {
   Play, ChevronRight, Phone, PhoneOff, MessageCircle, User, MapPin, Package, DollarSign,

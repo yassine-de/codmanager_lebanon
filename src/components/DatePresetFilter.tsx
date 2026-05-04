@@ -4,8 +4,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { formatPKT as format } from "@/lib/timezone";
 import type { DateRange } from "react-day-picker";
+import {
+  startOfDayPKT, endOfDayPKT,
+  startOfMonthPKT, endOfMonthPKT,
+  subDaysPKT, subMonthsPKT,
+} from "@/lib/timezone";
 
 export type DatePresetValue = "today" | "yesterday" | "7d" | "this_month" | "last_month" | "maximum" | "custom";
 
@@ -22,18 +27,18 @@ export function getDateRangeFromPreset(preset: DatePresetValue): DateRange | und
   const now = new Date();
   switch (preset) {
     case "today":
-      return { from: startOfDay(now), to: endOfDay(now) };
+      return { from: startOfDayPKT(now), to: endOfDayPKT(now) };
     case "yesterday": {
-      const y = subDays(now, 1);
-      return { from: startOfDay(y), to: endOfDay(y) };
+      const y = subDaysPKT(now, 1);
+      return { from: startOfDayPKT(y), to: endOfDayPKT(y) };
     }
     case "7d":
-      return { from: startOfDay(subDays(now, 6)), to: endOfDay(now) };
+      return { from: startOfDayPKT(subDaysPKT(now, 6)), to: endOfDayPKT(now) };
     case "this_month":
-      return { from: startOfMonth(now), to: endOfDay(now) };
+      return { from: startOfMonthPKT(now), to: endOfDayPKT(now) };
     case "last_month": {
-      const lm = subMonths(now, 1);
-      return { from: startOfMonth(lm), to: endOfMonth(lm) };
+      const lm = subMonthsPKT(now, 1);
+      return { from: startOfMonthPKT(lm), to: endOfMonthPKT(lm) };
     }
     case "maximum":
       return undefined;

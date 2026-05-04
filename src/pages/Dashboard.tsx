@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { DatePresetFilter, type DatePresetValue, getDateRangeFromPreset } from "@/components/DatePresetFilter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
+import { formatPKT as format } from "@/lib/timezone";
 import type { LucideIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { useDashboardData } from "@/hooks/useDashboardData";

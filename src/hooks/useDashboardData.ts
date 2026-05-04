@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
-import { format, subDays, startOfDay, endOfDay, eachDayOfInterval, isWithinInterval } from "date-fns";
+import { isWithinInterval } from "date-fns";
+import { formatPKT, startOfDayPKT, endOfDayPKT, subDaysPKT, eachDayOfIntervalPKT, toPKT } from "@/lib/timezone";
 import type { DateRange } from "react-day-picker";
 
 export interface DashboardOrder {
@@ -201,14 +202,16 @@ function reachedDeliveredStage(o: DashboardOrder): boolean {
 const SHIPPED_DELIVERY_STATUSES = ['shipped', 'booked', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'];
 
 function computeDailyData(orders: DashboardOrder[], numDays: number) {
-  const days = eachDayOfInterval({
-    start: startOfDay(subDays(new Date(), numDays - 1)),
-    end: startOfDay(new Date()),
-  });
+  const now = new Date();
+  // Use PKT day boundaries so "today" matches midnight in Karachi, not the server timezone
+  const days = eachDayOfIntervalPKT(
+    startOfDayPKT(subDaysPKT(now, numDays - 1)),
+    startOfDayPKT(now),
+  );
 
   return days.map((date) => {
-    const nextDay = new Date(date);
-    nextDay.setDate(nextDay.getDate() + 1);
+    // date here is already in PKT wall-clock; compute the next PKT day start
+    const nextDay = startOfDayPKT(new Date(toPKT(date).getTime() + 24 * 60 * 60 * 1000));
 
     // Dropped = orders CREATED on this day (created_at)
     const dropped = orders.filter((o) =>
@@ -234,7 +237,7 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
     }).length;
 
     return {
-      day: `${format(date, "EEE")}\n${format(date, "dd/MM")}`,
+      day: `${formatPKT(date, "EEE")}\n${formatPKT(date, "dd/MM")}`,
       orders: dropped,
       dropped,
       confirmed,
@@ -259,8 +262,8 @@ export function useDashboardData(dateRange?: DateRange) {
   // Filter by date range on treatment date
   const orders = useMemo(() => {
     if (!dateRange?.from) return allOrders;
-    const from = startOfDay(dateRange.from);
-    const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+    const from = startOfDayPKT(dateRange.from);
+    const to = dateRange.to ? endOfDayPKT(dateRange.to) : endOfDayPKT(dateRange.from);
     return allOrders.filter(o => {
       const treatDate = getTreatmentDate(o);
       return isWithinInterval(treatDate, { start: from, end: to });
@@ -269,8 +272,8 @@ export function useDashboardData(dateRange?: DateRange) {
 
   const kpis = useMemo(() => {
     if (!dateRange?.from) return computeKPIs(orders);
-    const from = startOfDay(dateRange.from);
-    const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+    const from = startOfDayPKT(dateRange.from);
+    const to = dateRange.to ? endOfDayPKT(dateRange.to) : endOfDayPKT(dateRange.from);
     return computeKPIs(orders, allOrders, { from, to });
   }, [orders, allOrders, dateRange]);
   // Daily charts use ALL orders so each metric is bucketed by its own event date

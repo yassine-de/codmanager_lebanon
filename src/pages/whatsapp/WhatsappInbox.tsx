@@ -43,13 +43,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 import { toast } from "sonner";
-import {
-  format,
-  formatDistanceToNowStrict,
-  differenceInHours,
-  isToday,
-  isYesterday,
-} from "date-fns";
+import { formatDistanceToNowStrict, differenceInHours } from "date-fns";
+import { formatPKT as format, isTodayPKT as isToday, toPKT } from "@/lib/timezone";
+// isYesterday in PKT context
+const isYesterday = (date: Date) => {
+  const pkt = toPKT(date);
+  const yesterdayPkt = toPKT(new Date(Date.now() - 86400000));
+  return pkt.getFullYear() === yesterdayPkt.getFullYear() &&
+    pkt.getMonth() === yesterdayPkt.getMonth() &&
+    pkt.getDate() === yesterdayPkt.getDate();
+};
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -247,6 +250,109 @@ function AudioMessagePlayer({ message }: { message: Msg }) {
   if (!src) return null;
 
   return <audio controls preload="metadata" src={src} className="max-w-full" />;
+}
+
+/**
+ * Renders a video attachment via the media-proxy edge function.
+ * WhatsApp's lookaside.fbsbx.com URLs are bearer-protected, so we fetch through
+ * the proxy, create a blob URL, and hand it to a native <video> element.
+ */
+function VideoMessagePlayer({ message }: { message: Msg }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const rawUrl: string | null =
+    message.payload?.video?.link ||
+    message.payload?.video?.url ||
+    null;
+  const isTemporary = typeof rawUrl === "string" && rawUrl.includes("lookaside.fbsbx.com");
+
+  useEffect(() => {
+    // If we have a permanent URL, use it directly
+    if (rawUrl && !isTemporary) {
+      setSrc(rawUrl);
+      setLoading(false);
+      setFailed(false);
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    const load = async () => {
+      setLoading(true);
+      setFailed(false);
+      setSrc(null);
+      try {
+        const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-media-proxy?messageId=${message.id}`;
+        const response = await fetch(proxyUrl, {
+          headers: await getFunctionHeaders(),
+        });
+
+        if (!response.ok) {
+          if (!cancelled) { setFailed(true); setLoading(false); }
+          return;
+        }
+
+        const contentType = response.headers.get("Content-Type") || "";
+        if (contentType.includes("application/json")) {
+          if (!cancelled) { setFailed(true); setLoading(false); }
+          return;
+        }
+
+        const blob = await response.blob();
+        const effectiveMime = response.headers.get("x-media-type") || blob.type || "video/mp4";
+        const typedBlob = blob.type === effectiveMime
+          ? blob
+          : new Blob([await blob.arrayBuffer()], { type: effectiveMime });
+
+        objectUrl = URL.createObjectURL(typedBlob);
+        if (cancelled) { URL.revokeObjectURL(objectUrl); return; }
+        setSrc(objectUrl);
+      } catch {
+        if (!cancelled) setFailed(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [message.id, message.payload?.video?.id, message.payload?.video?.link, message.payload?.video?.url]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center bg-muted/40 rounded-lg" style={{ minHeight: 120, minWidth: 200 }}>
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (failed || !src) {
+    return (
+      <div className="space-y-1">
+        <div className="text-xs text-destructive">Video unavailable</div>
+        {rawUrl && !isTemporary && (
+          <a href={rawUrl} target="_blank" rel="noreferrer" className="text-xs underline underline-offset-2">
+            Open video
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <video
+      controls
+      preload="metadata"
+      src={src}
+      className="rounded-lg max-w-full max-h-64 object-contain"
+    />
+  );
 }
 
 /**
@@ -1583,6 +1689,14 @@ export default function WhatsappInbox() {
                               }
                               if (m.message_type === "audio") {
                                 return <AudioMessagePlayer message={m} />;
+                              }
+                              if (m.message_type === "video") {
+                                return (
+                                  <div>
+                                    <VideoMessagePlayer message={m} />
+                                    {caption && <div className="whitespace-pre-wrap break-words mt-1">{caption}</div>}
+                                  </div>
+                                );
                               }
                               if (m.message_type === "document") {
                                 // For documents, link to the proxy so it works after the lookaside URL expires

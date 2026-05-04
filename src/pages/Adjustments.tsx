@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatUSD, formatPKR } from "@/lib/currency";
 import { toast } from "sonner";
 import { AlertTriangle, Check, X, Eye, ArrowUpDown, Truck } from "lucide-react";
-import { format } from "date-fns";
+import { formatPKT as format } from "@/lib/timezone";
 
 interface Adjustment {
   id: string;

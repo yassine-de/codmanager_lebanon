@@ -23,7 +23,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Search, ListChecks, FileText } from "lucide-react";
-import { format } from "date-fns";
+import { formatPKT as format } from "@/lib/timezone";
 
 interface FollowUpRow {
   order_id: string;

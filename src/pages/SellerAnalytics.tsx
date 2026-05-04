@@ -5,7 +5,7 @@ import { SearchableSelect } from "@/components/SearchableSelect";
 import { KPICard } from "@/components/KPICard";
 import { ShoppingCart, CheckCircle2, Truck, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { formatPKT as format, subDaysPKT as subDays, startOfDayPKT as startOfDay, endOfDayPKT as endOfDay } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { DateRange } from "react-day-picker";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";

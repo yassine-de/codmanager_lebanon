@@ -8,9 +8,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";
 import { DateRange } from "react-day-picker";
+import { startOfDayPKT as startOfDay, endOfDayPKT as endOfDay } from "@/lib/timezone";
 import { supabase } from "@/integrations/supabase/client";
 import { SmartRecommendations } from "@/components/SmartRecommendations";
 import { DailyConfirmationReport } from "@/components/DailyConfirmationReport";
+
+type DateField = "created" | "updated";
 
 export default function ConfirmationAnalytics() {
   const [agentFilter, setAgentFilter] = useState<string>("all");
@@ -18,17 +21,36 @@ export default function ConfirmationAnalytics() {
   const [productFilter, setProductFilter] = useState<string>("all");
   const [datePreset, setDatePreset] = useState<DatePresetValue>("maximum");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [dateField, setDateField] = useState<DateField>("updated");
 
-  // Fetch all orders
+  // Fetch ALL orders with pagination — Supabase caps at 1000 rows by default,
+  // so we paginate to avoid silently missing orders (which causes under-counting).
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["confirmation-analytics-orders"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("id, order_id, confirmation_status, delivery_status, cancel_reason, product_name, seller_id, agent_id, original_agent_id, created_at, confirmed_at, delivered_at, assigned_at, last_attempt_at, last_activity_at, updated_at, price, quantity, postpone_date, attempt_count")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      const pageSize = 1000;
+      let from = 0;
+      const all: Array<{
+        id: string; order_id: string; confirmation_status: string; confirmation_channel: string | null;
+        delivery_status: string; cancel_reason: string | null; product_name: string; seller_id: string;
+        agent_id: string | null; original_agent_id: string | null; created_at: string;
+        confirmed_at: string | null; delivered_at: string | null; assigned_at: string | null;
+        last_attempt_at: string | null; last_activity_at: string | null; updated_at: string;
+        price: number | null; quantity: number | null; postpone_date: string | null; attempt_count: number | null;
+      }> = [];
+      while (true) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("id, order_id, confirmation_status, confirmation_channel, delivery_status, cancel_reason, product_name, seller_id, agent_id, original_agent_id, created_at, confirmed_at, delivered_at, assigned_at, last_attempt_at, last_activity_at, updated_at, price, quantity, postpone_date, attempt_count")
+          .order("created_at", { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      return all;
     },
   });
 
@@ -130,45 +152,75 @@ export default function ConfirmationAnalytics() {
   //
   // This map is active whenever a date range OR an agent filter is applied. When neither
   // is set (= "maximum" with all agents), we fall back to the orders' current status snapshot.
+  // When dateField="updated" (default): filter by WHEN the status change happened in order_history
+  //   → most accurate for "what did agents do in this period"
+  // When dateField="created": filter orders by their created_at directly
+  //   → shows orders that were placed in this period (with current statuses)
+  // Agent filter always uses history events for precise attribution.
   const statusActionsInPeriod = useMemo(() => {
-    const hasDateFilter = !!(dateRange?.from || dateRange?.to);
+    const hasDateFilter  = !!(dateRange?.from || dateRange?.to);
     const hasAgentFilter = agentFilter !== "all";
-    if (!hasDateFilter && !hasAgentFilter) return null;
+    const useHistoryDate = hasDateFilter && dateField === "updated";
+
+    if (!hasAgentFilter && !useHistoryDate) return null;
 
     const map = new Map<string, { lastStatus: string; lastAt: string; changedBy: string }>();
     orderHistory.forEach(h => {
       if (h.field_changed !== "confirmation_status") return;
+      if (!h.new_value) return; // skip events with no new status (null new_value would cause fallback to stale status)
       if (hasAgentFilter && h.changed_by !== agentFilter) return;
-      if (dateRange?.from && new Date(h.created_at) < dateRange.from) return;
-      if (dateRange?.to && new Date(h.created_at) > dateRange.to) return;
+      if (useHistoryDate) {
+        if (dateRange?.from && new Date(h.created_at) < dateRange.from) return;
+        if (dateRange?.to   && new Date(h.created_at) > dateRange.to)   return;
+      }
       const prev = map.get(h.order_id);
       if (!prev || new Date(h.created_at) > new Date(prev.lastAt)) {
         map.set(h.order_id, {
-          lastStatus: h.new_value || "",
+          lastStatus: h.new_value, // guaranteed non-null/empty here
           lastAt: h.created_at,
           changedBy: h.changed_by || "",
         });
       }
     });
     return map;
-  }, [orderHistory, agentFilter, dateRange]);
+  }, [orderHistory, agentFilter, dateRange, dateField]);
 
   const filteredOrders = useMemo(() => {
+    // No deduplication — orders that share the same text order_id (generate_order_id
+    // overflow bug) are genuinely different orders with different UUIDs and should both
+    // be counted. Deduplicating by text order_id would remove legitimate orders.
     let filtered = [...orders];
+
+    // "created" mode: filter by order creation date (direct, no history)
+    if (dateRange?.from && dateField === "created") {
+      const from = startOfDay(dateRange.from);
+      const to   = endOfDay(dateRange.to ?? dateRange.from);
+      filtered = filtered.filter(o => {
+        const ts = new Date(o.created_at);
+        return ts >= from && ts <= to;
+      });
+    }
+
+    // History-based filter: active for "updated" date mode OR agent filter.
+    // Overrides confirmation_status with what actually happened in the period.
+    // No fallback to o.confirmation_status — if there's no history entry, the order is excluded.
     if (statusActionsInPeriod) {
-      // Restrict to orders where a matching status-change happened in the period,
-      // and override confirmation_status with the status that was set by that action.
       filtered = filtered
         .filter(o => statusActionsInPeriod.has(o.order_id))
         .map(o => {
           const action = statusActionsInPeriod.get(o.order_id)!;
-          return { ...o, confirmation_status: action.lastStatus || o.confirmation_status };
+          return { ...o, confirmation_status: action.lastStatus };
         });
     }
+
     if (sellerFilter !== "all") filtered = filtered.filter(o => o.seller_id === sellerFilter);
     if (productFilter !== "all") filtered = filtered.filter(o => o.product_name === productFilter);
     return filtered;
-  }, [orders, statusActionsInPeriod, sellerFilter, productFilter]);
+  }, [orders, statusActionsInPeriod, sellerFilter, productFilter, dateRange, dateField]);
+
+  // Statuses that indicate an order reached (and passed through) the confirmed stage.
+  // Mirrors the dashboard's reachedConfirmedStage logic so both pages agree on the count.
+  const POST_CONFIRM_STATUSES = ['booked', 'shipped', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'];
 
   // Stats — filteredOrders already has confirmation_status overridden to the in-period action,
   // so counts directly reflect "what happened in the selected period (and by the selected agent)".
@@ -176,20 +228,33 @@ export default function ConfirmationAnalytics() {
     const total = filteredOrders.length;
     const delivered = filteredOrders.filter(o => o.delivery_status === "delivered" || o.delivery_status === "paid").length;
 
-    const confirmed = filteredOrders.filter(o => o.confirmation_status === "confirmed").length;
+    // When statusActionsInPeriod is active, confirmation_status was overridden per-history-event
+    // so we only check that field. When null (maximum/no filter), we also count orders that
+    // "passed through" confirmed stage via confirmed_at or delivery progression — same as dashboard.
+    const confirmed = filteredOrders.filter(o =>
+      o.confirmation_status === "confirmed" ||
+      (!statusActionsInPeriod && (
+        Boolean((o as any).confirmed_at) ||
+        POST_CONFIRM_STATUSES.includes(o.delivery_status || "")
+      ))
+    ).length;
     const cancelled = filteredOrders.filter(o => o.confirmation_status === "cancelled").length;
     const postponed = filteredOrders.filter(o => o.confirmation_status === "postponed").length;
 
-    // Treated = total status-change actions (not just distinct orders) within filters.
+    // Treated = distinct orders that had at least one status-change action within filters.
+    // We count distinct order_ids (not raw event count) so an order touched 3x counts once.
     const filteredOrderIds = new Set(filteredOrders.map(o => o.order_id));
-    const treated = orderHistory.filter(h => {
-      if (h.field_changed !== "confirmation_status") return false;
-      if (!filteredOrderIds.has(h.order_id)) return false;
-      if (agentFilter !== "all" && h.changed_by !== agentFilter) return false;
-      if (dateRange?.from && new Date(h.created_at) < dateRange.from) return false;
-      if (dateRange?.to && new Date(h.created_at) > dateRange.to) return false;
-      return true;
-    }).length;
+    const treatedIds = new Set<string>();
+    orderHistory.forEach(h => {
+      if (h.field_changed !== "confirmation_status") return;
+      if (!h.new_value) return;
+      if (!filteredOrderIds.has(h.order_id)) return;
+      if (agentFilter !== "all" && h.changed_by !== agentFilter) return;
+      if (dateRange?.from && new Date(h.created_at) < dateRange.from) return;
+      if (dateRange?.to   && new Date(h.created_at) > dateRange.to)   return;
+      treatedIds.add(h.order_id);
+    });
+    const treated = treatedIds.size;
 
     // Claimed = orders that were touched by an agent (status not "new")
     const claimed = filteredOrders.filter(o => (o.agent_id || o.original_agent_id) && o.confirmation_status !== "new").length;
@@ -210,7 +275,49 @@ export default function ConfirmationAnalytics() {
       delivered,
       deliveredRate: deliveryRate,
     };
-  }, [filteredOrders, orderHistory, agentFilter, dateRange]);
+  }, [filteredOrders, orderHistory, agentFilter, dateRange, statusActionsInPeriod]);
+
+  // Confirmed count for display — mirrors dashboard's confirmed_at-based event-date logic
+  // so both pages agree when filtered by "updated" date range.
+  // The history-based statusActionsInPeriod over-counts because it catches re-confirmations
+  // (order originally confirmed before the period, then re-confirmed within it).
+  // Using confirmed_at (set once at first confirmation) eliminates that problem.
+  const confirmedForDisplay = useMemo(() => {
+    const reachedConfirmed = (o: typeof orders[0]) =>
+      o.confirmation_status === "confirmed" ||
+      Boolean((o as any).confirmed_at) ||
+      POST_CONFIRM_STATUSES.includes(o.delivery_status || "");
+
+    if (dateRange?.from && dateField === "updated") {
+      const from = startOfDay(dateRange.from);
+      const to   = endOfDay(dateRange.to ?? dateRange.from);
+      const confirmed = orders.filter(o => {
+        if (!reachedConfirmed(o)) return false;
+        if (agentFilter   !== "all" && o.agent_id !== agentFilter && (o as any).original_agent_id !== agentFilter) return false;
+        if (sellerFilter  !== "all" && o.seller_id !== sellerFilter) return false;
+        if (productFilter !== "all" && o.product_name !== productFilter) return false;
+        const eventDate = new Date((o as any).confirmed_at || o.updated_at);
+        return eventDate >= from && eventDate <= to;
+      });
+      return {
+        total:      confirmed.length,
+        byWhatsApp: confirmed.filter(o => (o as any).confirmation_channel === "whatsapp").length,
+      };
+    }
+
+    // Maximum / "created" mode — use filteredOrders with reachedConfirmedStage normalisation
+    const confirmed = filteredOrders.filter(o =>
+      o.confirmation_status === "confirmed" ||
+      (!statusActionsInPeriod && (
+        Boolean((o as any).confirmed_at) ||
+        POST_CONFIRM_STATUSES.includes(o.delivery_status || "")
+      ))
+    );
+    return {
+      total:      confirmed.length,
+      byWhatsApp: confirmed.filter(o => (o as any).confirmation_channel === "whatsapp").length,
+    };
+  }, [orders, filteredOrders, dateRange, dateField, agentFilter, sellerFilter, productFilter, statusActionsInPeriod]);
 
   // Time-based KPIs: First Call Avg & Handling Time
   const timeStats = useMemo(() => {
@@ -469,6 +576,24 @@ export default function ConfirmationAnalytics() {
           allLabel="All Products"
           className="w-[160px]"
         />
+        {/* Date field toggle: Created / Updated */}
+        <div className="flex items-center gap-0 rounded-lg border overflow-hidden h-9">
+          {(["created", "updated"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setDateField(f)}
+              className={cn(
+                "px-3 h-full text-xs font-medium transition-colors",
+                dateField === f
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+            >
+              {f === "created" ? "Created" : "Updated"}
+            </button>
+          ))}
+        </div>
+
         <DatePresetFilter
           dateRange={dateRange}
           onDateRangeChange={setDateRange}
@@ -486,14 +611,27 @@ export default function ConfirmationAnalytics() {
 
       {/* Daily Confirmation Report (includes merged Agent Performance Breakdown) */}
       <DailyConfirmationReport
-        orders={filteredOrders.map(o => ({
-          agent_id: o.agent_id,
-          original_agent_id: o.original_agent_id,
-          confirmation_status: o.confirmation_status,
-          postpone_date: o.postpone_date,
-        }))}
+        orders={filteredOrders.map(o => {
+          // When no period/agent filter is active (statusActionsInPeriod null), normalize
+          // orders that passed through confirmed stage so DailyConfirmationReport counts them.
+          const effectiveStatus = (
+            !statusActionsInPeriod && o.confirmation_status !== "confirmed" && (
+              Boolean((o as any).confirmed_at) ||
+              POST_CONFIRM_STATUSES.includes(o.delivery_status || "")
+            )
+          ) ? "confirmed" : o.confirmation_status;
+          return {
+            agent_id: o.agent_id,
+            original_agent_id: o.original_agent_id,
+            confirmation_status: effectiveStatus,
+            confirmation_channel: (o as any).confirmation_channel ?? null,
+            postpone_date: o.postpone_date,
+          };
+        })}
         profileNameMap={profileNameMap}
         agentIds={agentIds}
+        totalConfirmed={confirmedForDisplay.total}
+        totalByWhatsApp={confirmedForDisplay.byWhatsApp}
         treatedOrders={stats.treated}
         firstCallAvg={timeStats.firstCallAvg}
         handlingTime={timeStats.handlingTime}

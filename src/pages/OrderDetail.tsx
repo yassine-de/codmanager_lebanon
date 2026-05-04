@@ -3,7 +3,7 @@ import { ArrowLeft, Phone, MapPin, Calendar, StickyNote, Loader2, Truck } from "
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { mockOrders } from "@/lib/data";
-import { format } from "date-fns";
+import { formatPKT as format } from "@/lib/timezone";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";

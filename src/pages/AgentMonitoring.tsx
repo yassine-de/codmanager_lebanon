@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Activity, Timer, AlertTriangle, Trophy, Turtle } from "lucide-react";
 import { Link } from "react-router-dom";
-import { formatDistanceStrict, format } from "date-fns";
+import { formatDistanceStrict } from "date-fns";
+import { formatPKT as format } from "@/lib/timezone";
 
 type Activity = {
   id: string;
