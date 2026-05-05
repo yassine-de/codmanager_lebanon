@@ -435,14 +435,16 @@ export default function FollowUps() {
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <ClipboardCheck className="h-4 w-4 text-primary flex-shrink-0" />
-            <h1 className="text-base font-bold leading-tight tracking-tight">Follow Ups</h1>
-            {!isLoading && (
-              <span className="text-xs text-muted-foreground">
-                — {enriched.length.toLocaleString()} orders
-              </span>
-            )}
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary/10 border border-primary/20 flex-shrink-0">
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold leading-tight tracking-tight">Follow Ups</h1>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isLoading ? "Loading…" : `${enriched.length.toLocaleString()} orders tracked in real-time`}
+              </p>
+            </div>
           </div>
           {isFetching && !isLoading && (
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
