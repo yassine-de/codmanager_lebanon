@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Package, CheckCircle2, XCircle, Truck, BarChart2,
   ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight,
-  TrendingUp, TrendingDown, AlertCircle,
+  TrendingUp, TrendingDown, AlertCircle, PhoneMissed,
 } from "lucide-react";
 import {
   startOfDayPKT as startOfDay,
@@ -32,7 +32,7 @@ type Order = {
 };
 
 type SortDir = "asc" | "desc";
-type ProductSortField = "name" | "total" | "confirmed" | "confRate" | "delivered" | "delRate" | "cancelled";
+type ProductSortField = "name" | "total" | "confirmed" | "confRate" | "delivered" | "delRate" | "cancelled" | "wrongNumber";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -61,20 +61,20 @@ function fmtPct(n: number): string {
 }
 
 function rateColor(rate: number): string {
-  if (rate >= 70) return "hsl(155, 50%, 42%)";
-  if (rate >= 40) return "hsl(38, 90%, 55%)";
-  return "hsl(0, 65%, 52%)";
+  if (rate >= 50) return "hsl(155, 50%, 42%)";           // green
+  if (rate >= 20) return "hsl(25, 65%, 42%)";            // marron
+  return "hsl(0, 65%, 52%)";                             // red
 }
 
 function rateBadgeClass(rate: number): string {
-  if (rate >= 70) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
-  if (rate >= 40) return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300";
+  if (rate >= 50) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
+  if (rate >= 20) return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
   return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
 }
 
 function rateGradient(rate: number): string {
-  if (rate >= 70) return "from-emerald-500 to-green-400";
-  if (rate >= 40) return "from-amber-500 to-yellow-400";
+  if (rate >= 50) return "from-emerald-500 to-green-400";
+  if (rate >= 20) return "from-orange-700 to-amber-600";  // marron gradient
   return "from-red-500 to-rose-400";
 }
 
@@ -224,14 +224,17 @@ export default function SellerProductAnalytics() {
     ).length;
     const cancelled = filteredOrders.filter((o) => CANCELLED_STATUSES.includes(o.confirmation_status)).length;
     const delivered = filteredOrders.filter((o) => DELIVERED_STATUSES.includes(o.delivery_status || "")).length;
+    const wrongNumber = filteredOrders.filter((o) => o.confirmation_status === "wrong_number").length;
     return {
       total,
       confirmed,
       cancelled,
       delivered,
+      wrongNumber,
       confRate: pct(confirmed, total),
       delRate: pct(delivered, confirmed),
       cancelRate: pct(cancelled, total),
+      wrongNumberRate: pct(wrongNumber, total),
     };
   }, [filteredOrders]);
 
@@ -239,12 +242,12 @@ export default function SellerProductAnalytics() {
 
   const productRows = useMemo(() => {
     const map: Record<string, {
-      total: number; confirmed: number; delivered: number; cancelled: number;
+      total: number; confirmed: number; delivered: number; cancelled: number; wrongNumber: number;
       reasons: Record<string, number>;
     }> = {};
     filteredOrders.forEach((o) => {
       const name = o.product_name || "Unknown";
-      if (!map[name]) map[name] = { total: 0, confirmed: 0, delivered: 0, cancelled: 0, reasons: {} };
+      if (!map[name]) map[name] = { total: 0, confirmed: 0, delivered: 0, cancelled: 0, wrongNumber: 0, reasons: {} };
       map[name].total++;
       if (
         CONFIRMED_STATUSES.includes(o.confirmation_status) ||
@@ -256,6 +259,7 @@ export default function SellerProductAnalytics() {
         const reason = o.cancel_reason?.trim() || "Not specified";
         map[name].reasons[reason] = (map[name].reasons[reason] || 0) + 1;
       }
+      if (o.confirmation_status === "wrong_number") map[name].wrongNumber++;
     });
     return Object.entries(map).map(([name, d]) => ({
       name,
@@ -263,6 +267,7 @@ export default function SellerProductAnalytics() {
       confirmed: d.confirmed,
       delivered: d.delivered,
       cancelled: d.cancelled,
+      wrongNumber: d.wrongNumber,
       confRate: pct(d.confirmed, d.total),
       delRate: pct(d.delivered, d.confirmed),
       cancelRate: pct(d.cancelled, d.total),
@@ -378,7 +383,7 @@ export default function SellerProductAnalytics() {
       ) : (
         <>
           {/* ── Section 1: KPI Cards ─────────────────────────────────────── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <KPICard
               title="Total Orders"
               value={kpis.total}
@@ -419,6 +424,17 @@ export default function SellerProductAnalytics() {
               colorIcon="text-red-600 dark:text-red-300"
               gradient="from-red-500 to-rose-400"
               delay={150}
+              pool={kpis.total}
+            />
+            <KPICard
+              title="Wrong Numbers"
+              value={kpis.wrongNumber}
+              subtitle={fmtPct(kpis.wrongNumberRate) + " rate"}
+              icon={PhoneMissed}
+              colorBg="bg-slate-100 dark:bg-slate-800/60"
+              colorIcon="text-slate-500 dark:text-slate-400"
+              gradient="from-slate-500 to-slate-400"
+              delay={200}
               pool={kpis.total}
             />
           </div>
@@ -486,7 +502,8 @@ export default function SellerProductAnalytics() {
                           { key: "confRate",  label: "Conf. Rate",   align: "right" },
                           { key: "delivered", label: "Delivered",    align: "right" },
                           { key: "delRate",   label: "Del. Rate",    align: "right" },
-                          { key: "cancelled", label: "Cancelled",    align: "right" },
+                          { key: "cancelled",    label: "Cancelled",      align: "right" },
+                          { key: "wrongNumber",  label: "Wrong Numbers",  align: "right" },
                         ] as { key: ProductSortField; label: string; align: string }[]
                       ).map(({ key, label, align }) => (
                         <th
@@ -562,6 +579,10 @@ export default function SellerProductAnalytics() {
                             <td className="py-2.5 px-3 text-right tabular-nums text-red-600 dark:text-red-400 font-medium">
                               {row.cancelled.toLocaleString()}
                             </td>
+                            {/* Wrong Numbers */}
+                            <td className="py-2.5 px-3 text-right tabular-nums text-slate-500 dark:text-slate-400 font-medium">
+                              {row.wrongNumber > 0 ? row.wrongNumber.toLocaleString() : <span className="text-muted-foreground/40">—</span>}
+                            </td>
                             {/* Expand icon */}
                             <td className="py-2.5 pl-2 text-right">
                               {row.cancelled > 0 && (
@@ -578,7 +599,7 @@ export default function SellerProductAnalytics() {
                           {/* ── Expanded: cancellation reasons for this product ── */}
                           {isExpanded && row.cancelled > 0 && (
                             <tr className="border-b border-border/40">
-                              <td colSpan={9} className="px-4 pt-2 pb-4 bg-muted/40">
+                              <td colSpan={10} className="px-4 pt-2 pb-4 bg-muted/40">
                                 <div className="flex items-center gap-2 mb-3">
                                   <AlertCircle className="h-3.5 w-3.5 text-red-500" />
                                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
