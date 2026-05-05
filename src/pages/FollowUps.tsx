@@ -35,9 +35,6 @@ import {
   Activity,
   Pencil,
   History,
-  Truck,
-  PackageCheck,
-  Hourglass,
   X,
   RefreshCw,
   RotateCcw,
@@ -301,19 +298,6 @@ export default function FollowUps() {
 
   const enriched = useMemo(() => rows.map((r) => ({ ...r, segment: computeSegment(r) })), [rows]);
 
-  const kpis = useMemo(() => {
-    const total     = enriched.length;
-    const shipped   = enriched.filter((r) => ["shipped","in_transit","with_courier","out_for_delivery"].includes(r.delivery_status ?? "")).length;
-    const delivered = enriched.filter((r) => r.delivery_status === "delivered").length;
-    const pending   = enriched.filter((r) => r.follow_up_status !== "closed").length;
-    return {
-      total, shipped, delivered, pending,
-      shippedPct:   total > 0 ? Math.round((shipped   / total) * 100) : 0,
-      deliveredPct: total > 0 ? Math.round((delivered / total) * 100) : 0,
-      pendingPct:   total > 0 ? Math.round((pending   / total) * 100) : 0,
-    };
-  }, [enriched]);
-
   const segCounts = useMemo(() => {
     const c = { failed_attempt: 0, delayed: 0, on_going: 0, none: 0, returned: 0, re_attempted: 0, no_answer: 0 };
     for (const r of enriched) {
@@ -468,14 +452,6 @@ export default function FollowUps() {
               Syncing…
             </div>
           )}
-        </div>
-
-        {/* ── KPIs ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KPICard icon={Truck}       label="Total Orders"   value={kpis.total}     sub="Synced to ORIO"            pct={100}               tone="muted"   />
-          <KPICard icon={Activity}    label="In Transit"     value={kpis.shipped}   sub={`${kpis.shippedPct}% of total`}   pct={kpis.shippedPct}   tone="info"    />
-          <KPICard icon={PackageCheck} label="Delivered"     value={kpis.delivered} sub={`${kpis.deliveredPct}% of total`} pct={kpis.deliveredPct} tone="success" />
-          <KPICard icon={Hourglass}   label="Need Action"    value={kpis.pending}   sub={`${kpis.pendingPct}% pending`}    pct={kpis.pendingPct}   tone="warning" />
         </div>
 
         {/* ── Segment tabs ── */}
@@ -1681,57 +1657,3 @@ function SortableColumnItem({ id, label, visible, onToggle }: { id: ColumnKey; l
   );
 }
 
-/* ── KPI Card ── */
-function KPICard({
-  icon: Icon, label, value, sub, pct, tone,
-}: {
-  icon: typeof Truck;
-  label: string;
-  value: number;
-  sub: string;
-  pct: number;
-  tone: "muted" | "info" | "success" | "warning";
-}) {
-  const iconCls = {
-    muted:   "bg-muted/80 text-muted-foreground",
-    info:    "bg-[hsl(210,60%,52%)]/12 text-[hsl(210,60%,52%)]",
-    success: "bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)]",
-    warning: "bg-[hsl(25,85%,55%)]/12  text-[hsl(25,85%,55%)]",
-  }[tone];
-
-  const barCls = {
-    muted:   "bg-foreground/20",
-    info:    "bg-[hsl(210,60%,52%)]",
-    success: "bg-[hsl(155,50%,42%)]",
-    warning: "bg-[hsl(25,85%,55%)]",
-  }[tone];
-
-  const borderCls = {
-    muted:   "",
-    info:    "border-t-[hsl(210,60%,52%)]/30",
-    success: "border-t-[hsl(155,50%,42%)]/30",
-    warning: "border-t-[hsl(25,85%,55%)]/30",
-  }[tone];
-
-  return (
-    <Card className={`p-4 hover:shadow-elevated transition-all duration-200 overflow-hidden border-t-2 ${borderCls}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold truncate">{label}</p>
-          <p className="text-2xl font-bold tabular-nums mt-1.5 leading-none">{value.toLocaleString()}</p>
-          <p className="text-[11px] text-muted-foreground mt-1.5 leading-none">{sub}</p>
-        </div>
-        <div className={`p-2 rounded-xl flex-shrink-0 ${iconCls}`}>
-          <Icon className="h-4 w-4" />
-        </div>
-      </div>
-      {/* Progress bar */}
-      <div className="mt-3.5 h-1 rounded-full bg-muted overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${barCls}`}
-          style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
-        />
-      </div>
-    </Card>
-  );
-}

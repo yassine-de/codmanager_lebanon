@@ -3,7 +3,7 @@ import {
   ShoppingCart, CheckCircle2, Truck, DollarSign, XCircle, RotateCcw,
   Sparkles, PhoneOff, CalendarClock, TrendingUp, TrendingDown,
   Package, Copy, PhoneForwarded, Navigation, UserCheck, Banknote,
-  Clock, Store, Award,
+  Clock, Store, Award, Activity, PackageCheck, Hourglass,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, LabelList,
@@ -352,6 +352,31 @@ export default function Dashboard() {
 
   const pct = (val: number, base: number) => base > 0 ? Math.round((val / base) * 100) : 0;
 
+  // ── Follow-Up KPIs (admin only) ──
+  const { data: fuRows = [] } = useQuery({
+    queryKey: ["dashboard-follow-ups-kpis"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_follow_ups_data");
+      if (error) throw error;
+      return (data ?? []) as { delivery_status: string | null; follow_up_status: string }[];
+    },
+    enabled: !isSeller,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+  const fuKpis = useMemo(() => {
+    const total     = fuRows.length;
+    const shipped   = fuRows.filter((r) => ["shipped","in_transit","with_courier","out_for_delivery"].includes(r.delivery_status ?? "")).length;
+    const delivered = fuRows.filter((r) => r.delivery_status === "delivered").length;
+    const needAction = fuRows.filter((r) => r.follow_up_status !== "closed").length;
+    return {
+      total, shipped, delivered, needAction,
+      shippedPct:     total > 0 ? Math.round((shipped    / total) * 100) : 0,
+      deliveredPct:   total > 0 ? Math.round((delivered  / total) * 100) : 0,
+      needActionPct:  total > 0 ? Math.round((needAction / total) * 100) : 0,
+    };
+  }, [fuRows]);
+
   if (isLoading) {
     return <DashboardSkeleton />;
   }
@@ -543,6 +568,19 @@ export default function Dashboard() {
 
         {/* Team status moved to top */}
 
+        {/* ═══════════ FOLLOW-UP OVERVIEW (admin only) ═══════════ */}
+        {!isSeller && (
+          <div className="space-y-3">
+            <SectionHeader icon={Truck} title="Follow-Up Overview" color="text-primary" iconBg="bg-primary/10" delay={340} />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <FuKPICard icon={Truck}       label="Total Orders"   value={fuKpis.total}      sub="Synced to ORIO"                      pct={100}                    tone="muted"   delay={345} />
+              <FuKPICard icon={Activity}    label="In Transit"     value={fuKpis.shipped}    sub={`${fuKpis.shippedPct}% of total`}    pct={fuKpis.shippedPct}     tone="info"    delay={350} />
+              <FuKPICard icon={PackageCheck} label="Delivered"     value={fuKpis.delivered}  sub={`${fuKpis.deliveredPct}% of total`}  pct={fuKpis.deliveredPct}   tone="success" delay={355} />
+              <FuKPICard icon={Hourglass}   label="Need Action"    value={fuKpis.needAction} sub={`${fuKpis.needActionPct}% pending`}  pct={fuKpis.needActionPct}  tone="warning" delay={360} />
+            </div>
+          </div>
+        )}
+
         {/* ═══════════ TOP PERFORMERS ═══════════ */}
         <div className={`grid grid-cols-1 ${!isSeller ? 'lg:grid-cols-2' : ''} gap-4`}>
           {/* Top Sellers - admin only */}
@@ -599,6 +637,64 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Follow-Up KPI Card (used in Follow-Up Overview section) ── */
+function FuKPICard({
+  icon: Icon, label, value, sub, pct, tone, delay = 0,
+}: {
+  icon: typeof Truck;
+  label: string;
+  value: number;
+  sub: string;
+  pct: number;
+  tone: "muted" | "info" | "success" | "warning";
+  delay?: number;
+}) {
+  const iconCls = {
+    muted:   "bg-muted/80 text-muted-foreground",
+    info:    "bg-[hsl(210,60%,52%)]/12 text-[hsl(210,60%,52%)]",
+    success: "bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)]",
+    warning: "bg-[hsl(25,85%,55%)]/12  text-[hsl(25,85%,55%)]",
+  }[tone];
+
+  const barCls = {
+    muted:   "bg-foreground/20",
+    info:    "bg-[hsl(210,60%,52%)]",
+    success: "bg-[hsl(155,50%,42%)]",
+    warning: "bg-[hsl(25,85%,55%)]",
+  }[tone];
+
+  const borderCls = {
+    muted:   "border-t-border",
+    info:    "border-t-[hsl(210,60%,52%)]/30",
+    success: "border-t-[hsl(155,50%,42%)]/30",
+    warning: "border-t-[hsl(25,85%,55%)]/30",
+  }[tone];
+
+  return (
+    <div
+      className={`bg-card rounded-xl border border-t-2 ${borderCls} shadow-soft px-4 py-4 animate-slide-up hover:shadow-elevated hover:-translate-y-0.5 transition-all duration-200 overflow-hidden`}
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold truncate">{label}</p>
+          <p className="text-2xl font-bold tabular-nums mt-1.5 leading-none">{value.toLocaleString()}</p>
+          <p className="text-[11px] text-muted-foreground mt-1.5 leading-none">{sub}</p>
+        </div>
+        <div className={`p-2 rounded-xl flex-shrink-0 ${iconCls}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+      <div className="mt-3.5 h-1 rounded-full bg-muted overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ${barCls}`}
+          style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+        />
       </div>
     </div>
   );
