@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
       .not("orio_order_id", "is", null)
       .not("delivery_status", "in", '("delivered","returned","cancelled","return","rejected")')
       .order("updated_at", { ascending: true, nullsFirst: true })
-      .limit(300);
+      .limit(500);
 
     if (fetchErr) {
       console.error("Error fetching orders:", fetchErr);
