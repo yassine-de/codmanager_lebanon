@@ -32,12 +32,13 @@ type Order = {
   delivery_status: string | null;
   product_name: string;
   seller_id: string;
+  agent_id: string | null;
+  original_agent_id: string | null;
   customer_city: string | null;
   created_at: string;
   confirmed_at: string | null;
   delivered_at: string | null;
   updated_at: string;
-  shipping_company: string | null;
   shipping_status: string | null;
   orio_consignment_no: string | null;
 };
@@ -52,7 +53,7 @@ type AgentSortField = "name" | "confirmed" | "delivered" | "failed" | "rate";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ORDER_SELECT =
-  "id, order_id, confirmation_status, delivery_status, product_name, seller_id, customer_city, created_at, confirmed_at, delivered_at, updated_at, shipping_company, shipping_status, orio_consignment_no";
+  "id, order_id, confirmation_status, delivery_status, product_name, seller_id, agent_id, original_agent_id, customer_city, created_at, confirmed_at, delivered_at, updated_at, shipping_status, orio_consignment_no";
 const PAGE_SIZE = 1000;
 
 const CONFIRMED_DELIVERY_STATUSES = [
@@ -77,6 +78,30 @@ function courierColor(name: string) {
     if (key.includes(k)) return v;
   }
   return { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-700 dark:text-gray-300", accent: "#6b7280" };
+}
+
+// Detect courier name from consignment number prefix or shipping_status
+function detectCourier(o: Pick<Order, "orio_consignment_no" | "shipping_status">): string {
+  const cn = (o.orio_consignment_no || "").toUpperCase().trim();
+  const ss = (o.shipping_status || "").toLowerCase();
+
+  // Check consignment number prefix
+  if (cn.startsWith("MP") || cn.includes("MPX") || cn.includes("MPOSTEX")) return "MPostex";
+  if (cn.startsWith("BL") || cn.includes("BLX") || cn.includes("BLEUX"))   return "Bleux";
+  if (cn.startsWith("LD") || cn.includes("LEO") || cn.includes("LEOPARD")) return "Leopard";
+  if (cn.startsWith("TCS") || cn.includes("TCS"))                           return "TCS";
+  if (cn.startsWith("TR") || cn.includes("TRX") || cn.includes("TRAX"))    return "Trax";
+
+  // Fallback: check shipping_status for courier hints
+  if (ss.includes("mpostex")) return "MPostex";
+  if (ss.includes("bleux"))   return "Bleux";
+  if (ss.includes("leopard")) return "Leopard";
+  if (ss.includes("tcs"))     return "TCS";
+  if (ss.includes("trax"))    return "Trax";
+
+  // If consignment number exists but unknown pattern, label as "Other"
+  if (cn.length > 3) return "Other";
+  return "Unknown";
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -269,7 +294,7 @@ export default function DeliveryAnalytics() {
   // ── Data Queries ─────────────────────────────────────────────────────────────
 
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ["delivery-analytics-orders-v3"],
+    queryKey: ["delivery-analytics-orders-v4"],
     queryFn: fetchAllOrders,
   });
 
@@ -347,7 +372,7 @@ export default function DeliveryAnalytics() {
   const courierRows = useMemo(() => {
     const map: Record<string, { total: number; delivered: number; failed: number; returned: number }> = {};
     filteredOrders.forEach((o) => {
-      const co = o.shipping_company?.trim() || "Unknown";
+      const co = detectCourier(o);
       if (!map[co]) map[co] = { total: 0, delivered: 0, failed: 0, returned: 0 };
       map[co].total++;
       if (DELIVERED_STATUSES.includes(o.delivery_status || "")) map[co].delivered++;
@@ -478,7 +503,7 @@ export default function DeliveryAnalytics() {
   const agentRows = useMemo(() => {
     const map: Record<string, { confirmed: number; delivered: number; failed: number }> = {};
     filteredOrders.forEach((o) => {
-      const agentId = o.seller_id;
+      const agentId = o.agent_id || o.original_agent_id;
       if (!agentId) return;
       if (!map[agentId]) map[agentId] = { confirmed: 0, delivered: 0, failed: 0 };
       if (o.confirmation_status === "confirmed" || CONFIRMED_DELIVERY_STATUSES.includes(o.delivery_status || "")) {
