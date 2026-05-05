@@ -24,6 +24,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUnseen: number, productUnseen: number, supportUnread: number, agentNewOrders: number, pendingAdjustments: number, followUpPending: number) => [
   { title: "dashboard", url: "/", icon: LayoutDashboard },
   { title: "orders", url: "/orders", icon: ShoppingCart, badge: orderCount, permission: "access_to_orders", sellerVisible: true },
+  { title: "analytics", url: "/seller-analytics", icon: BarChart3, sellerOnly: true, beta: true },
   { title: "Follow Ups", url: "/follow-ups", icon: ClipboardCheck, adminOnly: true },
   { title: "products", url: "/products", icon: BoxIcon, permission: "access_to_products", sellerVisible: true, badge: productUnseen > 0 ? productUnseen : undefined },
   
@@ -35,7 +36,6 @@ const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUn
   { title: "sourcing", url: "/seller-sourcing", icon: Package2, sellerOnly: true, badge: sourcingUnseen > 0 ? sourcingUnseen : undefined },
   { title: "sheets", url: "/sheets", icon: FileSpreadsheet, sellerOnly: true },
   { title: "simulation", url: "/simulation", icon: Calculator, sellerOnly: true },
-  { title: "analytics", url: "/seller-analytics", icon: BarChart3, sellerOnly: true },
   { title: "settings", url: "/seller-settings", icon: Settings, sellerOnly: true },
   { title: "My Dashboard", url: "/agent-dashboard", icon: LayoutDashboard, agentOnly: true },
   { title: "Process Orders", url: "/agent-orders", icon: Play, agentOnly: true, badge: agentNewOrders > 0 ? agentNewOrders : undefined },
@@ -319,6 +319,11 @@ export function AppSidebar() {
                         {!collapsed && item.badge != null && (
                           <span className="ml-auto inline-flex items-center justify-center rounded-md bg-primary/90 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground min-w-[20px]">
                             {item.badge.toLocaleString()}
+                          </span>
+                        )}
+                        {!collapsed && (item as any).beta && (
+                          <span className="ml-auto inline-flex items-center justify-center rounded-md bg-violet-500/20 text-violet-500 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide border border-violet-500/30">
+                            BETA
                           </span>
                         )}
                         {collapsed && item.badge != null && (

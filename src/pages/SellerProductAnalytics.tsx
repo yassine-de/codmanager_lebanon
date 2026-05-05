@@ -1,9 +1,5 @@
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell, PieChart, Pie, Legend,
-} from "recharts";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { Button } from "@/components/ui/button";
@@ -191,6 +187,7 @@ export default function SellerProductAnalytics() {
   const [showAllProducts, setShowAllProducts] = useState(false);
 
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
+  const [showAllReasons, setShowAllReasons] = useState(false);
 
   // ── Data Fetch ────────────────────────────────────────────────────────────
 
@@ -672,67 +669,53 @@ export default function SellerProductAnalytics() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Bar list */}
-                <div className="space-y-3">
-                  {globalReasons.map(({ reason, count, pct: p }, i) => (
-                    <div key={reason} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: REASON_COLORS[i % REASON_COLORS.length] }} />
-                          <span className="font-medium text-foreground">{reason}</span>
-                        </div>
-                        <div className="flex items-center gap-2 tabular-nums">
-                          <span className="text-muted-foreground">{count}</span>
-                          <span className="font-bold w-12 text-right" style={{ color: REASON_COLORS[i % REASON_COLORS.length] }}>
-                            {fmtPct(p)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(p, 100)}%`, backgroundColor: REASON_COLORS[i % REASON_COLORS.length] }}
+              <div className="space-y-3">
+                {(showAllReasons ? globalReasons : globalReasons.slice(0, 5)).map(({ reason, count, pct: p }, i) => (
+                  <div key={reason} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: REASON_COLORS[i % REASON_COLORS.length] }}
                         />
+                        <span className="font-medium text-foreground truncate">{reason}</span>
+                      </div>
+                      <div className="flex items-center gap-3 tabular-nums flex-shrink-0 ml-3">
+                        <span className="text-muted-foreground">{count} orders</span>
+                        <span
+                          className="font-bold w-11 text-right"
+                          style={{ color: REASON_COLORS[i % REASON_COLORS.length] }}
+                        >
+                          {fmtPct(p)}
+                        </span>
                       </div>
                     </div>
-                  ))}
-                </div>
-
-                {/* Pie chart */}
-                {globalReasons.length > 1 && (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie
-                        data={globalReasons}
-                        dataKey="count"
-                        nameKey="reason"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={85}
-                        paddingAngle={3}
-                      >
-                        {globalReasons.map((_, i) => (
-                          <Cell key={i} fill={REASON_COLORS[i % REASON_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(v: number, _: string, entry: any) => [
-                          `${v} orders (${fmtPct(entry.payload.pct)})`,
-                          entry.payload.reason,
-                        ]}
-                        contentStyle={{
-                          borderRadius: "12px",
-                          border: "1px solid hsl(var(--border))",
-                          fontSize: "12px",
-                          background: "hsl(var(--card))",
-                        }}
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(p, 100)}%`, backgroundColor: REASON_COLORS[i % REASON_COLORS.length] }}
                       />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
+                    </div>
+                  </div>
+                ))}
               </div>
+
+              {globalReasons.length > 5 && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1.5"
+                    onClick={() => setShowAllReasons((v) => !v)}
+                  >
+                    {showAllReasons ? (
+                      <><ChevronUp className="h-3.5 w-3.5" /> Show Less</>
+                    ) : (
+                      <><ChevronRight className="h-3.5 w-3.5" /> Show All {globalReasons.length} Reasons</>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
