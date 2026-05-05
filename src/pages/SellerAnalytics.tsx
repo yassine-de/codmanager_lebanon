@@ -313,13 +313,14 @@ export default function SellerAnalytics() {
   const deliveryKPIs = useMemo(() => {
     const pool = filteredOrders.filter(reachedConfirmedStage);
     const poolCount = pool.length;
+    const booked = pool.filter((o) => o.delivery_status === "booked").length;
     const shipped = pool.filter((o) => SHIPPED_STATUSES.includes(o.delivery_status || "")).length;
     const delivered = pool.filter((o) => DELIVERED_STATUSES.includes(o.delivery_status || "")).length;
     const failedAttempt = pool.filter((o) => o.delivery_status === "failed_attempt").length;
     const returned = pool.filter((o) => o.delivery_status === "returned").length;
     const inReturnProcess = pool.filter((o) => o.delivery_status === "ready_for_return").length;
     const delRate = pct(delivered, poolCount);
-    return { poolCount, shipped, delivered, failedAttempt, returned, inReturnProcess, delRate };
+    return { poolCount, booked, shipped, delivered, failedAttempt, returned, inReturnProcess, delRate };
   }, [filteredOrders]);
 
   // ── Product Performance ──────────────────────────────────────────────────────
@@ -718,7 +719,17 @@ export default function SellerAnalytics() {
             iconBg="bg-blue-500/10"
             iconColor="text-blue-500"
           />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+            <KPICard
+              title="Booked"
+              value={deliveryKPIs.booked}
+              icon={Package}
+              color="bg-violet-500/10"
+              iconColor="text-violet-500"
+              gradient="bg-gradient-to-r from-violet-500 to-violet-400"
+              total={deliveryKPIs.poolCount}
+              delay={0}
+            />
             <KPICard
               title="Shipped / In Transit"
               value={deliveryKPIs.shipped}
