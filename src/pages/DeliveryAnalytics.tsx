@@ -47,7 +47,7 @@ type SortDir = "asc" | "desc";
 type DateField = "created" | "updated";
 
 type CourierSortField = "courier" | "total" | "delivered" | "failed" | "returned" | "rate";
-type CitySortField = "city" | "total" | "delivered" | "failed" | "returned" | "inTransit" | "rate";
+type CitySortField = "city" | "total" | "delivered" | "failed" | "returned" | "inProcess" | "rate";
 type AgentSortField = "name" | "confirmed" | "delivered" | "failed" | "rate";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -405,15 +405,20 @@ export default function DeliveryAnalytics() {
   // ── By City ──────────────────────────────────────────────────────────────────
 
   const cityRows = useMemo(() => {
-    const map: Record<string, { total: number; delivered: number; failed: number; returned: number; inTransit: number }> = {};
+    const map: Record<string, { total: number; delivered: number; failed: number; returned: number; inProcess: number }> = {};
     filteredOrders.forEach((o) => {
       const city = o.customer_city?.trim() || "Unknown";
-      if (!map[city]) map[city] = { total: 0, delivered: 0, failed: 0, returned: 0, inTransit: 0 };
+      if (!map[city]) map[city] = { total: 0, delivered: 0, failed: 0, returned: 0, inProcess: 0 };
       map[city].total++;
       if (DELIVERED_STATUSES.includes(o.delivery_status || "")) map[city].delivered++;
       if (o.delivery_status === "failed_attempt") map[city].failed++;
       if (o.delivery_status === "returned") map[city].returned++;
-      if (SHIPPED_STATUSES.includes(o.delivery_status || "")) map[city].inTransit++;
+      // In Process = booked + shipped/in_transit + failed_attempt (can still be delivered)
+      if (
+        o.delivery_status === "booked" ||
+        SHIPPED_STATUSES.includes(o.delivery_status || "") ||
+        o.delivery_status === "failed_attempt"
+      ) map[city].inProcess++;
     });
     return Object.entries(map)
       .filter(([, d]) => d.total > 0)
@@ -423,7 +428,7 @@ export default function DeliveryAnalytics() {
         delivered: d.delivered,
         failed: d.failed,
         returned: d.returned,
-        inTransit: d.inTransit,
+        inProcess: d.inProcess,
         rate: pct(d.delivered, d.total),
       }));
   }, [filteredOrders]);
@@ -918,7 +923,7 @@ export default function DeliveryAnalytics() {
                           { key: "delivered", label: "Delivered", align: "right" },
                           { key: "failed", label: "Failed", align: "right" },
                           { key: "returned", label: "Returned", align: "right" },
-                          { key: "inTransit", label: "In Transit", align: "right" },
+                          { key: "inProcess", label: "In Process", align: "right" },
                           { key: "rate", label: "Delivery Rate", align: "right" },
                         ] as { key: CitySortField; label: string; align: string }[]
                       ).map(({ key, label, align }) => (
@@ -960,8 +965,8 @@ export default function DeliveryAnalytics() {
                         <td className="py-3 px-3 text-right tabular-nums text-red-600 dark:text-red-400 font-medium">
                           {row.returned.toLocaleString()}
                         </td>
-                        <td className="py-3 px-3 text-right tabular-nums text-blue-600 dark:text-blue-400 font-medium">
-                          {row.inTransit.toLocaleString()}
+                        <td className="py-3 px-3 text-right tabular-nums text-sky-600 dark:text-sky-400 font-medium">
+                          {row.inProcess.toLocaleString()}
                         </td>
                         <td className="py-3 pl-3">
                           <div className="flex items-center justify-end gap-2">
