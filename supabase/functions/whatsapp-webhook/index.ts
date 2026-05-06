@@ -2151,18 +2151,33 @@ Deno.serve(async (req) => {
     }
 
     const entries: any[] = body?.entry ?? [];
+
+    // Collect all incoming message handlers
+    const tasks: Promise<void>[] = [];
     for (const entry of entries) {
       const changes: any[] = entry?.changes ?? [];
       for (const ch of changes) {
         if (ch.field === "messages") {
-          await handleIncoming(ch.value);
+          tasks.push(handleIncoming(ch.value));
         }
       }
     }
-    return new Response(JSON.stringify({ ok: true }), {
+
+    // Return 200 to WhatsApp/Meta IMMEDIATELY — must happen within ~5s
+    // or Meta will retry the webhook causing duplicate AI invocations.
+    // EdgeRuntime.waitUntil keeps the function alive to finish processing
+    // (batch wait + AI call) without blocking the HTTP response.
+    const res = new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+    if (tasks.length > 0) {
+      // @ts-ignore — Deno Deploy / Supabase Edge Runtime specific API
+      EdgeRuntime.waitUntil(
+        Promise.all(tasks).catch((e) => errLog("background task error", (e as Error).message))
+      );
+    }
+    return res;
   } catch (e) {
     errLog("fatal webhook error", (e as Error).message);
     // Still return 200 so Meta doesn't retry/disable us.
