@@ -109,7 +109,7 @@ const followUpStatusStyle: Record<string, string> = {
   failed_attempts: "bg-[hsl(15,75%,52%)]/12   text-[hsl(15,75%,52%)]   border-[hsl(15,75%,52%)]/25",
   delayed:         "bg-[hsl(38,90%,48%)]/12   text-[hsl(38,90%,48%)]   border-[hsl(38,90%,48%)]/25",
   re_attempted:    "bg-[hsl(270,50%,55%)]/12  text-[hsl(270,50%,55%)]  border-[hsl(270,50%,55%)]/25",
-  no_answer:       "bg-[hsl(0,65%,52%)]/12    text-[hsl(0,65%,52%)]    border-[hsl(0,65%,52%)]/25",
+  no_answer:       "bg-[hsl(220,60%,52%)]/12  text-[hsl(220,60%,52%)]  border-[hsl(220,60%,52%)]/25",
   refused:         "bg-[hsl(340,65%,45%)]/12  text-[hsl(340,65%,45%)]  border-[hsl(340,65%,45%)]/25",
   /* legacy */
   contacted_courier: "bg-[hsl(210,60%,52%)]/12 text-[hsl(210,60%,52%)]  border-[hsl(210,60%,52%)]/25",
@@ -129,7 +129,7 @@ const deliveryStatusStyle: Record<string, string> = {
   delivered:        "bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)] border-[hsl(155,50%,42%)]/25",
   returned:         "bg-[hsl(0,65%,52%)]/12   text-[hsl(0,65%,52%)]   border-[hsl(0,65%,52%)]/25",
   cancelled:        "bg-[hsl(0,65%,52%)]/12   text-[hsl(0,65%,52%)]   border-[hsl(0,65%,52%)]/25",
-  failed_attempt:   "bg-[hsl(0,65%,52%)]/12   text-[hsl(0,65%,52%)]   border-[hsl(0,65%,52%)]/25",
+  failed_attempt:   "bg-[hsl(25,85%,55%)]/12  text-[hsl(25,85%,55%)]  border-[hsl(25,85%,55%)]/25",
   ready_for_return: "bg-[hsl(15,75%,55%)]/12  text-[hsl(15,75%,55%)]  border-[hsl(15,75%,55%)]/25",
   rejected:         "bg-[hsl(0,65%,52%)]/12   text-[hsl(0,65%,52%)]   border-[hsl(0,65%,52%)]/25",
 };
@@ -186,13 +186,13 @@ const segmentMeta: Record<
   "failed_attempt" | "delayed" | "on_going",
   { label: string; color: string; chip: string; icon: typeof AlertTriangle }
 > = {
-  failed_attempt: { label: "Failed Attempt", color: "hsl(0,65%,52%)",   chip: "bg-[hsl(0,65%,52%)]/15 text-[hsl(0,65%,52%)]",   icon: AlertTriangle },
+  failed_attempt: { label: "Failed Attempt", color: "hsl(25,85%,55%)",  chip: "bg-[hsl(25,85%,55%)]/15 text-[hsl(25,85%,55%)]",  icon: AlertTriangle },
   delayed:        { label: "Delayed",        color: "hsl(25,85%,55%)",  chip: "bg-[hsl(25,85%,55%)]/15 text-[hsl(25,85%,55%)]",  icon: Clock },
   on_going:       { label: "On Going",       color: "hsl(210,60%,52%)", chip: "bg-[hsl(210,60%,52%)]/15 text-[hsl(210,60%,52%)]", icon: Activity },
 };
 
 function rowAccentStyle(row: FollowUpRow & { segment: "failed_attempt" | "delayed" | "on_going" | null }) {
-  if (row.segment === "failed_attempt") return { boxShadow: "inset 3px 0 0 hsl(0 65% 52% / 0.6)" };
+  if (row.segment === "failed_attempt") return { boxShadow: "inset 3px 0 0 hsl(25 85% 55% / 0.6)" };
   if (row.segment === "delayed")        return { boxShadow: "inset 3px 0 0 hsl(25 85% 55% / 0.6)" };
   if (row.segment === "on_going")       return { boxShadow: "inset 3px 0 0 hsl(210 60% 52% / 0.5)" };
   if (row.delivery_status === "delivered") return { boxShadow: "inset 3px 0 0 hsl(155 50% 42% / 0.5)" };
@@ -1172,12 +1172,12 @@ function FollowUpStatusCell({
                   {/* No Answer — opens stepper */}
                   <button
                     onClick={() => setView("attempts")}
-                    className={`w-full flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-[hsl(0,65%,52%)]/8 ${isNoAnswer ? "bg-[hsl(0,65%,52%)]/8" : ""}`}
+                    className={`w-full flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-[hsl(220,60%,52%)]/8 ${isNoAnswer ? "bg-[hsl(220,60%,52%)]/8" : ""}`}
                   >
                     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${followUpStatusStyle["no_answer"]}`}>
                       No Answer {isNoAnswer && doneCount > 0 ? `· ${doneCount}/${FU_MAX_ATTEMPTS}` : ""}
                     </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-[hsl(0,65%,52%)]/70 -rotate-90 flex-shrink-0" />
+                    <ChevronDown className="h-3.5 w-3.5 text-[hsl(220,60%,52%)]/70 -rotate-90 flex-shrink-0" />
                   </button>
 
                   {/* Refused — opens note input (obligatory) */}
