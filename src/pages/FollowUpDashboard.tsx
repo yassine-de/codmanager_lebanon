@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import OnlineStatusPanel from "@/components/OnlineStatusPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
@@ -115,6 +116,9 @@ export default function FollowUpDashboard() {
         </div>
         <p className="text-muted-foreground text-sm">{quote}</p>
       </div>
+
+      {/* Team Status */}
+      <OnlineStatusPanel />
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
