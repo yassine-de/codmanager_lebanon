@@ -908,6 +908,25 @@ export default function WhatsappInbox() {
     toast.success(next ? "AI auto-reply enabled" : "AI stopped for this conversation");
   };
 
+  const [forcingAi, setForcingAi] = useState(false);
+  const forceAiReply = async () => {
+    if (!selected || !conv) return;
+    setForcingAi(true);
+    try {
+      const { error } = await supabase.functions.invoke("whatsapp-webhook", {
+        body: { force_reply: true, conversation_id: selected },
+      });
+      if (error) throw error;
+      toast.success("AI is now replying…");
+      qc.invalidateQueries({ queryKey: ["wts-convos"] });
+      qc.invalidateQueries({ queryKey: ["wts-messages", selected] });
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to trigger AI reply");
+    } finally {
+      setForcingAi(false);
+    }
+  };
+
   const [forcingAgent, setForcingAgent] = useState(false);
   const forceToAgent = async () => {
     if (!selected || !conv?.order_id) {
@@ -1580,6 +1599,24 @@ export default function WhatsappInbox() {
                 >
                   {aiEnabled ? <Bot className="h-3.5 w-3.5" /> : <BotOff className="h-3.5 w-3.5" />}
                   <span className="hidden md:inline">{aiEnabled ? "AI On" : "AI Off"}</span>
+                </Button>
+
+                {/* Force AI — manually trigger an immediate AI reply */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={forceAiReply}
+                  disabled={forcingAi}
+                  className="h-8 shrink-0 gap-1.5 rounded-full px-3 text-xs font-medium border-violet-500/30 bg-violet-500/10 text-violet-600 hover:bg-violet-500/20 hover:text-violet-700 dark:text-violet-400"
+                  title="Force AI to read the conversation and reply now"
+                >
+                  {forcingAi ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  <span className="hidden md:inline">Force AI</span>
                 </Button>
 
                 {/* Status indicators removed per request */}

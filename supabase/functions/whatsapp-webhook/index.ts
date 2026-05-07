@@ -2191,6 +2191,54 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Force AI reply for a specific conversation — triggered manually by staff.
+    // Skips the batch wait and replies immediately with the latest conversation context.
+    if (body?.force_reply === true && body?.conversation_id) {
+      const convId: string = body.conversation_id;
+      const { data: conv } = await admin
+        .from("whatsapp_conversations")
+        .select("*")
+        .eq("id", convId)
+        .maybeSingle();
+      if (!conv) {
+        return new Response(JSON.stringify({ ok: false, error: "conversation not found" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Ensure AI is enabled for this conversation
+      await admin
+        .from("whatsapp_conversations")
+        .update({ ai_enabled: true })
+        .eq("id", convId);
+
+      let order = null;
+      if (conv.order_id) {
+        const { data: o } = await admin.from("orders").select("*").eq("order_id", conv.order_id).maybeSingle();
+        order = o;
+      }
+      // Build customerText from last few inbound messages
+      const { data: recentMsgs } = await admin
+        .from("whatsapp_messages")
+        .select("body, message_type, direction")
+        .eq("conversation_id", convId)
+        .eq("direction", "in")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      const customerText = (recentMsgs ?? [])
+        .reverse()
+        .map((m: any) => m.body || `[${m.message_type}]`)
+        .filter(Boolean)
+        .join("\n") || "[Staff triggered AI reply]";
+
+      log("force_reply triggered", convId);
+      await aiContinueReply({ conv: { ...conv, ai_enabled: true }, order, customerText });
+      return new Response(JSON.stringify({ ok: true, triggered: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const entries: any[] = body?.entry ?? [];
 
     // Collect all incoming message handlers
