@@ -698,7 +698,7 @@ export default function WhatsappInbox() {
       if (translations[m.id]) return false;
       if ((m.payload as any)?._translation_en) return false;
       if (autoTranslatedRef.current.has(m.id)) return false;
-      // Both directions: use full heuristic (non-Latin script + Roman Urdu hints)
+      // Both directions: non-Latin script OR Roman Urdu hints → auto-translate
       if (!containsNonLatin(m.body) && !needsTranslation(m.body)) return false;
       return true;
     });
