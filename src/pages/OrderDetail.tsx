@@ -2,7 +2,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Phone, MapPin, Calendar, StickyNote, Loader2, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
-import { mockOrders } from "@/lib/data";
 import { formatPKT as format } from "@/lib/timezone";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,11 +12,8 @@ export default function OrderDetail() {
   const navigate = useNavigate();
   const { authUser } = useAuth();
 
-  // Try mock orders first
-  const mockOrder = mockOrders.find(o => o.id === id);
-
-  // Fetch from DB if not in mock (match by order_id)
-  const { data: dbOrder, isLoading } = useQuery({
+  // Always fetch from DB — never use mock data in production
+  const { data: order, isLoading } = useQuery({
     queryKey: ["order-detail", id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -50,7 +46,6 @@ export default function OrderDetail() {
         total: Number(data.total_amount),
         confirmationStatus: data.confirmation_status,
         deliveryStatus: data.delivery_status || "pending",
-        shippingStatus: data.shipping_status,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         confirmedAt: data.confirmed_at,
@@ -71,12 +66,10 @@ export default function OrderDetail() {
         orioSyncedAt: (data as any).orio_synced_at,
       };
     },
-    enabled: !mockOrder && !!id,
+    enabled: !!id,
   });
 
-  const order = mockOrder || dbOrder;
-
-  if (isLoading && !mockOrder) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -93,33 +86,14 @@ export default function OrderDetail() {
     );
   }
 
-  // Normalize for both mock and DB orders
-  const isDbOrder = !mockOrder && !!dbOrder;
-  const customer = isDbOrder ? dbOrder.customer : order.customer;
-  const phone = isDbOrder ? dbOrder.phone : (order as any).phone;
-  const city = isDbOrder ? dbOrder.city : (order as any).city;
-  const address = isDbOrder ? dbOrder.address : (order as any).address;
-  const products = isDbOrder ? dbOrder.products : (order as any).products;
-  const total = isDbOrder ? dbOrder.total : (order as any).total;
-  const createdAt = isDbOrder ? dbOrder.createdAt : (order as any).createdAt;
-  const confirmedAt = isDbOrder ? dbOrder.confirmedAt : (order as any).confirmedAt;
-  const deliveredAt = isDbOrder ? dbOrder.deliveredAt : (order as any).deliveredAt;
-  const notes = isDbOrder ? dbOrder.notes : (order as any).notes;
-  const seller = isDbOrder ? dbOrder.seller : (order as any).seller;
-  const confirmationStatus = isDbOrder ? dbOrder.confirmationStatus : (order as any).confirmationStatus || (order as any).status;
-  const deliveryStatus = isDbOrder ? dbOrder.deliveryStatus : (order as any).deliveryStatus;
-  const shippingCost = isDbOrder ? dbOrder.shippingCost : 0;
-  const cancelReason = isDbOrder ? dbOrder.cancelReason : undefined;
-  const postponeDate = isDbOrder ? dbOrder.postponeDate : undefined;
-  const attemptCount = isDbOrder ? dbOrder.attemptCount : 0;
-  const fragile = isDbOrder ? dbOrder.fragile : false;
-  const offers = isDbOrder ? dbOrder.offers : undefined;
-  const orioOrderId = isDbOrder ? dbOrder.orioOrderId : undefined;
-  const orioConsignmentNo = isDbOrder ? dbOrder.orioConsignmentNo : undefined;
-  const orioShippingStatus = isDbOrder ? dbOrder.orioShippingStatus : undefined;
-  const orioSyncStatus = isDbOrder ? dbOrder.orioSyncStatus : undefined;
-  const orioSyncError = isDbOrder ? dbOrder.orioSyncError : undefined;
-  const orioSyncedAt = isDbOrder ? dbOrder.orioSyncedAt : undefined;
+  const {
+    customer, phone, city, address, products, total,
+    createdAt, confirmedAt, deliveredAt, notes, seller,
+    confirmationStatus, deliveryStatus, shippingCost,
+    cancelReason, postponeDate, attemptCount, fragile, offers,
+    orioOrderId, orioConsignmentNo, orioShippingStatus,
+    orioSyncStatus, orioSyncError, orioSyncedAt,
+  } = order;
 
   return (
     <div className="max-w-3xl space-y-6">
