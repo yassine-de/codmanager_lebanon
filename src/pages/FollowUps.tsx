@@ -917,7 +917,7 @@ const columnWidths: Record<ColumnKey, string> = {
   price:     "92px",
   delivery:  "145px",
   segment:   "160px",
-  days:      "48px",
+  days:      "72px",
   follow_up: "148px",
   note:      "52px",
   created:   "88px",
