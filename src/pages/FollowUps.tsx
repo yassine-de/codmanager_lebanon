@@ -281,8 +281,9 @@ export default function FollowUps() {
   const [noteDialog, setNoteDialog]     = useState<{ orderId: string; currentNote: string; fromStatusChange?: boolean } | null>(null);
   const [noteText, setNoteText]         = useState("");
   const [columns, setColumns]           = useState<ColumnConfig[]>(() => loadColumnConfig());
-  const [sortKey, setSortKey]   = useState<"days" | "created" | "updated" | null>(null);
+  const [sortKey, setSortKey]   = useState<"days" | "created" | "updated" | null>("days");
   const [sortDir, setSortDir]   = useState<"asc" | "desc">("asc");
+  const [filterDays, setFilterDays] = useState<string>("all");
 
   const saveColumns = useCallback((next: ColumnConfig[]) => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
@@ -354,6 +355,17 @@ export default function FollowUps() {
     if (filterSeller     !== "all" && r.seller_id       !== filterSeller)     return false;
     if (filterAgent    !== "all" && r.agent_id        !== filterAgent)    return false;
     if (filterFollowUp !== "all" && r.follow_up_status !== filterFollowUp) return false;
+    if (filterDays !== "all") {
+      const d = r.days_since_shipped ?? -1;
+      if (filterDays === "0"   && d !== 0) return false;
+      if (filterDays === "1"   && d !== 1) return false;
+      if (filterDays === "2"   && d !== 2) return false;
+      if (filterDays === "3"   && d !== 3) return false;
+      if (filterDays === "4"   && d !== 4) return false;
+      if (filterDays === "5"   && d !== 5) return false;
+      if (filterDays === "6"   && d !== 6) return false;
+      if (filterDays === "7+"  && d < 7)  return false;
+    }
     if (dateRange?.from) {
       try {
         const ts = dateField === "created" ? r.order_created_at
@@ -381,7 +393,7 @@ export default function FollowUps() {
       if (!hay.includes(q)) return false;
     }
     return true;
-  }), [enriched, segment, filterDelivery, filterSubStatus, filterSeller, filterAgent, filterFollowUp, search, dateRange, dateField]);
+  }), [enriched, segment, filterDelivery, filterSubStatus, filterSeller, filterAgent, filterFollowUp, filterDays, search, dateRange, dateField]);
 
   // Reset to page 1 whenever filtered result set changes
   useEffect(() => { setPage(1); }, [filtered]);
@@ -411,11 +423,12 @@ export default function FollowUps() {
     (segment !== "all" ? 1 : 0) + (filterDelivery !== "all" ? 1 : 0) +
     (filterSubStatus !== "all" ? 1 : 0) +
     (filterSeller !== "all" ? 1 : 0) + (filterAgent !== "all" ? 1 : 0) +
-    (filterFollowUp !== "all" ? 1 : 0) + (dateRange?.from ? 1 : 0) + (search.trim() ? 1 : 0);
+    (filterFollowUp !== "all" ? 1 : 0) + (filterDays !== "all" ? 1 : 0) +
+    (dateRange?.from ? 1 : 0) + (search.trim() ? 1 : 0);
 
   function clearFilters() {
     setSegment("all"); setFilterDelivery("all"); setFilterSubStatus("all"); setFilterSeller("all");
-    setFilterAgent("all"); setFilterFollowUp("all"); setSearch(""); setDateRange(undefined);
+    setFilterAgent("all"); setFilterFollowUp("all"); setFilterDays("all"); setSearch(""); setDateRange(undefined);
   }
 
   function toggleSort(key: "days" | "created" | "updated") {
@@ -653,6 +666,24 @@ export default function FollowUps() {
               {FOLLOW_UP_STATUSES.map((s) => (
                 <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          {/* Days filter */}
+          <Select value={filterDays} onValueChange={setFilterDays}>
+            <SelectTrigger className="h-8 text-xs w-[120px]">
+              <SelectValue placeholder="Days" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Days</SelectItem>
+              <SelectItem value="0">0 days</SelectItem>
+              <SelectItem value="1">1 day</SelectItem>
+              <SelectItem value="2">2 days</SelectItem>
+              <SelectItem value="3">3 days</SelectItem>
+              <SelectItem value="4">4 days</SelectItem>
+              <SelectItem value="5">5 days</SelectItem>
+              <SelectItem value="6">6 days</SelectItem>
+              <SelectItem value="7+">7+ days</SelectItem>
             </SelectContent>
           </Select>
 
