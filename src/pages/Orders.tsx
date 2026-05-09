@@ -381,7 +381,7 @@ export default function Orders() {
       setIsLoading(true);
       try {
         const COLS = [
-          "order_id", "system_id", "customer_name", "customer_phone", "customer_city",
+          "id", "order_id", "system_id", "customer_name", "customer_phone", "customer_city",
           "customer_address", "product_name", "quantity", "price", "total_amount",
           "confirmation_status", "delivery_status", "confirmation_channel",
           "created_at", "updated_at", "confirmed_at", "delivered_at",
@@ -448,6 +448,7 @@ export default function Orders() {
 
         const mapped: Order[] = ((data as any[]) || []).map((o) => ({
           id: o.order_id,
+          dbId: o.id, // UUID primary key — used for URL navigation
           systemId: o.system_id || undefined,
           customer: o.customer_name,
           phone: o.customer_phone,
@@ -943,7 +944,7 @@ export default function Orders() {
                     "border-b last:border-0 hover:bg-muted/40 cursor-pointer transition-colors duration-150",
                     selectedOrders.has(order.id) && "bg-primary/[0.04]"
                   )}
-                  onClick={() => navigate(`/orders/${order.id}`)}
+                  onClick={() => navigate(`/orders/${(order as any).dbId || order.id}`)}
                 >
                   {isAdmin && (
                     <td className="py-2.5 px-3 w-10" onClick={(e) => e.stopPropagation()}>
@@ -1084,7 +1085,7 @@ export default function Orders() {
             <div
               key={order.id}
               className="p-4 hover:bg-muted/30 cursor-pointer transition-colors active:scale-[0.98]"
-              onClick={() => navigate(`/orders/${order.id}`)}
+              onClick={() => navigate(`/orders/${(order as any).dbId || order.id}`)}
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="font-medium text-sm">{order.id}</span>

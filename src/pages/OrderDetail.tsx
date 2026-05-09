@@ -19,7 +19,7 @@ export default function OrderDetail() {
       const { data, error } = await supabase
         .from("orders")
         .select("*")
-        .eq("order_id", id!)
+        .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
