@@ -98,7 +98,9 @@ Deno.serve(async (req) => {
       .not("orio_order_id", "is", null)
       .not("delivery_status", "in", '("delivered","returned","cancelled","return","rejected")')
       .order("updated_at", { ascending: true, nullsFirst: true })
-      .limit(500);
+      // Use .range() instead of .limit() to bypass PostgREST default max-rows cap (300)
+      // which was starving orders past position 300 in the queue.
+      .range(0, 1499);
 
     if (fetchErr) {
       console.error("Error fetching orders:", fetchErr);
