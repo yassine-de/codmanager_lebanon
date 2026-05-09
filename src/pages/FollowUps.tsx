@@ -784,17 +784,13 @@ export default function FollowUps() {
                         style={{ width: columnWidths[col.key] }}
                         className={`text-left py-2 px-3 font-semibold text-[10px] text-muted-foreground uppercase tracking-widest whitespace-nowrap overflow-hidden ${isCenter ? "text-center" : ""}`}
                       >
-                        {(col.key === "days" || col.key === "created" || col.key === "updated") ? (
+                        {col.key === "days" ? (
                           <button
-                            onClick={() => toggleSort(col.key as "days" | "created" | "updated")}
-                            className={`inline-flex items-center gap-1 hover:text-foreground transition-colors ${isCenter ? "justify-center w-full" : ""} ${sortKey === col.key ? "text-foreground" : ""}`}
+                            onClick={() => toggleSort("days")}
+                            className={`inline-flex items-center gap-1 hover:text-foreground transition-colors justify-center w-full ${sortKey === "days" ? "text-foreground" : ""}`}
                           >
                             {meta.label}
-                            {sortKey === col.key ? (
-                              sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                            ) : (
-                              <ArrowUpDown className="w-3 h-3 opacity-40" />
-                            )}
+                            {sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
                           </button>
                         ) : meta.label}
                       </th>
