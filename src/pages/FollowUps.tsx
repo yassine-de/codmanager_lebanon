@@ -102,8 +102,12 @@ const FU_ACTION_STATUSES = [
   { value: "re_attempted", label: "Re-attempted" },
   { value: "refused",      label: "Refused"      },
 ];
-const FOLLOW_UP_STATUSES = [...FU_TOP_STATUSES, ...FU_ACTION_STATUSES,
+const FOLLOW_UP_STATUSES = [
+  { value: "pending",  label: "Pending"  },
+  ...FU_TOP_STATUSES,
+  ...FU_ACTION_STATUSES,
   { value: "no_answer", label: "No Answer" },
+  { value: "closed",    label: "Closed"    },
 ];
 
 const followUpStatusStyle: Record<string, string> = {
@@ -281,7 +285,7 @@ export default function FollowUps() {
   const [noteDialog, setNoteDialog]     = useState<{ orderId: string; currentNote: string; fromStatusChange?: boolean } | null>(null);
   const [noteText, setNoteText]         = useState("");
   const [columns, setColumns]           = useState<ColumnConfig[]>(() => loadColumnConfig());
-  const [sortKey, setSortKey]   = useState<"days" | "created" | "updated" | null>("days");
+  const [sortKey, setSortKey]   = useState<"days" | "created" | "updated" | null>(null);
   const [sortDir, setSortDir]   = useState<"asc" | "desc">("asc");
   const [filterDays, setFilterDays] = useState<string>("all");
 
@@ -433,7 +437,13 @@ export default function FollowUps() {
 
   function toggleSort(key: "days" | "created" | "updated") {
     if (sortKey === key) {
-      setSortDir(d => d === "asc" ? "desc" : "asc");
+      if (sortDir === "asc") {
+        setSortDir("desc");
+      } else {
+        // third click → clear sort
+        setSortKey(null);
+        setSortDir("asc");
+      }
     } else {
       setSortKey(key);
       setSortDir("asc");
@@ -787,10 +797,15 @@ export default function FollowUps() {
                         {col.key === "days" ? (
                           <button
                             onClick={() => toggleSort("days")}
-                            className={`inline-flex items-center gap-1 hover:text-foreground transition-colors justify-center w-full ${sortKey === "days" ? "text-foreground" : ""}`}
+                            className={`inline-flex items-center gap-1 hover:text-foreground transition-colors justify-center w-full ${sortKey === "days" ? "text-foreground" : "text-muted-foreground"}`}
                           >
                             {meta.label}
-                            {sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                            {sortKey === "days"
+                              ? sortDir === "asc"
+                                ? <ArrowUp className="w-3 h-3" />
+                                : <ArrowDown className="w-3 h-3" />
+                              : <ArrowUpDown className="w-3 h-3 opacity-50" />
+                            }
                           </button>
                         ) : meta.label}
                       </th>
