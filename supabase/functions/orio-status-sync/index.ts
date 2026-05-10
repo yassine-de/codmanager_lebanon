@@ -198,6 +198,7 @@ Deno.serve(async (req) => {
         const updateData: any = {
           orio_shipping_status: orioStatus,
           orio_consignment_no: payload.consigment_no || undefined,
+          orio_synced_at: new Date().toISOString(),
         };
 
         if (mappedStatus && mappedStatus !== order.delivery_status) {
@@ -208,13 +209,15 @@ Deno.serve(async (req) => {
           console.log(`Order ${order.order_id}: ${order.delivery_status} → ${mappedStatus} (ORIO: ${orioStatus})`);
         }
 
-        if (orioStatus !== order.orio_shipping_status || mappedStatus !== order.delivery_status) {
-          const { error: updateErr } = await supabase.from("orders").update(updateData).eq("id", order.id);
+        // Always write back orio_synced_at so the staleness filter advances
+        const { error: updateErr } = await supabase.from("orders").update(updateData).eq("id", order.id);
 
-          if (updateErr) {
-            console.error(`Error updating order ${order.order_id}:`, updateErr);
-            return { order_id: order.order_id, error: updateErr.message };
-          }
+        if (updateErr) {
+          console.error(`Error updating order ${order.order_id}:`, updateErr);
+          return { order_id: order.order_id, error: updateErr.message };
+        }
+
+        if (orioStatus !== order.orio_shipping_status || (mappedStatus && mappedStatus !== order.delivery_status)) {
 
           // Log status change to order_history (single source of truth for billing)
           if (mappedStatus && mappedStatus !== order.delivery_status) {
