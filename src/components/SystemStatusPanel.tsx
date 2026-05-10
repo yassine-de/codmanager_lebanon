@@ -91,6 +91,25 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
     refetchInterval: 30_000,
   });
 
+  // Stale ORIO sync — orders not synced in >30 min (excluding terminal statuses)
+  const { data: staleSyncCount = 0 } = useQuery({
+    queryKey: ["system-stale-orio-sync"],
+    queryFn: async () => {
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { count, error } = await supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .not("orio_order_id", "is", null)
+        .in("delivery_status", ["booked", "shipped", "failed_attempt", "ready_for_return"])
+        .gte("created_at", thirtyDaysAgo)
+        .or(`orio_synced_at.is.null,orio_synced_at.lt.${thirtyMinAgo}`);
+      if (error) throw error;
+      return count || 0;
+    },
+    refetchInterval: 60_000,
+  });
+
   // Pending adjustments
   const { data: pendingAdjustments = 0 } = useQuery({
     queryKey: ["system-pending-adjustments", rangeKey],
@@ -165,6 +184,14 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
       count: stuckPendingCount,
       severity: stuckPendingCount > 0 ? "warning" : "ok",
       icon: <Clock className="w-4 h-4" />,
+      onClick: () => setSyncModalOpen(true),
+    },
+    {
+      id: "stale-orio-sync",
+      label: "Stale ORIO Sync (>30m)",
+      count: staleSyncCount,
+      severity: staleSyncCount > 50 ? "error" : staleSyncCount > 10 ? "warning" : "ok",
+      icon: <Activity className="w-4 h-4" />,
       onClick: () => setSyncModalOpen(true),
     },
     {

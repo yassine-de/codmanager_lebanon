@@ -91,16 +91,42 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch orders that need status sync — oldest updated first so all orders rotate through
-    const { data: orders, error: fetchErr } = await supabase
-      .from("orders")
-      .select("id, order_id, orio_order_id, delivery_status, orio_shipping_status, updated_at")
-      .not("orio_order_id", "is", null)
-      .not("delivery_status", "in", '("delivered","returned","cancelled","return","rejected")')
-      .order("updated_at", { ascending: true, nullsFirst: true })
-      // Use .range() instead of .limit() to bypass PostgREST default max-rows cap (300)
-      // which was starving orders past position 300 in the queue.
-      .range(0, 1499);
+    // Smart fetching with tiered priorities + 30-day cutoff + paginated loop.
+    // Tier rules (an order qualifies if ANY tier matches):
+    //   - booked            → sync every run (no staleness gate)
+    //   - shipped / failed_attempt → sync if last synced > 12 min ago
+    //   - ready_for_return  → sync if last synced > 25 min ago
+    // Hard exclusions:
+    //   - terminal statuses (delivered/returned/cancelled/return/rejected)
+    //   - orders older than 30 days (created_at) — stop polling stale shipments forever
+    const now = Date.now();
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const twelveMinAgo = new Date(now - 12 * 60 * 1000).toISOString();
+    const twentyFiveMinAgo = new Date(now - 25 * 60 * 1000).toISOString();
+
+    const tierFilter =
+      `and(delivery_status.eq.booked),` +
+      `and(delivery_status.in.(shipped,failed_attempt),or(orio_synced_at.is.null,orio_synced_at.lt.${twelveMinAgo})),` +
+      `and(delivery_status.eq.ready_for_return,or(orio_synced_at.is.null,orio_synced_at.lt.${twentyFiveMinAgo}))`;
+
+    const PAGE_SIZE = 1000;
+    const MAX_PAGES = 5; // safety cap → up to 5000 orders/run
+    const orders: any[] = [];
+    let fetchErr: any = null;
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const { data: pageData, error } = await supabase
+        .from("orders")
+        .select("id, order_id, orio_order_id, delivery_status, orio_shipping_status, updated_at, orio_synced_at")
+        .not("orio_order_id", "is", null)
+        .gte("created_at", thirtyDaysAgo)
+        .or(tierFilter)
+        .order("orio_synced_at", { ascending: true, nullsFirst: true })
+        .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+      if (error) { fetchErr = error; break; }
+      if (!pageData || pageData.length === 0) break;
+      orders.push(...pageData);
+      if (pageData.length < PAGE_SIZE) break;
+    }
 
     if (fetchErr) {
       console.error("Error fetching orders:", fetchErr);
@@ -172,6 +198,7 @@ Deno.serve(async (req) => {
         const updateData: any = {
           orio_shipping_status: orioStatus,
           orio_consignment_no: payload.consigment_no || undefined,
+          orio_synced_at: new Date().toISOString(),
         };
 
         if (mappedStatus && mappedStatus !== order.delivery_status) {
@@ -182,13 +209,15 @@ Deno.serve(async (req) => {
           console.log(`Order ${order.order_id}: ${order.delivery_status} → ${mappedStatus} (ORIO: ${orioStatus})`);
         }
 
-        if (orioStatus !== order.orio_shipping_status || mappedStatus !== order.delivery_status) {
-          const { error: updateErr } = await supabase.from("orders").update(updateData).eq("id", order.id);
+        // Always write back orio_synced_at so the staleness filter advances
+        const { error: updateErr } = await supabase.from("orders").update(updateData).eq("id", order.id);
 
-          if (updateErr) {
-            console.error(`Error updating order ${order.order_id}:`, updateErr);
-            return { order_id: order.order_id, error: updateErr.message };
-          }
+        if (updateErr) {
+          console.error(`Error updating order ${order.order_id}:`, updateErr);
+          return { order_id: order.order_id, error: updateErr.message };
+        }
+
+        if (orioStatus !== order.orio_shipping_status || (mappedStatus && mappedStatus !== order.delivery_status)) {
 
           // Log status change to order_history (single source of truth for billing)
           if (mappedStatus && mappedStatus !== order.delivery_status) {
