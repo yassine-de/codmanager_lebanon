@@ -59,10 +59,11 @@ const PAGE_SIZE = 1000;
 
 const CONFIRMED_DELIVERY_STATUSES = [
   "booked", "shipped", "in_transit", "with_courier", "out_for_delivery",
-  "delivered", "paid", "failed_attempt", "returned", "ready_for_return",
+  "delivered", "paid", "failed_attempt", "returned", "return", "ready_for_return",
 ];
 const DELIVERED_STATUSES = ["delivered", "paid"];
 const SHIPPED_STATUSES = ["shipped", "in_transit", "with_courier", "out_for_delivery"];
+const RETURNED_STATUSES = ["returned", "return"];
 
 // Courier color map
 const COURIER_COLORS: Record<string, { bg: string; text: string; accent: string }> = {
@@ -345,20 +346,56 @@ export default function DeliveryAnalytics() {
 
   // ── KPI Calculations ─────────────────────────────────────────────────────────
 
+  // When a date range is active, confirmed/delivered/returned use their own event
+  // dates so we count "confirmed today", "delivered today", "returned today"
+  // accurately — not just orders *created* today that happen to have that status.
+  const eventFilteredPool = useMemo(() => {
+    if (!dateRange?.from) return null;
+    return orders.filter((o) => {
+      if (sellerFilter !== "all" && o.seller_id !== sellerFilter) return false;
+      if (productFilter !== "all" && o.product_name !== productFilter) return false;
+      return true;
+    });
+  }, [orders, sellerFilter, productFilter, dateRange]);
+
   const kpis = useMemo(() => {
     const total = filteredOrders.length;
-    const confirmed = filteredOrders.filter(
-      (o) => o.confirmation_status === "confirmed" || CONFIRMED_DELIVERY_STATUSES.includes(o.delivery_status || "")
-    ).length;
+
+    const pool = eventFilteredPool ?? filteredOrders;
+
+    // Confirmed: use confirmed_at if set, otherwise updated_at
+    const confirmed = pool.filter((o) => {
+      const isConf =
+        o.confirmation_status === "confirmed" ||
+        CONFIRMED_DELIVERY_STATUSES.includes(o.delivery_status || "");
+      if (!isConf) return false;
+      if (!dateRange?.from) return true;
+      return isWithinRange(new Date(o.confirmed_at ?? o.updated_at), dateRange);
+    }).length;
+
     const deliveryPool = filteredOrders.filter((o) =>
       CONFIRMED_DELIVERY_STATUSES.includes(o.delivery_status || "")
     );
     const poolCount = deliveryPool.length;
-    const booked = filteredOrders.filter((o) => o.delivery_status === "booked").length;
+    const booked  = filteredOrders.filter((o) => o.delivery_status === "booked").length;
     const shipped = filteredOrders.filter((o) => SHIPPED_STATUSES.includes(o.delivery_status || "")).length;
-    const delivered = filteredOrders.filter((o) => DELIVERED_STATUSES.includes(o.delivery_status || "")).length;
-    const failedAttempt = filteredOrders.filter((o) => o.delivery_status === "failed_attempt").length;
-    const returned = filteredOrders.filter((o) => o.delivery_status === "returned").length;
+
+    // Delivered: use delivered_at if set, otherwise updated_at
+    const delivered = pool.filter((o) => {
+      if (!DELIVERED_STATUSES.includes(o.delivery_status || "")) return false;
+      if (!dateRange?.from) return true;
+      return isWithinRange(new Date(o.delivered_at ?? o.updated_at), dateRange);
+    }).length;
+
+    // Returned: no returned_at field — use updated_at as proxy
+    // Matches both "returned" and "return" (both values exist in the DB)
+    const returned = pool.filter((o) => {
+      if (!RETURNED_STATUSES.includes(o.delivery_status || "")) return false;
+      if (!dateRange?.from) return true;
+      return isWithinRange(new Date(o.updated_at), dateRange);
+    }).length;
+
+    const failedAttempt  = filteredOrders.filter((o) => o.delivery_status === "failed_attempt").length;
     const inReturnProcess = filteredOrders.filter((o) => o.delivery_status === "ready_for_return").length;
 
     return {
@@ -368,7 +405,7 @@ export default function DeliveryAnalytics() {
       returnRate: pct(returned, poolCount),
       failedAttemptRate: pct(failedAttempt, poolCount),
     };
-  }, [filteredOrders]);
+  }, [filteredOrders, eventFilteredPool, dateRange]);
 
   // ── By Courier ───────────────────────────────────────────────────────────────
 
@@ -380,7 +417,7 @@ export default function DeliveryAnalytics() {
       map[co].total++;
       if (DELIVERED_STATUSES.includes(o.delivery_status || "")) map[co].delivered++;
       if (o.delivery_status === "failed_attempt") map[co].failed++;
-      if (o.delivery_status === "returned") map[co].returned++;
+      if (RETURNED_STATUSES.includes(o.delivery_status || "")) map[co].returned++;
     });
     return Object.entries(map)
       .filter(([, d]) => d.total > 0)
@@ -415,7 +452,7 @@ export default function DeliveryAnalytics() {
       map[city].total++;
       if (DELIVERED_STATUSES.includes(o.delivery_status || "")) map[city].delivered++;
       if (o.delivery_status === "failed_attempt") map[city].failed++;
-      if (o.delivery_status === "returned") map[city].returned++;
+      if (RETURNED_STATUSES.includes(o.delivery_status || "")) map[city].returned++;
       // In Process = booked + shipped/in_transit + failed_attempt (can still be delivered)
       if (
         o.delivery_status === "booked" ||
@@ -468,24 +505,36 @@ export default function DeliveryAnalytics() {
       buckets[key] = { confirmed: 0, delivered: 0, returned: 0 };
     }
 
-    filteredOrders.forEach((o) => {
-      const dateToUse = dateField === "created" ? o.created_at : o.updated_at;
-      const key = format(new Date(dateToUse), "MMM dd");
-      if (buckets[key]) {
-        if (o.confirmation_status === "confirmed" || CONFIRMED_DELIVERY_STATUSES.includes(o.delivery_status || "")) {
-          buckets[key].confirmed++;
-        }
-        if (DELIVERED_STATUSES.includes(o.delivery_status || "")) {
-          buckets[key].delivered++;
-        }
-        if (o.delivery_status === "returned") {
-          buckets[key].returned++;
-        }
+    // Use all orders (seller/product filtered) so event-date buckets are not
+    // constrained by the main date filter — each line uses its own event date.
+    const trendPool = eventFilteredPool ?? filteredOrders;
+
+    trendPool.forEach((o) => {
+      // Confirmed line: use confirmed_at ?? created_at (when confirmed happened)
+      const confDate = format(new Date(o.confirmed_at ?? o.created_at), "MMM dd");
+      if (
+        buckets[confDate] &&
+        (o.confirmation_status === "confirmed" || CONFIRMED_DELIVERY_STATUSES.includes(o.delivery_status || ""))
+      ) {
+        buckets[confDate].confirmed++;
+      }
+
+      // Delivered line: use delivered_at ?? updated_at
+      if (DELIVERED_STATUSES.includes(o.delivery_status || "")) {
+        const delDate = format(new Date(o.delivered_at ?? o.updated_at), "MMM dd");
+        if (buckets[delDate]) buckets[delDate].delivered++;
+      }
+
+      // Returned line: use updated_at (no returned_at field)
+      // Matches both "returned" and "return"
+      if (RETURNED_STATUSES.includes(o.delivery_status || "")) {
+        const retDate = format(new Date(o.updated_at), "MMM dd");
+        if (buckets[retDate]) buckets[retDate].returned++;
       }
     });
 
     return Object.entries(buckets).map(([date, d]) => ({ date, ...d }));
-  }, [filteredOrders, dateField, dateRange]);
+  }, [filteredOrders, eventFilteredPool, dateField, dateRange]);
 
   // ── By Product ───────────────────────────────────────────────────────────────
 

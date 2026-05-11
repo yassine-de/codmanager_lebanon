@@ -288,7 +288,20 @@ export default function SellerAnalytics() {
 
   const confirmationKPIs = useMemo(() => {
     const total = filteredOrders.length;
-    const confirmed = filteredOrders.filter(reachedConfirmedStage);
+    // Use confirmed_at for date-accurate count — avoids inflating count when
+    // dateFieldMode="updated" picks up old confirmed orders recently touched by delivery updates
+    const confirmed = (dateRange?.from
+      ? orders.filter((o) => {
+          if (!reachedConfirmedStage(o)) return false;
+          if (sellerFilter !== "all" && o.seller_id !== sellerFilter) return false;
+          if (productFilter !== "all" && o.product_name !== productFilter) return false;
+          // If confirmed_at available, use it; otherwise fall back to updated_at
+          // (orders confirmed today but missing confirmed_at still have updated_at = today)
+          const dateToCheck = o.confirmed_at ?? o.updated_at;
+          return isWithinRange(new Date(dateToCheck), dateRange);
+        })
+      : filteredOrders.filter(reachedConfirmedStage)
+    );
     const confirmedCount = confirmed.length;
     const whatsapp = confirmed.filter((o) => o.confirmation_channel === "whatsapp").length;
     const agent = confirmed.filter((o) => o.confirmation_channel !== "whatsapp").length;

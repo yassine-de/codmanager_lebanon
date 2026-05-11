@@ -91,7 +91,7 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <AlertTriangle className="w-4 h-4 text-destructive" />
-            ORIO Sync Errors ({failedOrders.length})
+            OR Sync Errors ({failedOrders.length})
           </DialogTitle>
         </DialogHeader>
 

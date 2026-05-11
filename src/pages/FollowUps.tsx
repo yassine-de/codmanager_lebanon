@@ -315,6 +315,19 @@ export default function FollowUps() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: totalCount } = useQuery<number>({
+    queryKey: ["follow-ups-count"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_follow_ups_count");
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+    enabled: !!authUser && ["admin", "agent", "follow_up"].includes(authUser.role),
+    refetchInterval: 30000,
+    staleTime: 25_000,
+    refetchOnWindowFocus: false,
+  });
+
   useEffect(() => {
     const channel = supabase
       .channel("follow-ups-changes")
@@ -518,7 +531,7 @@ export default function FollowUps() {
             <div>
               <h1 className="text-xl font-bold leading-tight tracking-tight">Follow Ups</h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {isLoading ? "Loading…" : `${enriched.length.toLocaleString()} orders tracked in real-time`}
+                {isLoading ? "Loading…" : `${(totalCount ?? enriched.length).toLocaleString()} orders tracked in real-time`}
               </p>
             </div>
           </div>
@@ -544,7 +557,7 @@ export default function FollowUps() {
             All orders
             <span className={`tabular-nums text-[10px] rounded-full px-1.5 py-0.5 font-semibold ${
               segment === "all" ? "bg-white/20" : "bg-muted"
-            }`}>{enriched.length}</span>
+            }`}>{(totalCount ?? enriched.length).toLocaleString()}</span>
           </button>
 
           {(["failed_attempt", "delayed", "on_going"] as const).map((seg) => {
