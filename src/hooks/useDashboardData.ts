@@ -88,8 +88,8 @@ function reachedConfirmedStage(o: DashboardOrder): boolean {
   return o.confirmation_status === 'confirmed';
 }
 
-function getConfirmationEventDate(o: DashboardOrder): Date {
-  return new Date(o.confirmed_at || o.updated_at);
+function getConfirmationEventDate(o: DashboardOrder): Date | null {
+  return o.confirmed_at ? new Date(o.confirmed_at) : null;
 }
 
 function computeKPIs(orders: DashboardOrder[], allOrders?: DashboardOrder[], dateRange?: { from: Date; to: Date }): DashboardKPIs {
@@ -107,7 +107,7 @@ function computeKPIs(orders: DashboardOrder[], allOrders?: DashboardOrder[], dat
   const newOrders = orders.filter(o => o.confirmation_status === 'new').length;
   // Confirmed = orders whose confirmation EVENT happened in this period (confirmed_at)
   const confirmed = dateRange
-    ? source.filter(o => reachedConfirmedStage(o) && inRange(getConfirmationEventDate(o))).length
+    ? source.filter(o => { const d = getConfirmationEventDate(o); return reachedConfirmedStage(o) && d != null && inRange(d); }).length
     : orders.filter(reachedConfirmedStage).length;
   const noAnswer = orders.filter(o => o.confirmation_status === 'no_answer').length;
   const postponed = orders.filter(o => o.confirmation_status === 'postponed').length;
@@ -224,10 +224,11 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
       isInDay(new Date(o.created_at), start, nextDay)
     ).length;
 
-    // Confirmed = orders whose confirmation EVENT happened on this day (confirmed_at)
+    // Confirmed = orders whose confirmation EVENT happened on this day (confirmed_at only — no updated_at fallback)
     const confirmed = orders.filter((o) => {
       if (!reachedConfirmedStage(o)) return false;
-      return isInDay(getConfirmationEventDate(o), start, nextDay);
+      const d = getConfirmationEventDate(o);
+      return d != null && isInDay(d, start, nextDay);
     }).length;
 
     // Delivered = orders that were actually DELIVERED on this day (delivered_at)

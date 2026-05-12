@@ -643,12 +643,46 @@ const AgentOrders = () => {
         });
       }
 
-      const { error: updateError } = await supabase
-        .from("orders")
-        .update(updateData as any)
-        .eq("id", currentOrder.id);
+      // Use SECURITY DEFINER RPC to bypass RLS entirely.
+      // The RPC enforces ownership (agent_id = auth.uid()) internally and
+      // returns 0 rows if a race condition occurred (another agent took it).
+      const { data: updatedRows, error: updateError } = await supabase
+        .rpc("agent_submit_order" as any, {
+          p_order_id:            currentOrder.id,
+          p_confirmation_status: updateData.confirmation_status,
+          p_agent_id:            updateData.agent_id ?? null,
+          p_assigned_at:         updateData.assigned_at ?? null,
+          p_last_activity_at:    updateData.last_activity_at ?? null,
+          p_customer_name:       updateData.customer_name,
+          p_customer_phone:      updateData.customer_phone,
+          p_customer_city:       updateData.customer_city,
+          p_customer_address:    updateData.customer_address,
+          p_product_name:        updateData.product_name,
+          p_quantity:            updateData.quantity,
+          p_price:               updateData.price,
+          p_total_amount:        updateData.total_amount,
+          p_is_manual_price:     updateData.is_manual_price,
+          p_note:                updateData.note,
+          p_attempt_count:       updateData.attempt_count,
+          p_original_agent_id:   updateData.original_agent_id ?? null,
+          p_last_attempt_at:     updateData.last_attempt_at ?? null,
+          p_attempts_today:      updateData.attempts_today ?? null,
+          p_last_attempt_date:   updateData.last_attempt_date ?? null,
+          p_postpone_date:       updateData.postpone_date ?? null,
+          p_postpone_note:       updateData.postpone_note ?? null,
+          p_confirmed_at:        updateData.confirmed_at ?? null,
+          p_delivery_status:     updateData.delivery_status ?? null,
+          p_cancel_reason:       updateData.cancel_reason ?? null,
+        });
 
       if (updateError) throw updateError;
+
+      if (!updatedRows || (updatedRows as any[]).length === 0) {
+        // 0 rows = race condition: order was reclaimed by another agent
+        toast.warning("⚠️ Order was taken by another agent — loading next...");
+        await loadNextOrder();
+        return;
+      }
 
       // Determine action_type and group_id for history
       const groupId = crypto.randomUUID();
