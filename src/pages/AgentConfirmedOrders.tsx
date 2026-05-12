@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Search, Package, MapPin, Pencil, DollarSign, Tag, Store, Video, ExternalLink, Plus, Trash2, CalendarIcon } from "lucide-react";
+import { CheckCircle2, Search, Package, MapPin, Pencil, DollarSign, Tag, Store, Video, ExternalLink, Plus, Trash2, CalendarIcon, PhoneIncoming } from "lucide-react";
 import { addMinutes, isBefore } from "date-fns";
 import { formatPKT as format, startOfDayPKT as startOfDay, isTodayPKT as isToday } from "@/lib/timezone";
 import { useAuth } from "@/contexts/AuthContext";
@@ -77,6 +77,7 @@ const AgentConfirmedOrders = () => {
   const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
   const [editOrder, setEditOrder] = useState<any>(null);
+  const [reclaimingId, setReclaimingId] = useState<string | null>(null);
   const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; product_url: string | null; video_url: string | null }[]>([]);
   const [editForm, setEditForm] = useState<EditForm>({
     customer_name: "",
@@ -237,6 +238,29 @@ const AgentConfirmedOrders = () => {
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const canEdit = (order: any) => !SHIPPED_STATUSES.includes(order.delivery_status || "");
+
+  // Reclaim: original agent claims back an unassigned no_answer order for a callback
+  const handleReclaim = async (order: any) => {
+    setReclaimingId(order.id);
+    try {
+      const { data, error } = await supabase.rpc("reclaim_no_answer_order", { p_order_id: order.id });
+      if (error) throw error;
+      if (!data || (Array.isArray(data) && data.length === 0)) {
+        toast.error("Order is no longer available — another agent may have claimed it");
+        queryClient.invalidateQueries({ queryKey: ["agent-treated-orders", userId] });
+        return;
+      }
+      toast.success(`Order ${order.order_id} reclaimed — you can now update it`);
+      queryClient.invalidateQueries({ queryKey: ["agent-treated-orders", userId] });
+      // Open edit modal with fresh order data
+      const fresh = Array.isArray(data) ? data[0] : data;
+      openEdit({ ...order, agent_id: fresh?.agent_id ?? userId });
+    } catch (e: any) {
+      toast.error(`Reclaim failed: ${e.message}`);
+    } finally {
+      setReclaimingId(null);
+    }
+  };
 
   const openEdit = (order: any) => {
     setEditOrder(order);
@@ -439,11 +463,22 @@ const AgentConfirmedOrders = () => {
                           {format(new Date(order.updated_at), "dd/MM/yy HH:mm")}
                         </TableCell>
                         <TableCell>
-                          {editable && (
+                          {editable && order.confirmation_status === "no_answer" && order.agent_id === null ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-[10px] gap-1 text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
+                              onClick={() => handleReclaim(order)}
+                              disabled={reclaimingId === order.id}
+                            >
+                              <PhoneIncoming className="h-3 w-3" />
+                              {reclaimingId === order.id ? "..." : "Reclaim"}
+                            </Button>
+                          ) : editable ? (
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(order)}>
                               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                             </Button>
-                          )}
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     );

@@ -418,9 +418,16 @@ export default function ConfirmationAnalytics() {
       .sort((a, b) => b.confirmationRate - a.confirmationRate);
   }, [filteredOrders, orderHistory, profileNameMap]);
 
-  // No Answer attempts breakdown
+  // No Answer attempts breakdown — always shows CURRENT state of no_answer orders,
+  // ignoring agent/date filters. Only seller and product filters apply so you see
+  // the real live picture: how many orders are sitting at no_answer at each attempt.
   const noAnswerAttempts = useMemo(() => {
-    const noAnswerOrders = filteredOrders.filter(o => o.confirmation_status === "no_answer");
+    const noAnswerOrders = orders.filter(o => {
+      if (o.confirmation_status !== "no_answer") return false;
+      if (sellerFilter !== "all" && o.seller_id !== sellerFilter) return false;
+      if (productFilter !== "all" && o.product_name !== productFilter) return false;
+      return true;
+    });
     const buckets: Record<number, number> = {};
     noAnswerOrders.forEach(o => {
       const n = Math.max(1, o.attempt_count ?? 1);
@@ -438,7 +445,7 @@ export default function ConfirmationAnalytics() {
       });
     }
     return { rows, total };
-  }, [filteredOrders]);
+  }, [orders, sellerFilter, productFilter]);
 
   // Cancel reasons
   const cancelData = useMemo(() => {

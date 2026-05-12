@@ -33,7 +33,7 @@ const CANCEL_REASONS = [
   { value: "other", label: "📝 Other" },
 ];
 
-const NO_ANSWER_MAX_ATTEMPTS = 9;
+const NO_ANSWER_MAX_ATTEMPTS = 12;
 const RETRY_COOLDOWN_MS = 30 * 60 * 1000; // 30 min
 const RETRY_AGING_MS = 2 * 60 * 60 * 1000; // 2 hours → urgent
 const NEW_TO_RETRY_RATIO = 3; // 3 new then 1 retry
@@ -240,13 +240,12 @@ const AgentOrders = () => {
     const nowIso = new Date().toISOString();
     const cooldownCutoff = new Date(Date.now() - RETRY_COOLDOWN_MS).toISOString();
 
-    // no_answer retries: own orders only, respecting cooldown
+    // no_answer retries: any agent can claim any no_answer order
     let noAnswerQuery = supabase
       .from("orders")
       .select("id", { count: "exact", head: true })
       .eq("confirmation_status", "no_answer")
       .is("agent_id", null)
-      .eq("original_agent_id", authUser.id)
       .lt("attempt_count", NO_ANSWER_MAX_ATTEMPTS)
       .or(`last_attempt_at.is.null,last_attempt_at.lte.${cooldownCutoff}`);
     if (productNames) noAnswerQuery = noAnswerQuery.in("product_name", productNames);
