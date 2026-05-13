@@ -123,7 +123,7 @@ function computeKPIs(orders: DashboardOrder[], allOrders?: DashboardOrder[], dat
   const withCourier = orders.filter(o => o.delivery_status === 'with_courier').length;
   // Delivered = orders DELIVERED in this period (delivered_at event date)
   const delivered = dateRange
-    ? source.filter(o => reachedDeliveredStage(o) && inRange(getDeliveredEventDate(o))).length
+    ? source.filter(o => { const d = getDeliveredEventDate(o); return reachedDeliveredStage(o) && d != null && inRange(d); }).length
     : orders.filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid').length;
   const paid = orders.filter(o => o.delivery_status === 'paid').length;
   // Returned = 'return' (current) OR 'returned' (legacy) OR 'ready_for_return'
@@ -142,7 +142,7 @@ function computeKPIs(orders: DashboardOrder[], allOrders?: DashboardOrder[], dat
   // Revenue (Delivered Amount) = total of orders delivered/paid in this period
   const revenue = dateRange
     ? source
-        .filter(o => reachedDeliveredStage(o) && inRange(getDeliveredEventDate(o)))
+        .filter(o => { const d = getDeliveredEventDate(o); return reachedDeliveredStage(o) && d != null && inRange(d); })
         .reduce((s, o) => s + Number(o.total_amount), 0)
     : orders
         .filter(o => o.delivery_status === 'delivered' || o.delivery_status === 'paid')
@@ -150,7 +150,7 @@ function computeKPIs(orders: DashboardOrder[], allOrders?: DashboardOrder[], dat
   // Paid Amount = total of orders with delivery_status 'paid' in this period (by delivered_at event)
   const paidAmount = dateRange
     ? source
-        .filter(o => o.delivery_status === 'paid' && inRange(getDeliveredEventDate(o)))
+        .filter(o => { const d = getDeliveredEventDate(o); return o.delivery_status === 'paid' && d != null && inRange(d); })
         .reduce((s, o) => s + Number(o.total_amount), 0)
     : orders
         .filter(o => o.delivery_status === 'paid')
@@ -158,7 +158,7 @@ function computeKPIs(orders: DashboardOrder[], allOrders?: DashboardOrder[], dat
   // Pending Amount = delivered (not yet paid) in this period
   const pendingAmount = dateRange
     ? source
-        .filter(o => o.delivery_status === 'delivered' && inRange(getDeliveredEventDate(o)))
+        .filter(o => { const d = getDeliveredEventDate(o); return o.delivery_status === 'delivered' && d != null && inRange(d); })
         .reduce((s, o) => s + Number(o.total_amount), 0)
     : orders
         .filter(o => o.delivery_status === 'delivered')
@@ -190,9 +190,8 @@ function getTreatmentDate(o: DashboardOrder): Date {
 
 // Event date helpers — each metric uses its own actual event timestamp so
 // charts reflect WHEN the event happened, not when the order was treated.
-function getDeliveredEventDate(o: DashboardOrder): Date {
-  // delivered_at is set when status flips to delivered; fall back to updated_at
-  return new Date(o.delivered_at || o.updated_at);
+function getDeliveredEventDate(o: DashboardOrder): Date | null {
+  return o.delivered_at ? new Date(o.delivered_at) : null;
 }
 
 function reachedDeliveredStage(o: DashboardOrder): boolean {
@@ -231,10 +230,11 @@ function computeDailyData(orders: DashboardOrder[], numDays: number) {
       return d != null && isInDay(d, start, nextDay);
     }).length;
 
-    // Delivered = orders that were actually DELIVERED on this day (delivered_at)
+    // Delivered = orders that were actually DELIVERED on this day (delivered_at only — no updated_at fallback)
     const delivered = orders.filter((o) => {
       if (!reachedDeliveredStage(o)) return false;
-      return isInDay(getDeliveredEventDate(o), start, nextDay);
+      const d = getDeliveredEventDate(o);
+      return d != null && isInDay(d, start, nextDay);
     }).length;
 
     // Shipped = orders currently in/past shipping pipeline (uses treatment date for trend visualisation)

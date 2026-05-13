@@ -304,9 +304,17 @@ export default function FollowUps() {
   const { data: rows = [], isLoading, isFetching, refetch } = useQuery({
     queryKey: ["follow-ups-data"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_follow_ups_data").limit(10000);
-      if (error) throw error;
-      return (data ?? []) as FollowUpRow[];
+      const PAGE = 1000;
+      const rows: FollowUpRow[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase.rpc("get_follow_ups_data").range(from, from + PAGE - 1);
+        if (error) throw error;
+        rows.push(...((data ?? []) as FollowUpRow[]));
+        if ((data ?? []).length < PAGE) break;
+        from += PAGE;
+      }
+      return rows;
     },
     enabled: !!authUser && ["admin", "agent", "follow_up"].includes(authUser.role),
     refetchInterval: 30000,

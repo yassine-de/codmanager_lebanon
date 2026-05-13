@@ -81,7 +81,7 @@ BEGIN
   LEFT JOIN public.profiles sp ON sp.user_id = o.seller_id
   LEFT JOIN public.profiles ap ON ap.user_id = o.agent_id
   WHERE o.delivery_status IN (
-    'shipped','in_transit','out_for_delivery','with_courier',
+    'booked','shipped','in_transit','out_for_delivery','with_courier',
     'delivered','failed_attempt','returned','return','ready_for_return'
   )
   AND (

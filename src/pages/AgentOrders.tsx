@@ -646,8 +646,10 @@ const AgentOrders = () => {
       // Use SECURITY DEFINER RPC to bypass RLS entirely.
       // The RPC enforces ownership (agent_id = auth.uid()) internally and
       // returns 0 rows if a race condition occurred (another agent took it).
-      const { data: updatedRows, error: updateError } = await supabase
-        .rpc("agent_submit_order" as any, {
+      // We retry once after 400ms to handle transient lock contention (e.g.
+      // ORIO sync briefly holding a row lock causing the UPDATE to block and
+      // time out on the first attempt).
+      const rpcParams = {
           p_order_id:            currentOrder.id,
           p_confirmation_status: updateData.confirmation_status,
           p_agent_id:            updateData.agent_id ?? null,
@@ -673,12 +675,21 @@ const AgentOrders = () => {
           p_confirmed_at:        updateData.confirmed_at ?? null,
           p_delivery_status:     updateData.delivery_status ?? null,
           p_cancel_reason:       updateData.cancel_reason ?? null,
-        });
+      };
+
+      let { data: updatedRows, error: updateError } = await supabase.rpc("agent_submit_order" as any, rpcParams);
+
+      // Retry once on transient failure (lock timeout or 0-rows due to brief lock contention)
+      if (updateError || !updatedRows || (updatedRows as any[]).length === 0) {
+        console.warn("[AgentOrders] First submit attempt failed — retrying in 400ms", updateError?.message);
+        await new Promise(resolve => setTimeout(resolve, 400));
+        ({ data: updatedRows, error: updateError } = await supabase.rpc("agent_submit_order" as any, rpcParams));
+      }
 
       if (updateError) throw updateError;
 
       if (!updatedRows || (updatedRows as any[]).length === 0) {
-        // 0 rows = race condition: order was reclaimed by another agent
+        // Still 0 rows after retry = genuine race: order taken by another agent
         toast.warning("⚠️ Order was taken by another agent — loading next...");
         await loadNextOrder();
         return;
