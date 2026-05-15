@@ -110,8 +110,11 @@ const AgentOrders = () => {
   const [historicalOffers, setHistoricalOffers] = useState<string | null>(null);
   const [historicalLastPrice, setHistoricalLastPrice] = useState<number | null>(null);
 
+  // Duplicate order warning
+  const [duplicateWarnings, setDuplicateWarnings] = useState<{ order_id: string; confirmation_status: string; delivery_status: string | null }[]>([]);
+
   // Status change form
-  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("")
   const [cancelReason, setCancelReason] = useState("");
   const [note, setNote] = useState("");
   const [postponeDate, setPostponeDate] = useState<Date | undefined>();
@@ -138,7 +141,27 @@ const AgentOrders = () => {
     setShippingStatus("");
     setEditMode(false);
     setEditingCustomer(false);
+    setDuplicateWarnings([]);
   }, []);
+
+  // Check for duplicate orders when agent selects "confirmed"
+  useEffect(() => {
+    if (selectedStatus !== "confirmed" || !currentOrder) {
+      setDuplicateWarnings([]);
+      return;
+    }
+    const phone   = editCustomer.phone || currentOrder.customer_phone;
+    const product = currentOrder.product_name;
+    supabase
+      .from("orders")
+      .select("order_id, confirmation_status, delivery_status")
+      .eq("customer_phone", phone)
+      .eq("product_name", product)
+      .eq("confirmation_status", "confirmed")
+      .neq("id", currentOrder.id)
+      .limit(5)
+      .then(({ data }) => setDuplicateWarnings(data ?? []));
+  }, [selectedStatus, currentOrder, editCustomer.phone]);
 
   const clearActiveOrderState = useCallback(() => {
     currentOrderRef.current = null;
@@ -1286,6 +1309,34 @@ const AgentOrders = () => {
                   <SelectItem value="double" className="text-sm">🔁 Double Order</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Confirmed → Duplicate warning */}
+              {selectedStatus === "confirmed" && duplicateWarnings.length > 0 && (
+                <div className="rounded-lg border border-amber-400/50 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
+                  <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-semibold text-xs">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    Duplicate order detected for this customer &amp; product
+                  </div>
+                  <div className="space-y-1.5">
+                    {duplicateWarnings.map(d => (
+                      <div key={d.order_id} className="flex items-center gap-2 text-xs bg-white dark:bg-amber-950/50 rounded px-2 py-1.5 border border-amber-200/60">
+                        <span className="font-mono font-bold text-amber-800 dark:text-amber-300">{d.order_id}</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="capitalize font-medium text-emerald-700 dark:text-emerald-400">{d.confirmation_status.replace(/_/g, " ")}</span>
+                        {d.delivery_status && (
+                          <>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="capitalize text-blue-700 dark:text-blue-400">{d.delivery_status.replace(/_/g, " ")}</span>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-snug">
+                    📞 Call the customer and try to understand the situation properly — why another order was placed.
+                  </p>
+                </div>
+              )}
 
               {/* Confirmed → Shipping status */}
               {selectedStatus === "confirmed" && (
