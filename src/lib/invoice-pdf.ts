@@ -146,9 +146,8 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
 .pill{display:inline-block;background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:9.5px;font-family:monospace;margin:0 2px}
 .empty{text-align:center;color:#9ca3af;padding:12px;font-style:italic}
 
-/* ── PAGE BREAK ── */
-.page-break{page-break-before:always;padding-top:24px}
-.page-title{font-size:13px;font-weight:700;color:#374151;margin-bottom:14px;padding-bottom:6px;border-bottom:1.5px solid #e5e7eb}
+/* ── DETAIL SECTION ── */
+.detail-wrap{padding-top:8px}
 
 /* ── FOOTER ── */
 .footer{margin-top:28px;padding-top:10px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-size:9.5px;color:#bbb}
@@ -261,10 +260,8 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════ PAGE 2: DETAILS ══ -->
-<div class="page-break">
-  <div class="page-title">📦 Delivered Orders Detail — ${cnt?.delivered_count??0} orders</div>
-
+<!-- ═══════════════════ DETAIL TABLES ═══════════════════════════════ -->
+<div class="detail-wrap">
   <div class="section">
     <div class="sh" style="background:#dcfce7;color:#15803d;border-left:4px solid #16a34a">
       Delivered Orders — Revenue Detail
