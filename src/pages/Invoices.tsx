@@ -667,6 +667,22 @@ export default function Invoices() {
                                 </TooltipTrigger>
                                 <TooltipContent className="text-[10px]">History</TooltipContent>
                               </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => handlePrint(inv)} disabled={printingId === inv.id}>
+                                    {printingId === inv.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-[10px]">Print</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted" onClick={() => handleDownload(inv)} disabled={downloadingId === inv.id}>
+                                    {downloadingId === inv.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-[10px]">Download</TooltipContent>
+                              </Tooltip>
                             </>
                           )}
                           {isSeller && (
