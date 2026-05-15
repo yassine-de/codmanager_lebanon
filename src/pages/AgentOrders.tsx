@@ -141,27 +141,27 @@ const AgentOrders = () => {
     setShippingStatus("");
     setEditMode(false);
     setEditingCustomer(false);
-    setDuplicateWarnings([]);
   }, []);
 
   // Check for duplicate orders as soon as an order is claimed
   useEffect(() => {
-    if (!currentOrder) {
+    if (!currentOrder?.id) {
       setDuplicateWarnings([]);
       return;
     }
     const phone   = currentOrder.customer_phone;
     const product = currentOrder.product_name;
+    const orderId = currentOrder.id;
     supabase
       .from("orders")
       .select("order_id, confirmation_status, delivery_status")
       .eq("customer_phone", phone)
       .eq("product_name", product)
       .eq("confirmation_status", "confirmed")
-      .neq("id", currentOrder.id)
+      .neq("id", orderId)
       .limit(5)
       .then(({ data }) => setDuplicateWarnings(data ?? []));
-  }, [currentOrder]);
+  }, [currentOrder?.id]);
 
   const clearActiveOrderState = useCallback(() => {
     currentOrderRef.current = null;
