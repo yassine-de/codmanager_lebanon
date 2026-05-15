@@ -141,7 +141,6 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
 @media print{
   body{padding:14px 18px}
   @page{margin:.6cm;size:A4}
-  .section{page-break-inside:avoid}
 }
 </style>
 </head>
