@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatPKT as format } from "@/lib/timezone";
-import { ExternalLink, Pencil, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Package2, Plus, Loader2, ImageIcon, History } from "lucide-react";
+import { ExternalLink, Pencil, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Package2, Plus, Loader2, ImageIcon, History, LayoutList, Clock, Plane, PackageCheck } from "lucide-react";
 import { SourcingVariantsBadge } from "@/components/SourcingVariantsBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { EditSourcingModal } from "@/components/EditSourcingModal";
@@ -77,6 +77,7 @@ export default function Sourcing() {
   const [sellerFilter, setSellerFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [validationFilter, setValidationFilter] = useState("all");
+  const [kpiFilter, setKpiFilter] = useState<"all" | "awaiting_validation" | "in_transit" | "arrived_not_created">("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [editRequest, setEditRequest] = useState<DbSourcingRequest | null>(null);
@@ -138,6 +139,22 @@ export default function Sourcing() {
     })).sort((a, b) => a.label.localeCompare(b.label));
   }, [sellerIds, sellerNameMap]);
 
+  const kpis = useMemo(() => ({
+    total:               requests.length,
+    awaitingValidation:  requests.filter(r => r.status === "quoted" && !r.seller_validated).length,
+    inTransit:           requests.filter(r => r.status === "shipped").length,
+    arrivedNotCreated:   requests.filter(r => r.status === "received" && !r.product_created).length,
+  }), [requests]);
+
+  const applyKpi = (key: typeof kpiFilter) => {
+    setKpiFilter(key);
+    setPage(1);
+    if (key === "all")                  { setStatusFilter("all");      setValidationFilter("all"); }
+    if (key === "awaiting_validation")  { setStatusFilter("quoted");   setValidationFilter("pending"); }
+    if (key === "in_transit")           { setStatusFilter("shipped");  setValidationFilter("all"); }
+    if (key === "arrived_not_created")  { setStatusFilter("received"); setValidationFilter("all"); }
+  };
+
   const filtered = useMemo(() => {
     return requests.filter(r => {
       if (sellerFilter !== "all" && r.seller_id !== sellerFilter) return false;
@@ -145,9 +162,10 @@ export default function Sourcing() {
       if (validationFilter === "validated" && r.seller_validated !== true) return false;
       if (validationFilter === "cancelled" && r.seller_validated !== false) return false;
       if (validationFilter === "pending" && r.seller_validated !== null) return false;
+      if (kpiFilter === "arrived_not_created" && r.product_created === true) return false;
       return true;
     });
-  }, [requests, sellerFilter, statusFilter, validationFilter]);
+  }, [requests, sellerFilter, statusFilter, validationFilter, kpiFilter]);
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -173,6 +191,48 @@ export default function Sourcing() {
           <Plus className="h-4 w-4" />
           New Request
         </Button>
+      </div>
+
+      {/* KPI Banners */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Total */}
+        <button onClick={() => applyKpi("all")} className={`text-left rounded-lg border p-3 transition-all hover:shadow-sm ${kpiFilter === "all" ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "bg-card border-border hover:border-primary/40"}`}>
+          <div className="flex items-center gap-2 mb-1">
+            <LayoutList className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Total Requests</span>
+          </div>
+          <div className="text-2xl font-bold text-foreground">{kpis.total}</div>
+        </button>
+
+        {/* Awaiting Seller Validation */}
+        <button onClick={() => applyKpi("awaiting_validation")} className={`text-left rounded-lg border p-3 transition-all hover:shadow-sm ${kpiFilter === "awaiting_validation" ? "border-amber-500 bg-amber-500/5 ring-1 ring-amber-500/30" : "bg-card border-border hover:border-amber-400/40"}`}>
+          <div className="flex items-center gap-2 mb-1">
+            <Clock className="h-3.5 w-3.5 text-amber-500" />
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Awaiting Validation</span>
+          </div>
+          <div className="text-2xl font-bold text-amber-600">{kpis.awaitingValidation}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">Quoted — seller not validated</div>
+        </button>
+
+        {/* In Transit */}
+        <button onClick={() => applyKpi("in_transit")} className={`text-left rounded-lg border p-3 transition-all hover:shadow-sm ${kpiFilter === "in_transit" ? "border-blue-500 bg-blue-500/5 ring-1 ring-blue-500/30" : "bg-card border-border hover:border-blue-400/40"}`}>
+          <div className="flex items-center gap-2 mb-1">
+            <Plane className="h-3.5 w-3.5 text-blue-500" />
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">In Transit</span>
+          </div>
+          <div className="text-2xl font-bold text-blue-600">{kpis.inTransit}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">Shipped — on the way</div>
+        </button>
+
+        {/* Arrived Not Created */}
+        <button onClick={() => applyKpi("arrived_not_created")} className={`text-left rounded-lg border p-3 transition-all hover:shadow-sm ${kpiFilter === "arrived_not_created" ? "border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/30" : "bg-card border-border hover:border-emerald-400/40"}`}>
+          <div className="flex items-center gap-2 mb-1">
+            <PackageCheck className="h-3.5 w-3.5 text-emerald-500" />
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Arrived — Not Created</span>
+          </div>
+          <div className="text-2xl font-bold text-emerald-600">{kpis.arrivedNotCreated}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">Received — product not added</div>
+        </button>
       </div>
 
       {/* Filters */}
