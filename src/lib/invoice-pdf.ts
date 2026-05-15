@@ -105,7 +105,7 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
 <!-- HEADER -->
 <div class="hdr">
   <div>
-    <div class="brand">CodPakistani</div>
+    <div class="brand">SCALERS</div>
     <div class="brand-sub">COD Fulfillment &amp; Logistics</div>
   </div>
   <div>
@@ -193,7 +193,7 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
 
 <!-- FOOTER -->
 <div class="footer">
-  <span>CodPakistani CRM · ${inv.invoice_number} · ${sellerName}</span>
+  <span>SCALERS · ${inv.invoice_number} · ${sellerName}</span>
   <span>Generated ${new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"long",year:"numeric"})}</span>
 </div>
 
