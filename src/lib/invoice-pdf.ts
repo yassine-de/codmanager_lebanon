@@ -100,20 +100,13 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#111;backgroun
 .stat-l{font-size:8.5px;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
 
 /* ── SUMMARY BOX ── */
-.summary-grid{display:flex;gap:16px;margin-bottom:24px}
-.fee-list{flex:1;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+.fee-list{width:100%;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:20px}
 .fee-row{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid #f3f4f6;font-size:11.5px}
 .fee-row:last-child{border-bottom:none}
 .fee-lbl{color:#555}
 .fee-lbl small{display:block;font-size:9.5px;color:#aaa;margin-top:1px}
 .fee-minus{background:#fef2f2}
 .fee-total{background:#f9fafb;font-weight:700;font-size:12px}
-
-.net-box{width:200px;border:2.5px solid #111;border-radius:8px;overflow:hidden;align-self:flex-end}
-.net-hdr{background:#111;color:#fff;text-align:center;padding:8px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
-.net-body{padding:18px;text-align:center}
-.net-amt{font-size:28px;font-weight:800;letter-spacing:-1px}
-.net-lbl{font-size:9.5px;color:#888;margin-top:4px}
 
 /* ── SECTIONS ── */
 .section{margin-bottom:20px}
@@ -181,9 +174,8 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
   <div class="stat"><div class="stat-n" style="color:#7c3aed">${summary.adjustments.length}</div><div class="stat-l">Adjustments</div></div>
 </div>
 
-<!-- FINAL SUMMARY — on page 1 so it's immediately visible -->
-<div class="summary-grid">
-  <div class="fee-list">
+<!-- FINAL SUMMARY -->
+<div class="fee-list">
     <div class="fee-row" style="background:#f0fdf4">
       <span class="fee-lbl"><strong>Delivered Revenue</strong><small>${cnt?.delivered_count??0} orders × avg price</small></span>
       <span class="g bold">${usd(tot?.delivered_revenue_usd??0)}</span>
@@ -219,15 +211,6 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
       <span>NET PAYABLE TO SELLER</span>
       <span class="${(tot?.net_payable??0)>=0?"g":"r-val"}">${usd(tot?.net_payable??0)}</span>
     </div>
-  </div>
-
-  <div class="net-box">
-    <div class="net-hdr">Net Payable</div>
-    <div class="net-body">
-      <div class="net-amt ${(tot?.net_payable??0)>=0?"g":"r-val"}">${usd(tot?.net_payable??0)}</div>
-      <div class="net-lbl">${inv.status==="paid"?"✓ PAID — Thank you":"Amount due to seller"}</div>
-    </div>
-  </div>
 </div>
 
 <!-- ═══════════════════ DETAIL TABLES ═══════════════════════════════ -->
