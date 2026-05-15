@@ -174,45 +174,6 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
   <div class="stat"><div class="stat-n" style="color:#7c3aed">${summary.adjustments.length}</div><div class="stat-l">Adjustments</div></div>
 </div>
 
-<!-- FINAL SUMMARY -->
-<div class="fee-list">
-    <div class="fee-row" style="background:#f0fdf4">
-      <span class="fee-lbl"><strong>Delivered Revenue</strong><small>${cnt?.delivered_count??0} orders × avg price</small></span>
-      <span class="g bold">${usd(tot?.delivered_revenue_usd??0)}</span>
-    </div>
-    <div class="fee-row fee-minus">
-      <span class="fee-lbl">Shipping Fees<small>${cnt?.shipped_count??0} orders shipped</small></span>
-      <span class="r-val">−${usd(tot?.shipping_fees??0)}</span>
-    </div>
-    <div class="fee-row fee-minus">
-      <span class="fee-lbl">COD Fees<small>${summary.rates?.cod_fee_percentage??0}% of delivered revenue</small></span>
-      <span class="r-val">−${usd(tot?.cod_fees??0)}</span>
-    </div>
-    <div class="fee-row fee-minus">
-      <span class="fee-lbl">Call Center Fees<small>${cc?.confirmed_count??0} confirmed + ${cc?.dropped_count??0} dropped</small></span>
-      <span class="r-val">−${usd(tot?.call_center_fees??0)}</span>
-    </div>
-    ${(tot?.addon_net??0)!==0?`
-    <div class="fee-row">
-      <span class="fee-lbl">Addons Net<small>${summary.addons.length} addon(s)</small></span>
-      <span class="${(tot?.addon_net??0)>=0?"g":"r-val"}">${sign(tot?.addon_net??0)}</span>
-    </div>`:""}
-    ${(tot?.adjustment_net??0)!==0?`
-    <div class="fee-row">
-      <span class="fee-lbl">Adjustments Net<small>${summary.adjustments.length} adjustment(s)</small></span>
-      <span class="${(tot?.adjustment_net??0)>=0?"g":"r-val"}">${sign(tot?.adjustment_net??0)}</span>
-    </div>`:""}
-    ${(tot?.previous_balance??0)!==0?`
-    <div class="fee-row">
-      <span class="fee-lbl">Previous Balance</span>
-      <span class="${(tot?.previous_balance??0)>=0?"g":"r-val"}">${sign(tot?.previous_balance??0)}</span>
-    </div>`:""}
-    <div class="fee-row fee-total" style="border-top:2px solid #e5e7eb">
-      <span>NET PAYABLE TO SELLER</span>
-      <span class="${(tot?.net_payable??0)>=0?"g":"r-val"}">${usd(tot?.net_payable??0)}</span>
-    </div>
-</div>
-
 <!-- ═══════════════════ DETAIL TABLES ═══════════════════════════════ -->
 <div class="detail-wrap">
   <div class="section">
@@ -303,6 +264,45 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
 
   ${addonHtml}
   ${adjHtml}
+</div>
+
+<!-- FINAL SUMMARY -->
+<div class="fee-list">
+    <div class="fee-row" style="background:#f0fdf4">
+      <span class="fee-lbl"><strong>Delivered Revenue</strong><small>${cnt?.delivered_count??0} orders × avg price</small></span>
+      <span class="g bold">${usd(tot?.delivered_revenue_usd??0)}</span>
+    </div>
+    <div class="fee-row fee-minus">
+      <span class="fee-lbl">Shipping Fees<small>${cnt?.shipped_count??0} orders shipped</small></span>
+      <span class="r-val">−${usd(tot?.shipping_fees??0)}</span>
+    </div>
+    <div class="fee-row fee-minus">
+      <span class="fee-lbl">COD Fees<small>${summary.rates?.cod_fee_percentage??0}% of delivered revenue</small></span>
+      <span class="r-val">−${usd(tot?.cod_fees??0)}</span>
+    </div>
+    <div class="fee-row fee-minus">
+      <span class="fee-lbl">Call Center Fees<small>${cc?.confirmed_count??0} confirmed + ${cc?.dropped_count??0} dropped</small></span>
+      <span class="r-val">−${usd(tot?.call_center_fees??0)}</span>
+    </div>
+    ${(tot?.addon_net??0)!==0?`
+    <div class="fee-row">
+      <span class="fee-lbl">Addons Net<small>${summary.addons.length} addon(s)</small></span>
+      <span class="${(tot?.addon_net??0)>=0?"g":"r-val"}">${sign(tot?.addon_net??0)}</span>
+    </div>`:""}
+    ${(tot?.adjustment_net??0)!==0?`
+    <div class="fee-row">
+      <span class="fee-lbl">Adjustments Net<small>${summary.adjustments.length} adjustment(s)</small></span>
+      <span class="${(tot?.adjustment_net??0)>=0?"g":"r-val"}">${sign(tot?.adjustment_net??0)}</span>
+    </div>`:""}
+    ${(tot?.previous_balance??0)!==0?`
+    <div class="fee-row">
+      <span class="fee-lbl">Previous Balance</span>
+      <span class="${(tot?.previous_balance??0)>=0?"g":"r-val"}">${sign(tot?.previous_balance??0)}</span>
+    </div>`:""}
+    <div class="fee-row fee-total" style="border-top:2px solid #e5e7eb">
+      <span>NET PAYABLE TO SELLER</span>
+      <span class="${(tot?.net_payable??0)>=0?"g":"r-val"}">${usd(tot?.net_payable??0)}</span>
+    </div>
 </div>
 
 <!-- FOOTER -->
