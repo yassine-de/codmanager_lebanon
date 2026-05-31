@@ -59,17 +59,11 @@ Deno.serve(async (req) => {
     const isInternalCall = jwt === serviceRoleKey || jwt === anonKey;
 
     if (!isInternalCall) {
-      // Regular user call — validate JWT and confirm admin role
+      // Regular user call — validate JWT (any authenticated user may send)
       const { data: userData } = await admin.auth.getUser(jwt);
       if (!userData?.user) {
         return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const { data: profile } = await admin.from("profiles").select("role").eq("user_id", userData.user.id).maybeSingle();
-      if (profile?.role !== "admin") {
-        return new Response(JSON.stringify({ ok: false, error: "Forbidden" }), {
-          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
