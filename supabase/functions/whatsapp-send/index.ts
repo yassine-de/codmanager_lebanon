@@ -17,7 +17,7 @@ interface SendBody {
   conversation_id?: string;
   template_id?: string;
   body?: string;
-  mode?: "template" | "text" | "order" | "image" | "document" | "audio";
+  mode?: "template" | "text" | "order" | "image" | "document" | "audio" | "note";
   media_url?: string;
   media_filename?: string;
 }
@@ -170,6 +170,39 @@ Deno.serve(async (req) => {
       settings.default_country_code,
     );
     if (!to) throw new Error("Customer phone invalid");
+
+    // ── note mode: internal-only message, no Meta API call ──────────────────
+    if (mode === "note") {
+      const noteText = body.body ?? "";
+      if (!noteText.trim()) throw new Error("Empty note");
+
+      // Ensure conversation exists
+      if (!conv) {
+        const ins = await admin.from("whatsapp_conversations").insert({
+          order_id: order?.order_id ?? null,
+          customer_phone: normalizePhone(order?.customer_phone ?? "", settings.default_country_code),
+          customer_name: order?.customer_name ?? null,
+          status: "pending",
+        }).select().single();
+        conv = ins.data;
+      }
+
+      await admin.from("whatsapp_messages").insert({
+        conversation_id: conv!.id,
+        order_id: order?.order_id ?? null,
+        direction: "out",
+        message_type: "text",
+        body: noteText,
+        payload: { note: true, text: { body: noteText } },
+        meta_message_id: null,
+        status: "note",
+        error_message: null,
+      });
+
+      return new Response(JSON.stringify({ ok: true, note: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Build payload depending on mode
     let payload: any;
