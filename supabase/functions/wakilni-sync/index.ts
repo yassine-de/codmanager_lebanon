@@ -137,10 +137,14 @@ function pickBulkId(payload: any) {
 }
 
 function startBulkPayload() {
+  const locationId = Number(Deno.env.get("WAKILNI_WAREHOUSE_LOCATION_ID") || 0);
+  const longitude = Number(Deno.env.get("WAKILNI_WAREHOUSE_LONGITUDE") || 0);
+  const latitude = Number(Deno.env.get("WAKILNI_WAREHOUSE_LATITUDE") || 0);
+
   return {
-    location_id: Deno.env.get("WAKILNI_WAREHOUSE_LOCATION_ID") || "wakilni-warehouse",
-    longitude: Deno.env.get("WAKILNI_WAREHOUSE_LONGITUDE") || "0",
-    latitude: Deno.env.get("WAKILNI_WAREHOUSE_LATITUDE") || "0",
+    location_id: Number.isFinite(locationId) ? locationId : 0,
+    longitude: Number.isFinite(longitude) ? longitude : 0,
+    latitude: Number.isFinite(latitude) ? latitude : 0,
     floor: Deno.env.get("WAKILNI_WAREHOUSE_FLOOR") || "",
     area: Deno.env.get("WAKILNI_WAREHOUSE_AREA") || "Wakilni Warehouse",
   };
@@ -149,7 +153,7 @@ function startBulkPayload() {
 function deliveryPayload(order: any) {
   const { firstName, lastName } = splitName(order.customer_name);
   const totalAmount = Number(order.total_amount ?? order.price * order.quantity ?? 0);
-  const area = String(order.customer_city || "").trim();
+  const area = String(order.customer_city || order.customer_address || "Lebanon").trim();
 
   return {
     get_order_details: true,
@@ -162,7 +166,7 @@ function deliveryPayload(order: any) {
     receiver_gender: 1,
     receiver_email: "",
     receiver_secondary_phone_number: "",
-    receiver_location_id: order.id,
+    receiver_location_id: Number(order.wakilni_receiver_location_id || 0),
     receiver_longitude: "",
     receiver_latitude: "",
     receiver_building: "",
