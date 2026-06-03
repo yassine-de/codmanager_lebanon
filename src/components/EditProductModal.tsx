@@ -23,6 +23,9 @@ const isValidUrl = (str: string): boolean => {
   return pattern.test(str.trim());
 };
 
+const isSupabaseStorageUrl = (url: string): boolean =>
+  /supabase\.co\/storage\/v1\/object\/public\//i.test(url);
+
 interface EditProductModalProps {
   product: Product | null;
   open: boolean;
@@ -134,7 +137,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
     setName(product.name);
     setSeller(product.seller);
     setSku(product.sku);
-    setImage(product.image);
+    setImage(isSupabaseStorageUrl(product.image) ? "" : product.image);
     setPrice(product.price);
     setTotalQty(product.totalQty);
     setVariants(product.variants.map(v => ({ ...v })));
