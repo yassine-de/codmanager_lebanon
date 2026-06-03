@@ -788,6 +788,19 @@ const AgentOrders = () => {
         if (historyError) console.error("[AgentOrders] History insert failed:", historyError);
       }
 
+      if (selectedStatus === "confirmed" && shippingStatus === "shipped") {
+        const { data: wakilniResult, error: wakilniError } = await supabase.functions.invoke("wakilni-sync", {
+          body: { action: "sync-order", order_id: currentOrder.id },
+        });
+
+        if (wakilniError || (wakilniResult as any)?.error) {
+          console.error("[AgentOrders] Wakilni sync failed", wakilniError || wakilniResult);
+          toast.warning(`Order confirmed, but Wakilni sync failed: ${(wakilniError as any)?.message || (wakilniResult as any)?.error || "Unknown error"}`);
+        } else if (!(wakilniResult as any)?.skipped) {
+          toast.success("Order sent to Wakilni");
+        }
+      }
+
       toast.success(`Order ${currentOrder.order_id} → ${selectedStatus.toUpperCase()} ✅`, {
         duration: 3000,
         style: { background: "hsl(155, 50%, 96%)", border: "1px solid hsl(155, 50%, 42%)", color: "hsl(155, 50%, 25%)", fontWeight: 600 },
