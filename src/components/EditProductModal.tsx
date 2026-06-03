@@ -292,7 +292,13 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                 <div className="space-y-1.5">
                   <Label className="text-xs">SKU *</Label>
                   <div className="relative">
-                    <Input value={sku} onChange={e => setSku(e.target.value)} className={`h-9 text-sm pr-9 ${errors.sku ? "border-destructive" : ""}`} disabled={isDbProduct} readOnly={isDbProduct} />
+                    <Input
+                      value={sku}
+                      onChange={e => setSku(e.target.value)}
+                      className={`h-9 text-sm pr-9 ${errors.sku ? "border-destructive" : ""}`}
+                      disabled={isDbProduct && !isAdmin}
+                      readOnly={isDbProduct && !isAdmin}
+                    />
                     <Button
                       type="button"
                       variant="ghost"
