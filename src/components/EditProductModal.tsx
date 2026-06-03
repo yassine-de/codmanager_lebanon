@@ -75,22 +75,28 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
 
   const dbUpdateMutation = useMutation({
     mutationFn: async () => {
+      const updateData: Record<string, unknown> = {
+        name: name.trim(),
+        price: lastSellingPrice,
+        landed_price: price,
+        last_price: lastPrice,
+        offers: offers.map(o => ({ quantity: o.quantity, price: o.price })),
+        quantity: totalQty,
+        weight: weight || null,
+        weight_kg: weight ? parseFloat(weight) : null,
+        product_url: storeLink.trim(),
+        video_url: videoLink.trim(),
+        image_url: image.trim(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (isAdmin) {
+        updateData.sku = sku.trim();
+      }
+
       const { error } = await supabase
         .from("products")
-        .update({
-          name: name.trim(),
-          price: lastSellingPrice,
-          landed_price: price,
-          last_price: lastPrice,
-          offers: offers.map(o => ({ quantity: o.quantity, price: o.price })),
-          quantity: totalQty,
-          weight: weight || null,
-          weight_kg: weight ? parseFloat(weight) : null,
-          product_url: storeLink.trim(),
-          video_url: videoLink.trim(),
-          image_url: image.trim(),
-          updated_at: new Date().toISOString(),
-        } as any)
+        .update(updateData as any)
         .eq("id", product!.id);
       if (error) throw error;
 
@@ -113,7 +119,12 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
       onOpenChange(false);
       toast.success("Product updated");
     },
-    onError: () => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("products_sku_unique") || message.toLowerCase().includes("duplicate key")) {
+        toast.error("SKU already exists. Choose a unique SKU.");
+        return;
+      }
       toast.error("Failed to update product");
     },
   });
