@@ -1,4 +1,6 @@
 -- 1. RPC: drop 'booked' from the visible pipeline
+DROP FUNCTION IF EXISTS public.get_follow_ups_data();
+
 CREATE OR REPLACE FUNCTION public.get_follow_ups_data()
 RETURNS TABLE(
   order_id text,

@@ -65,7 +65,7 @@ import {
   startOfDayPKT as startOfDay, endOfDayPKT as endOfDay,
   subDaysPKT as subDays, startOfMonthPKT as startOfMonth, endOfMonthPKT as endOfMonth,
 } from "@/lib/timezone";
-// startOfYesterday / endOfYesterday expressed in PKT
+// startOfYesterday / endOfYesterday expressed in Lebanon time
 import { subDaysPKT } from "@/lib/timezone";
 const startOfYesterday = () => startOfDay(subDaysPKT(new Date(), 1));
 const endOfYesterday   = () => endOfDay(subDaysPKT(new Date(), 1));
@@ -1582,7 +1582,7 @@ function renderCell(
       return row.total_amount != null ? (
         <span className="text-xs font-semibold tabular-nums">
           {Number(row.total_amount).toLocaleString()}
-          <span className="text-muted-foreground font-normal ml-0.5">PKR</span>
+          <span className="text-muted-foreground font-normal ml-0.5">USD</span>
         </span>
       ) : <span className="text-muted-foreground/50 text-xs">—</span>;
 

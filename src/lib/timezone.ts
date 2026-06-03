@@ -1,9 +1,9 @@
 /**
- * Pakistan Standard Time (PKT) — UTC+5, no Daylight Saving Time.
+ * Lebanon time — Asia/Beirut.
  *
  * All date calculations that involve "today", "yesterday", "this month", etc.
- * must use PKT boundaries so that filters and analytics match what the
- * Pakistan-based team sees on the wall clock.
+ * must use Lebanon boundaries so that filters and analytics match what the
+ * Lebanon-based team sees on the wall clock.
  *
  * Usage:
  *   import { startOfDayPKT, endOfDayPKT, formatPKT, nowPKT } from "@/lib/timezone";
@@ -25,7 +25,8 @@ import {
   format,
 } from "date-fns";
 
-export const PKT = "Asia/Karachi";
+export const LEBANON_TIMEZONE = "Asia/Beirut";
+export const PKT = LEBANON_TIMEZONE;
 
 // ── Converters ────────────────────────────────────────────────────────────────
 
@@ -34,54 +35,54 @@ export function nowPKT(): Date {
   return new Date();
 }
 
-/** Convert a UTC Date to its PKT "wall-clock" representation. */
+/** Convert a UTC Date to its Lebanon "wall-clock" representation. */
 export function toPKT(date: Date): Date {
-  return toZonedTime(date, PKT);
+  return toZonedTime(date, LEBANON_TIMEZONE);
 }
 
-/** Convert a PKT wall-clock Date back to UTC. */
+/** Convert a Lebanon wall-clock Date back to UTC. */
 export function fromPKT(date: Date): Date {
-  return fromZonedTime(date, PKT);
+  return fromZonedTime(date, LEBANON_TIMEZONE);
 }
 
-// ── Day / month boundaries in PKT ─────────────────────────────────────────────
+// ── Day / month boundaries in Lebanon time ─────────────────────────────────────────────
 
 export function startOfDayPKT(date: Date): Date {
-  return fromZonedTime(startOfDay(toZonedTime(date, PKT)), PKT);
+  return fromZonedTime(startOfDay(toZonedTime(date, LEBANON_TIMEZONE)), LEBANON_TIMEZONE);
 }
 
 export function endOfDayPKT(date: Date): Date {
-  return fromZonedTime(endOfDay(toZonedTime(date, PKT)), PKT);
+  return fromZonedTime(endOfDay(toZonedTime(date, LEBANON_TIMEZONE)), LEBANON_TIMEZONE);
 }
 
 export function startOfMonthPKT(date: Date): Date {
-  return fromZonedTime(startOfMonth(toZonedTime(date, PKT)), PKT);
+  return fromZonedTime(startOfMonth(toZonedTime(date, LEBANON_TIMEZONE)), LEBANON_TIMEZONE);
 }
 
 export function endOfMonthPKT(date: Date): Date {
-  return fromZonedTime(endOfMonth(toZonedTime(date, PKT)), PKT);
+  return fromZonedTime(endOfMonth(toZonedTime(date, LEBANON_TIMEZONE)), LEBANON_TIMEZONE);
 }
 
 export function subDaysPKT(date: Date, amount: number): Date {
-  return subDays(toZonedTime(date, PKT), amount);
+  return subDays(toZonedTime(date, LEBANON_TIMEZONE), amount);
 }
 
 export function subMonthsPKT(date: Date, amount: number): Date {
-  return subMonths(toZonedTime(date, PKT), amount);
+  return subMonths(toZonedTime(date, LEBANON_TIMEZONE), amount);
 }
 
-/** Each calendar day in [start, end] expressed as PKT wall-clock dates. */
+/** Each calendar day in [start, end] expressed as Lebanon time wall-clock dates. */
 export function eachDayOfIntervalPKT(start: Date, end: Date): Date[] {
   return eachDayOfInterval({
-    start: toZonedTime(start, PKT),
-    end:   toZonedTime(end,   PKT),
+    start: toZonedTime(start, LEBANON_TIMEZONE),
+    end:   toZonedTime(end,   LEBANON_TIMEZONE),
   });
 }
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 
 /**
- * Format a date/timestamp in Pakistan time using a date-fns format string.
+ * Format a date/timestamp in Lebanon time using a date-fns format string.
  * Accepts ISO strings or Date objects.
  *
  * @example
@@ -89,7 +90,7 @@ export function eachDayOfIntervalPKT(start: Date, end: Date): Date[] {
  */
 export function formatPKT(date: Date | string, fmt: string): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return formatTZ(toZonedTime(d, PKT), fmt, { timeZone: PKT });
+  return formatTZ(toZonedTime(d, LEBANON_TIMEZONE), fmt, { timeZone: LEBANON_TIMEZONE });
 }
 
 /**
@@ -107,11 +108,11 @@ export function fullTimePKT(date: Date | string): string {
 }
 
 /**
- * Check whether a UTC Date falls within today in PKT.
+ * Check whether a UTC Date falls within today in Lebanon time.
  */
 export function isTodayPKT(date: Date): boolean {
-  const pkt = toZonedTime(date, PKT);
-  const todayPkt = toZonedTime(new Date(), PKT);
+  const pkt = toZonedTime(date, LEBANON_TIMEZONE);
+  const todayPkt = toZonedTime(new Date(), LEBANON_TIMEZONE);
   return (
     pkt.getFullYear() === todayPkt.getFullYear() &&
     pkt.getMonth()    === todayPkt.getMonth()    &&

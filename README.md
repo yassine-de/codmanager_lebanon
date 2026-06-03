@@ -1,3 +1,5 @@
-# Welcome to your Lovable project
+# COD Service Lebanon
 
-TODO: Document your project here
+Lebanon instance based on the Pakistan COD Service codebase.
+
+Set the Lebanon Supabase project values in `.env` before running or deploying.

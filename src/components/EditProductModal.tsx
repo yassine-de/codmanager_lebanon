@@ -365,7 +365,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                   {errors.price && <p className="text-[11px] text-destructive">{errors.price}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Selling Price (PKR) {isSeller && isDbProduct && <span className="text-destructive">*</span>}</Label>
+                  <Label className="text-xs">Selling Price (USD) {isSeller && isDbProduct && <span className="text-destructive">*</span>}</Label>
                   <Input type="number" min={0} step={0.01} value={lastSellingPrice || ""} onChange={e => setLastSellingPrice(Number(e.target.value))} placeholder={isSeller ? "Enter selling price" : ""} className={`h-9 text-sm ${errors.sellingPrice ? "border-destructive" : ""}`} />
                   {errors.sellingPrice && <p className="text-[11px] text-destructive">{errors.sellingPrice}</p>}
                 </div>
@@ -486,7 +486,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-[10px] text-muted-foreground">Price (PKR) *</Label>
+                          <Label className="text-[10px] text-muted-foreground">Price (USD) *</Label>
                           <Input
                             type="number" min={0.01} step={0.01} value={offer.price}
                             onChange={e => updateOffer(i, "price", Math.max(0, Number(e.target.value)))}
@@ -505,7 +505,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
 
             {/* Last Selling Price (for agent) */}
             <div>
-              <h3 className={sectionTitle}>Last Selling Price (PKR)</h3>
+              <h3 className={sectionTitle}>Last Selling Price (USD)</h3>
               <p className="text-[11px] text-muted-foreground mb-2">This price will be shown to the confirmation agent</p>
               <div className="w-1/2">
                 <Input

@@ -115,7 +115,7 @@ function SectionKPI({
   );
 }
 
-/* ── Financial KPI Card (PKR + USD) ── */
+/* ── Financial KPI Card (USD + USD) ── */
 interface FinancialKPIProps {
   title: string;
   pkrAmount: number;
@@ -150,7 +150,7 @@ function FinancialKPI({
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-1">
             <p className={`font-bold tabular-nums tracking-tight leading-none ${highlight ? 'text-3xl' : 'text-2xl'}`}>
-              {isDataVisible ? <AnimatedNumber value={pkrAmount} suffix=" PKR" /> : <MaskedValue className="gap-1" />}
+              {isDataVisible ? <AnimatedNumber value={pkrAmount} suffix=" USD" /> : <MaskedValue className="gap-1" />}
             </p>
             <p className={`font-bold tabular-nums tracking-tight leading-none text-foreground ${highlight ? 'text-2xl' : 'text-xl'}`}>
               {isDataVisible ? `≈ ${formatUSD(usdEquiv)}` : <MaskedValue />}
@@ -439,7 +439,7 @@ export default function Dashboard() {
                 onClick: () => navigate("/orders?delivery=delivered"),
               },
               {
-                title: "Revenue (PKR)",
+                title: "Revenue (USD)",
                 value: kpis.revenue,
                 sub: `≈ ${formatUSD(pkrToUsd(kpis.revenue))}`,
                 icon: DollarSign,
@@ -492,7 +492,7 @@ export default function Dashboard() {
         <div className="space-y-3">
           <SectionHeader icon={DollarSign} title="Financial Overview" color="text-primary" iconBg="bg-primary/10" delay={160} />
           <div className="mb-2 flex items-center gap-2">
-            <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md">1 USD = 290 PKR</span>
+            <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md">1 USD = 290 USD</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <FinancialKPI title="Delivered Amount" pkrAmount={kpis.revenue} percentage={100}

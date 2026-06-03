@@ -52,6 +52,7 @@ import WhatsappCampaigns from "./pages/whatsapp/WhatsappCampaigns";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isFeatureEnabled, type FeatureKey } from "@/config/features";
 
 const queryClient = new QueryClient();
 
@@ -121,6 +122,14 @@ function ProtectedRoute({ children, permission }: { children: React.ReactNode; p
   return <>{children}</>;
 }
 
+function FeatureRoute({ children, feature }: { children: React.ReactNode; feature: FeatureKey }) {
+  if (!isFeatureEnabled(feature)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   const { user, loading } = useAuth();
 
@@ -144,7 +153,7 @@ function AppRoutes() {
         <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
         <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
         <Route path="/confirmations" element={<ProtectedRoute permission="access_to_confirmations"><Confirmations /></ProtectedRoute>} />
-        <Route path="/sourcing" element={<ProtectedRoute permission="access_to_sourcing"><Sourcing /></ProtectedRoute>} />
+        <Route path="/sourcing" element={<FeatureRoute feature="sourcing"><ProtectedRoute permission="access_to_sourcing"><Sourcing /></ProtectedRoute></FeatureRoute>} />
         <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
         <Route path="/products/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
         <Route path="/analytics" element={<ProtectedRoute permission="access_to_analytics"><ConfirmationAnalytics /></ProtectedRoute>} />
@@ -152,40 +161,40 @@ function AppRoutes() {
         <Route path="/analytics/delivery" element={<ProtectedRoute permission="access_to_analytics"><DeliveryAnalytics /></ProtectedRoute>} />
         <Route path="/analytics/seller" element={<ProtectedRoute permission="access_to_analytics"><SellerAnalytics /></ProtectedRoute>} />
         <Route path="/analytics/finance" element={<ProtectedRoute permission="access_to_analytics"><FinanceAnalytics /></ProtectedRoute>} />
-        <Route path="/analytics/follow-up" element={<ProtectedRoute permission="access_to_analytics"><FollowUpAnalytics /></ProtectedRoute>} />
-        <Route path="/analytics/agent-monitoring" element={<ProtectedRoute permission="access_to_analytics"><AgentMonitoring /></ProtectedRoute>} />
+        <Route path="/analytics/follow-up" element={<FeatureRoute feature="followUps"><ProtectedRoute permission="access_to_analytics"><FollowUpAnalytics /></ProtectedRoute></FeatureRoute>} />
+        <Route path="/analytics/agent-monitoring" element={<FeatureRoute feature="agentAssignment"><ProtectedRoute permission="access_to_analytics"><AgentMonitoring /></ProtectedRoute></FeatureRoute>} />
         <Route path="/settings" element={<ProtectedRoute permission="access_to_settings"><SettingsPage /></ProtectedRoute>} />
         <Route path="/rates" element={<ProtectedRoute permission="access_to_settings"><RatesManagement /></ProtectedRoute>} />
         <Route path="/integrations" element={<ProtectedRoute permission="access_to_settings"><Integrations /></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute permission="access_to_users"><Users /></ProtectedRoute>} />
         <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
         <Route path="/sheets" element={<ProtectedRoute><SellerSheets /></ProtectedRoute>} />
-        <Route path="/seller-sourcing" element={<ProtectedRoute><SellerSourcing /></ProtectedRoute>} />
+        <Route path="/seller-sourcing" element={<FeatureRoute feature="sourcing"><ProtectedRoute><SellerSourcing /></ProtectedRoute></FeatureRoute>} />
         <Route path="/simulation" element={<ProtectedRoute><Simulation /></ProtectedRoute>} />
         <Route path="/seller-settings" element={<ProtectedRoute><SellerSettings /></ProtectedRoute>} />
         <Route path="/seller-analytics" element={<ProtectedRoute><SellerProductAnalytics /></ProtectedRoute>} />
-        <Route path="/agent-dashboard" element={<ProtectedRoute><AgentDashboard /></ProtectedRoute>} />
-        <Route path="/agent-orders" element={<ProtectedRoute><AgentOrders /></ProtectedRoute>} />
-        <Route path="/agent-confirmed" element={<ProtectedRoute><AgentConfirmedOrders /></ProtectedRoute>} />
-        <Route path="/support" element={<ProtectedRoute permission="access_to_settings"><Support /></ProtectedRoute>} />
-        <Route path="/alerts" element={<ProtectedRoute permission="access_to_settings"><Alerts /></ProtectedRoute>} />
+        <Route path="/agent-dashboard" element={<FeatureRoute feature="agentAssignment"><ProtectedRoute><AgentDashboard /></ProtectedRoute></FeatureRoute>} />
+        <Route path="/agent-orders" element={<FeatureRoute feature="agentAssignment"><ProtectedRoute><AgentOrders /></ProtectedRoute></FeatureRoute>} />
+        <Route path="/agent-confirmed" element={<FeatureRoute feature="agentAssignment"><ProtectedRoute><AgentConfirmedOrders /></ProtectedRoute></FeatureRoute>} />
+        <Route path="/support" element={<FeatureRoute feature="support"><ProtectedRoute permission="access_to_settings"><Support /></ProtectedRoute></FeatureRoute>} />
+        <Route path="/alerts" element={<FeatureRoute feature="alerts"><ProtectedRoute permission="access_to_settings"><Alerts /></ProtectedRoute></FeatureRoute>} />
         <Route path="/adjustments" element={<ProtectedRoute permission="access_to_settings"><Adjustments /></ProtectedRoute>} />
-        <Route path="/system-health" element={<ProtectedRoute permission="access_to_settings"><SystemHealth /></ProtectedRoute>} />
-        <Route path="/follow-ups" element={<ProtectedRoute><FollowUps /></ProtectedRoute>} />
-        <Route path="/follow-up/dashboard" element={<ProtectedRoute><FollowUpDashboard /></ProtectedRoute>} />
-        <Route path="/follow-up/queue" element={<ProtectedRoute><FollowUps /></ProtectedRoute>} />
-        <Route path="/follow-up/control" element={<ProtectedRoute><FollowUpControl /></ProtectedRoute>} />
-        <Route path="/whatsapp" element={<ProtectedRoute permission="access_to_settings"><WhatsappLayout /></ProtectedRoute>}>
+        <Route path="/system-health" element={<FeatureRoute feature="orioSync"><ProtectedRoute permission="access_to_settings"><SystemHealth /></ProtectedRoute></FeatureRoute>} />
+        <Route path="/follow-ups" element={<FeatureRoute feature="followUps"><ProtectedRoute><FollowUps /></ProtectedRoute></FeatureRoute>} />
+        <Route path="/follow-up/dashboard" element={<FeatureRoute feature="followUps"><ProtectedRoute><FollowUpDashboard /></ProtectedRoute></FeatureRoute>} />
+        <Route path="/follow-up/queue" element={<FeatureRoute feature="followUps"><ProtectedRoute><FollowUps /></ProtectedRoute></FeatureRoute>} />
+        <Route path="/follow-up/control" element={<FeatureRoute feature="followUps"><ProtectedRoute><FollowUpControl /></ProtectedRoute></FeatureRoute>} />
+        <Route path="/whatsapp" element={<FeatureRoute feature="whatsapp"><ProtectedRoute permission="access_to_settings"><WhatsappLayout /></ProtectedRoute></FeatureRoute>}>
           <Route index element={<WhatsappOverview />} />
           <Route path="inbox" element={<WhatsappInbox />} />
           <Route path="confirmations" element={<WhatsappConfirmations />} />
           <Route path="automations" element={<WhatsappAutomations />} />
-          <Route path="campaigns" element={<WhatsappCampaigns />} />
+          <Route path="campaigns" element={<FeatureRoute feature="whatsappCampaigns"><WhatsappCampaigns /></FeatureRoute>} />
           <Route path="templates" element={<WhatsappTemplates />} />
-          <Route path="ai" element={<WhatsappAI />} />
+          <Route path="ai" element={<FeatureRoute feature="whatsappAi"><WhatsappAI /></FeatureRoute>} />
           <Route path="settings" element={<WhatsappSettings />} />
         </Route>
-        <Route path="/whatsapp/automations/:id" element={<ProtectedRoute permission="access_to_settings"><WhatsappAutomationBuilder /></ProtectedRoute>} />
+        <Route path="/whatsapp/automations/:id" element={<FeatureRoute feature="whatsapp"><ProtectedRoute permission="access_to_settings"><WhatsappAutomationBuilder /></ProtectedRoute></FeatureRoute>} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

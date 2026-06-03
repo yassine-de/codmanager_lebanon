@@ -4,6 +4,8 @@ ALTER TABLE public.order_follow_ups
   ADD COLUMN IF NOT EXISTS fu_no_answer_count integer NOT NULL DEFAULT 0;
 
 -- Recreate get_follow_ups_data to include fu_no_answer_count
+DROP FUNCTION IF EXISTS public.get_follow_ups_data();
+
 CREATE OR REPLACE FUNCTION public.get_follow_ups_data()
  RETURNS TABLE(
   order_id text,

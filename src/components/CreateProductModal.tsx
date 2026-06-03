@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { type Product } from "@/lib/products-data";
 import { cn } from "@/lib/utils";
+import { features } from "@/config/features";
 
 interface CreateProductModalProps {
   open: boolean;
@@ -130,7 +131,7 @@ export function CreateProductModal({ open, onOpenChange, onCreate }: CreateProdu
           </div>
 
           {/* WhatsApp Confirmation toggle (Admin only) */}
-          {isAdmin && (
+          {features.whatsapp && isAdmin && (
             <div className="flex items-start justify-between gap-4 rounded-lg border bg-muted/20 p-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

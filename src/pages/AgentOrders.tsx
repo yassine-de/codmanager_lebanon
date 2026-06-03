@@ -978,7 +978,7 @@ const AgentOrders = () => {
                   <p className="text-[10px] text-muted-foreground">Created: {format(new Date(dup.created_at), "dd/MM/yyyy HH:mm")}</p>
                 </div>
                 <div className="text-right space-y-0.5">
-                  <p className="text-sm font-bold">{Number(dup.price) * dup.quantity} PKR</p>
+                  <p className="text-sm font-bold">{Number(dup.price) * dup.quantity} USD</p>
                   <p className="text-[10px] text-muted-foreground">Qty: {dup.quantity}</p>
                   {currentOrder.id === dup.id && (
                     <Badge className="text-[9px] bg-primary text-primary-foreground">Selected</Badge>
@@ -1175,7 +1175,7 @@ const AgentOrders = () => {
                             </span>
                             <span className="text-muted-foreground font-medium">|</span>
                             <span className="inline-flex items-center gap-1 text-sm font-bold text-foreground">
-                              {orderTotal} PKR
+                              {orderTotal} USD
                             </span>
                           </div>
                         )}
@@ -1193,7 +1193,7 @@ const AgentOrders = () => {
                             <div className="rounded-md bg-accent/60 border border-accent px-2.5 py-1.5 flex items-center gap-2">
                               <DollarSign className="h-3 w-3 text-primary shrink-0" />
                               <span className="text-[10px] text-muted-foreground">Last sold at</span>
-                              <span className="text-xs font-bold text-primary tabular-nums">{effectiveLastPrice} PKR</span>
+                              <span className="text-xs font-bold text-primary tabular-nums">{effectiveLastPrice} USD</span>
                               {effectiveLastPrice !== op.price && (
                                 <span className={cn(
                                   "text-[9px] font-semibold px-1.5 py-0.5 rounded-full",
@@ -1201,7 +1201,7 @@ const AgentOrders = () => {
                                     ? "bg-emerald-500/10 text-emerald-600"
                                     : "bg-amber-500/10 text-amber-600"
                                 )}>
-                                  {effectiveLastPrice < op.price ? "↓" : "↑"} {Math.abs(op.price - effectiveLastPrice)} PKR
+                                  {effectiveLastPrice < op.price ? "↓" : "↑"} {Math.abs(op.price - effectiveLastPrice)} USD
                                 </span>
                               )}
                             </div>
@@ -1239,7 +1239,7 @@ const AgentOrders = () => {
                         </div>
                       </div>
                       {!editMode && (
-                        <p className="text-sm font-bold text-foreground whitespace-nowrap">{orderTotal} PKR</p>
+                        <p className="text-sm font-bold text-foreground whitespace-nowrap">{orderTotal} USD</p>
                       )}
                     </div>
                   </div>
@@ -1251,7 +1251,7 @@ const AgentOrders = () => {
                 const outerMatchedProduct = sellerProducts.find(p => p.name === currentOrder.product_name);
                 const productOffers = (outerMatchedProduct as any)?.offers as any[] | undefined;
                 const productOffersText = productOffers && productOffers.length > 0
-                  ? productOffers.map((o: any) => `${o.quantity}x → ${o.price} PKR`).join(" | ")
+                  ? productOffers.map((o: any) => `${o.quantity}x → ${o.price} USD`).join(" | ")
                   : null;
                 const effectiveOffers = productOffersText
                   || (currentOrder.offers && currentOrder.offers.trim() ? currentOrder.offers.trim() : null)
@@ -1292,7 +1292,7 @@ const AgentOrders = () => {
                             }}
                           >
                             <span className="truncate font-medium">{sp.name}</span>
-                            <span className="text-muted-foreground shrink-0">{sp.price} PKR</span>
+                            <span className="text-muted-foreground shrink-0">{sp.price} USD</span>
                           </button>
                         ))}
                       {sellerProducts.filter(sp => !activeItems.some(ai => ai.name === sp.name)).length === 0 && (
@@ -1306,7 +1306,7 @@ const AgentOrders = () => {
               <div className="pt-2 border-t">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold">Total</span>
-                  <span className="text-lg font-bold text-primary tabular-nums">{orderTotal} PKR</span>
+                  <span className="text-lg font-bold text-primary tabular-nums">{orderTotal} USD</span>
                 </div>
               </div>
             </CardContent>

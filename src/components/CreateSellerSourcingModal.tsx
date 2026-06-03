@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { SearchableSelect } from "@/components/SearchableSelect";
 
-const countries = ["Pakistan"];
+const countries = ["Lebanon"];
 
 interface VariantItem {
   id: string;

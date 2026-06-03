@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
-const countries = ["Pakistan"];
+const countries = ["Lebanon"];
 
 interface SourcingRequest {
   id: string;

@@ -201,13 +201,13 @@ function reachedDeliveredStage(o: DashboardOrder): boolean {
 const SHIPPED_DELIVERY_STATUSES = ['shipped', 'booked', 'in_transit', 'with_courier', 'delivered', 'paid', 'returned'];
 
 function computeDailyData(orders: DashboardOrder[], numDays: number) {
-  // Use startOfDayPKT(now) as the true UTC timestamp for midnight PKT today.
-  // PKT = UTC+5, no DST → exactly 86 400 000 ms per calendar day.
+  // Use startOfDayPKT(now) as the true UTC timestamp for midnight Lebanon time today.
+  // Lebanon time uses Asia/Beirut boundaries.
   // We avoid eachDayOfIntervalPKT / toPKT here because those return "zoned"
   // Date objects whose internal UTC value is shifted for display purposes;
   // comparing them directly against real UTC timestamps (o.created_at etc.)
   // would give wrong results.
-  const todayStart = startOfDayPKT(new Date()); // real UTC ≡ midnight PKT today
+  const todayStart = startOfDayPKT(new Date()); // real UTC ≡ midnight Lebanon time today
   const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
   const buckets = Array.from({ length: numDays }, (_, i) => {

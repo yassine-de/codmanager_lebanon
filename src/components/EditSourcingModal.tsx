@@ -221,12 +221,12 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     if (!request) return;
     // Generate SKU
     const { data: skuData, error: skuError } = await supabase.rpc("generate_product_sku");
-    if (skuError) throw skuError;
+    if (skuError) throw new Error(`SKU generation failed: ${skuError.message}`);
     const sku = skuData as string;
 
     // Generate display_id
     const { data: displayIdData, error: displayIdError } = await supabase.rpc("generate_product_display_id", { p_seller_id: request.seller_id });
-    if (displayIdError) throw displayIdError;
+    if (displayIdError) throw new Error(`Display ID generation failed: ${displayIdError.message}`);
     const displayId = displayIdData as string;
 
     const insertData: Record<string, unknown> = {
@@ -244,7 +244,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
       variants: request.variants || null,
     };
     const { error } = await supabase.from("products").insert(insertData as any);
-    if (error) throw error;
+    if (error) throw new Error(`Product creation failed: ${error.message}`);
   };
 
   const addStockToExistingProduct = async () => {
@@ -255,7 +255,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
       .select("quantity, variants")
       .eq("id", sourceProductId)
       .single();
-    if (fetchErr) throw fetchErr;
+    if (fetchErr) throw new Error(`Product fetch failed: ${fetchErr.message}`);
 
     const currentQty = prod.quantity || 0;
     const newQty = currentQty + n(quantity);
@@ -295,7 +295,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
     }
 
     const { error } = await supabase.from("products").update(updateData).eq("id", sourceProductId);
-    if (error) throw error;
+    if (error) throw new Error(`Product stock update failed: ${error.message}`);
   };
 
   const updateMutation = useMutation({
@@ -322,8 +322,9 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
         toast.success("Request updated successfully");
       }
     },
-    onError: () => {
-      toast.error("Failed to update request");
+    onError: (error) => {
+      console.error("Failed to update sourcing request", error);
+      toast.error(error instanceof Error ? error.message : "Failed to update request");
     },
   });
 
@@ -660,7 +661,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
               {request.payment_status === "paid" && request.payment_date && (
                 <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5">
                   <span className="text-xs text-muted-foreground">Payment Date</span>
-                  <span className="text-xs font-medium tabular-nums">{new Date(request.payment_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Karachi" })}</span>
+                              <span className="text-xs font-medium tabular-nums">{new Date(request.payment_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Beirut" })}</span>
                 </div>
               )}
             </div>

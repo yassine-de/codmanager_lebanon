@@ -89,7 +89,7 @@ export function calculateInvoiceSummary(params: InvoiceCalcParams): InvoiceSumma
     getProductWeight,
   } = params;
 
-  // 1. Delivered orders → revenue (PKR → USD)
+  // 1. Delivered orders → revenue (USD → USD)
   const delivered = orders.filter(o => o.delivery_status === "delivered");
   const deliveredRevenuePKR = delivered.reduce((sum, o) => sum + o.price * o.quantity, 0);
   const deliveredRevenueUSD = pkrToUsd(deliveredRevenuePKR);

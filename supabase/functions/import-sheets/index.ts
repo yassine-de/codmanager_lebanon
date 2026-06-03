@@ -20,7 +20,7 @@ function cleanPhone(raw: string): string {
 }
 
 /**
- * Normalize phone to +92XXXXXXXXXX format.
+ * Normalize phone to +961XXXXXXXX format.
  * Returns { valid: true, phone } or { valid: false, reason }.
  */
 function normalizePhone(raw: string): { valid: true; phone: string } | { valid: false; reason: string } {
@@ -35,30 +35,30 @@ function normalizePhone(raw: string): { valid: true; phone: string } | { valid: 
 
   let phone = cleanPhone(raw);
 
-  // Convert 0092... → +92...
-  if (phone.startsWith("0092")) {
-    phone = "+92" + phone.slice(4);
+  // Convert 00961... → +961...
+  if (phone.startsWith("00961")) {
+    phone = "+961" + phone.slice(5);
   }
-  // Convert 92... (without +) → +92...
-  else if (phone.startsWith("92") && !phone.startsWith("+")) {
+  // Convert 961... (without +) → +961...
+  else if (phone.startsWith("961") && !phone.startsWith("+")) {
     phone = "+" + phone;
   }
-  // No country code — prepend +92
+  // No country code — prepend +961
   else if (phone.startsWith("0")) {
-    phone = "+92" + phone.slice(1);
+    phone = "+961" + phone.slice(1);
   }
-  // Already has +92
-  else if (phone.startsWith("+92")) {
+  // Already has +961
+  else if (phone.startsWith("+961")) {
     // keep as-is
   }
-  // Just digits without any prefix (e.g. 3001234567)
+  // Just digits without any prefix (e.g. 70123456)
   else if (/^\d+$/.test(phone)) {
-    phone = "+92" + phone;
+    phone = "+961" + phone;
   }
 
-  // Validate length: +92 + 10 digits = 13 chars
+  // Validate length: Lebanon mobile/landline numbers are commonly 7-8 digits after 961.
   const digitsOnly = phone.replace(/\D/g, "");
-  if (digitsOnly.length < 11 || digitsOnly.length > 13) {
+  if (digitsOnly.length < 10 || digitsOnly.length > 11) {
     return { valid: false, reason: `Phone "${raw}" has invalid length (${digitsOnly.length} digits after formatting to "${phone}")` };
   }
 
@@ -173,9 +173,44 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const body = await req.clone().json().catch(() => ({}));
+    const manualRun = body?.manual === true;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const googleKey = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY");
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    if (!manualRun) {
+      const { data: settings } = await supabase
+        .from("app_settings")
+        .select("key, value")
+        .in("key", ["sheet_import_interval_minutes", "sheet_import_last_run_at"]);
+
+      const settingsMap = new Map((settings || []).map((s) => [s.key, s.value]));
+      const intervalMinutes = Math.max(
+        1,
+        Math.min(1440, Number(settingsMap.get("sheet_import_interval_minutes") || 5) || 5)
+      );
+      const lastRunRaw = settingsMap.get("sheet_import_last_run_at");
+      const lastRunAt = lastRunRaw ? new Date(lastRunRaw) : null;
+      const now = new Date();
+      const nextRunAt = lastRunAt
+        ? new Date(lastRunAt.getTime() + intervalMinutes * 60_000)
+        : null;
+
+      if (nextRunAt && now < nextRunAt) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            skipped: true,
+            reason: "Import interval not reached",
+            interval_minutes: intervalMinutes,
+            next_run_at: nextRunAt.toISOString(),
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
     if (!googleKey) {
       return new Response(
@@ -184,7 +219,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    await supabase
+      .from("app_settings")
+      .upsert(
+        { key: "sheet_import_last_run_at", value: new Date().toISOString(), updated_at: new Date().toISOString() },
+        { onConflict: "key" }
+      );
+
     const accessToken = await getAccessToken(googleKey);
 
     const { data: sheets, error: sheetsError } = await supabase
@@ -318,24 +359,13 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // ── Price sanity validation ──
-        // Block if unit price is suspiciously low (< 50 PKR) — almost certainly a parsing error
-        // or wildly off vs the product's configured price (e.g. parsed "8,372" as "8")
-        const productPrice = Number(product.price) || 0;
-        if (orderData.unit_price > 0 && orderData.unit_price < 50) {
+        // ── Price validation ──
+        // Lebanon uses lower USD prices than Pakistan. Only reject missing or non-positive prices.
+        if (!orderData.unit_price || orderData.unit_price <= 0) {
           await supabase.from("integration_errors").insert({
             sheet_id: sheet.id,
             order_data: orderData as any,
-            error_message: `Price "${priceStr}" parsed as ${orderData.unit_price} PKR is suspiciously low (< 50). Likely a number format issue (commas/separators). Please verify the sheet column for "Price".`,
-          });
-          errorsCount++;
-          continue;
-        }
-        if (productPrice > 100 && orderData.unit_price > 0 && orderData.unit_price < productPrice * 0.1) {
-          await supabase.from("integration_errors").insert({
-            sheet_id: sheet.id,
-            order_data: orderData as any,
-            error_message: `Price ${orderData.unit_price} PKR is far below product price ${productPrice} PKR. Likely a parsing or column mapping error.`,
+            error_message: `Price "${priceStr}" must be greater than 0 USD.`,
           });
           errorsCount++;
           continue;

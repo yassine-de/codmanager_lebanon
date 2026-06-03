@@ -1,14 +1,12 @@
-// Currency configuration for the CRM system
-// Primary currency: PKR (Pakistani Rupee)
-// Sourcing/Product prices: USD
-// Fees: USD
-// Financial overview: PKR with USD equivalent
+// Currency configuration for the Lebanon CRM system.
+// Primary currency: USD.
 
-export const USD_TO_PKR = 290;
+export const USD_TO_LBP = 89500;
+export const USD_TO_PKR = 1;
 
-/** Format amount as PKR */
+/** Format amount as USD for legacy call sites that still use this function name. */
 export function formatPKR(amount: number): string {
-  return `${amount.toLocaleString()} PKR`;
+  return formatUSD(amount);
 }
 
 /** Format amount as USD */
@@ -17,28 +15,28 @@ export function formatUSD(amount: number): string {
   return `${rounded.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
 }
 
-/** Convert PKR to USD */
+/** Legacy conversion hook retained for compatibility. */
 export function pkrToUsd(pkr: number): number {
-  return pkr / USD_TO_PKR;
+  return pkr;
 }
 
-/** Convert USD to PKR */
+/** Legacy conversion hook retained for compatibility. */
 export function usdToPkr(usd: number): number {
-  return usd * USD_TO_PKR;
+  return usd;
 }
 
-/** Format amount as PKR with USD equivalent shown */
+/** Format amount as USD with no secondary conversion for Lebanon. */
 export function formatPKRWithUSD(pkrAmount: number): { pkr: string; usd: string } {
   return {
-    pkr: formatPKR(pkrAmount),
-    usd: formatUSD(pkrToUsd(pkrAmount)),
+    pkr: formatUSD(pkrAmount),
+    usd: formatUSD(pkrAmount),
   };
 }
 
-/** Format amount as USD with PKR equivalent shown */
+/** Format amount as USD with no secondary conversion for Lebanon. */
 export function formatUSDWithPKR(usdAmount: number): { usd: string; pkr: string } {
   return {
     usd: formatUSD(usdAmount),
-    pkr: formatPKR(usdToPkr(usdAmount)),
+    pkr: formatUSD(usdAmount),
   };
 }

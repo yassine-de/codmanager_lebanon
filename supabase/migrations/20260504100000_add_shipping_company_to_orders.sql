@@ -3,6 +3,8 @@ ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS shipping_company text;
 
 -- Recreate get_follow_ups_data to include shipping_company
+DROP FUNCTION IF EXISTS public.get_follow_ups_data();
+
 CREATE OR REPLACE FUNCTION public.get_follow_ups_data()
  RETURNS TABLE(
   order_id text,

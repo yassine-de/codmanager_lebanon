@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, RefreshCw, Search, Eye, ExternalLink, AlertTriangle, Loader2, Mail, Save, FileSpreadsheet, Database, Copy, Check, Globe, Key, Hash } from "lucide-react";
+import { Plus, Pencil, Trash2, RefreshCw, Search, Eye, ExternalLink, AlertTriangle, Loader2, Mail, Save, FileSpreadsheet, Database, Copy, Check, Globe, Key, Hash, Clock } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { features } from "@/config/features";
 
 interface ColumnMapping {
   order_id: string;
@@ -67,6 +68,9 @@ const Integrations = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [sheetImportInterval, setSheetImportInterval] = useState("5");
+  const [sheetImportLastRun, setSheetImportLastRun] = useState("");
+  const [sheetImportSaving, setSheetImportSaving] = useState(false);
 
   // Service account email
   const [serviceEmail, setServiceEmail] = useState("");
@@ -106,7 +110,48 @@ const Integrations = () => {
     setServiceEmailLoaded(true);
   };
 
+  const fetchSheetImportSettings = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("key, value")
+      .in("key", ["sheet_import_interval_minutes", "sheet_import_last_run_at"]);
+
+    data?.forEach((d) => {
+      if (d.key === "sheet_import_interval_minutes") setSheetImportInterval(d.value || "5");
+      if (d.key === "sheet_import_last_run_at") setSheetImportLastRun(d.value || "");
+    });
+  };
+
+  const saveSheetImportSettings = async () => {
+    const interval = Math.max(1, Math.min(1440, Number(sheetImportInterval) || 5));
+    setSheetImportSaving(true);
+    const { error } = await supabase
+      .from("app_settings")
+      .upsert(
+        { key: "sheet_import_interval_minutes", value: String(interval), updated_at: new Date().toISOString() },
+        { onConflict: "key" }
+      );
+
+    if (error) {
+      toast.error("Error saving import interval");
+    } else {
+      setSheetImportInterval(String(interval));
+      toast.success("Import interval saved");
+    }
+    setSheetImportSaving(false);
+  };
+
   const fetchApiConfig = async () => {
+    if (!features.orioSync) {
+      setApiEnabled(false);
+      setApiKey("");
+      setApiAccountNumber("");
+      setSyncInterval("");
+      setLastStatusSync("");
+      setApiLoaded(true);
+      return;
+    }
+
     const { data } = await supabase
       .from("app_settings")
       .select("key, value")
@@ -124,6 +169,11 @@ const Integrations = () => {
   };
 
   const saveApiConfig = async () => {
+    if (!features.orioSync) {
+      toast.error("ORIO sync is disabled for Lebanon");
+      return;
+    }
+
     setApiSaving(true);
     const now = new Date().toISOString();
     const settings = [
@@ -212,7 +262,12 @@ const Integrations = () => {
     fetchSheets();
     fetchSellers();
     fetchServiceEmail();
-    fetchApiConfig();
+    fetchSheetImportSettings();
+    if (features.orioSync) {
+      fetchApiConfig();
+    } else {
+      setApiLoaded(true);
+    }
   }, []);
 
   const openCreate = () => {
@@ -282,9 +337,10 @@ const Integrations = () => {
 
   const triggerSync = async () => {
     try {
-      const { error } = await supabase.functions.invoke("import-sheets");
+      const { error } = await supabase.functions.invoke("import-sheets", { body: { manual: true } });
       if (error) throw error;
       toast.success("Import triggered successfully");
+      fetchSheetImportSettings();
       setTimeout(fetchSheets, 3000);
     } catch {
       toast.error("Error triggering import");
@@ -338,7 +394,7 @@ const Integrations = () => {
       </div>
 
       {/* API Configuration */}
-      {apiLoaded && (
+      {features.orioSync && apiLoaded && (
         <div className="bg-card border rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -450,6 +506,45 @@ const Integrations = () => {
           </div>
         </div>
       )}
+
+      <div className="bg-card border rounded-xl p-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="bg-primary/10 rounded-lg p-2">
+            <Clock className="w-4 h-4 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs font-semibold">Automatic Sheet Import</p>
+            <p className="text-xs text-muted-foreground">
+              Background imports run by this interval. Manual imports always run immediately.
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Last automatic run: {sheetImportLastRun ? formatDistanceToNow(new Date(sheetImportLastRun), { addSuffix: true }) : "Never"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-end gap-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Interval</Label>
+            <Select value={sheetImportInterval} onValueChange={setSheetImportInterval}>
+              <SelectTrigger className="h-9 w-[150px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Every minute</SelectItem>
+                <SelectItem value="5">Every 5 minutes</SelectItem>
+                <SelectItem value="10">Every 10 minutes</SelectItem>
+                <SelectItem value="15">Every 15 minutes</SelectItem>
+                <SelectItem value="30">Every 30 minutes</SelectItem>
+                <SelectItem value="60">Every hour</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button size="sm" className="h-9 text-xs gap-1.5" onClick={saveSheetImportSettings} disabled={sheetImportSaving}>
+            {sheetImportSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+            Save
+          </Button>
+        </div>
+      </div>
 
       {/* KPI Cards */}
       {!loading && sheets.length > 0 && (
@@ -618,7 +713,7 @@ const Integrations = () => {
                            onClick={async () => {
                              setSyncing(true);
                              try {
-                               const { data, error } = await supabase.functions.invoke("import-sheets");
+                                const { data, error } = await supabase.functions.invoke("import-sheets", { body: { manual: true } });
                                if (error) throw error;
                                const results = data?.results || {};
                                let totalImported = 0;
@@ -832,7 +927,7 @@ const Integrations = () => {
                             <div>
                               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Qty × Price</p>
                               <p className="text-xs font-medium mt-0.5">
-                                {String(od.quantity)} × {od.unit_price ? String(od.unit_price) : "—"} PKR
+                                {String(od.quantity)} × {od.unit_price ? String(od.unit_price) : "—"} USD
                               </p>
                             </div>
                           )}

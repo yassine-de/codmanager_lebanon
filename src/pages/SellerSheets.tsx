@@ -84,7 +84,7 @@ export default function SellerSheets() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("import-sheets");
+      const { data, error } = await supabase.functions.invoke("import-sheets", { body: { manual: true } });
       if (error) throw error;
       const results = data?.results || {};
       let totalImported = 0;
@@ -603,7 +603,7 @@ export default function SellerSheets() {
                             <div>
                               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Qty × Price</p>
                               <p className="text-xs font-medium mt-0.5">
-                                {String(od.quantity)} × {od.unit_price ? String(od.unit_price) : "—"} PKR
+                                {String(od.quantity)} × {od.unit_price ? String(od.unit_price) : "—"} USD
                               </p>
                             </div>
                           )}

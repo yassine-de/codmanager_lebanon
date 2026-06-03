@@ -46,7 +46,7 @@ import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 import { toast } from "sonner";
 import { formatDistanceToNowStrict, differenceInHours } from "date-fns";
 import { formatPKT as format, isTodayPKT as isToday, toPKT } from "@/lib/timezone";
-// isYesterday in PKT context
+// isYesterday in Lebanon time context
 const isYesterday = (date: Date) => {
   const pkt = toPKT(date);
   const yesterdayPkt = toPKT(new Date(Date.now() - 86400000));
@@ -983,7 +983,7 @@ export default function WhatsappInbox() {
     if (/[\u0600-\u06FF\u0900-\u097F\u0980-\u09FF\u4E00-\u9FFF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(t)) {
       return true;
     }
-    // Roman Urdu / Hinglish hint words (broad coverage incl. Pakistani spellings).
+    // Roman Urdu / Hinglish hint words (broad coverage incl. Lebanese spellings).
     const romanHints = /\b(hai|hain|hay|ha|ho|hota|hoti|hote|hoga|hogi|hona|hua|hui|huwa|nahi|nhi|nai|na|nahin|kya|kyu|kyun|kyon|kyunki|kuch|kuchh|raha|rahi|rahe|rahu|rahun|karo|karna|karne|karke|karta|karti|karte|karu|kar|mujhe|mujhko|mera|meri|mere|main|mai|me|aap|apka|apki|apke|apko|tum|tumhara|tumhari|tujhe|tu|bhai|behan|theek|thik|teek|acha|achha|achhi|achhe|abhi|chahiye|chye|chahye|paisa|paise|qeemat|keemat|qimat|bhej|bhejna|bhejdo|bhejen|bhejenge|bejna|bejdo|plz|plzz|haan|han|jee|ji|bilkul|bilkl|sahi|sai|ghalat|samjh|samajh|samjha|samjhi|matlab|kaisa|kaise|kese|kahan|kahaan|jab|tab|magar|lekin|liye|wala|wali|wale|mein|hum|hamara|hamari|hamare|pouch|pucha|baat|kaam|kam|jo|wo|woh|yeh|ye|iska|uska|iss|uss|phir|fir|sirf|zyada|kam|thoda|bohot|bhot|order|item|items|deliver|delivery|address|parsal|parcel|courier|cod|cash|product|wai|wesa|aisa|jaisa|saath|sath|agar|toh|to|chalo|chalega|chalti|dekh|dekho|dekha|sun|suno|suna|bol|bolo|bola|de|do|do|dena|liya|lena|loga|lega|legi|lenge|aaya|aayi|aaye|aye|gya|gyi|gye|gaya|gayi|gaye|milta|milti|milte|mil|mila|mili|paas|saamne|piche|peeche|aage|jaldi|jaldee|der|abhi|baad|pehle|pehlay|pahle|kal|aaj|kal|kalam|sahab|sahib|saheb|saab|janab|hazoor|huzoor|inshallah|mashallah|alhamdulillah|jazak|shukria|shukriya|meherbani|meharbani)\b/i;
     if (romanHints.test(t)) return true;
     // Heuristic: very few common English words → likely non-English Latin script.

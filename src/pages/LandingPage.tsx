@@ -51,7 +51,7 @@ function Reveal({ children, className = "", id, delay = 0 }: { children: React.R
 
 const opportunityPoints = [
   { icon: Users, title: "240M+ Population", desc: "5th most populous nation — a massive untapped consumer base hungry for new products." },
-  { icon: Banknote, title: "COD Dominant", desc: "Cash-on-Delivery rules e-commerce in Pakistan, perfect for high-conversion campaigns." },
+  { icon: Banknote, title: "COD Dominant", desc: "Cash-on-Delivery rules e-commerce in Lebanon, perfect for high-conversion campaigns." },
   { icon: TrendingUp, title: "Fast Growth", desc: "Double-digit YoY growth in online retail and mobile commerce adoption." },
   { icon: MapPin, title: "Untapped Market", desc: "Fewer competitors, lower CPMs, and white-space categories ready to dominate." },
 ];
@@ -83,13 +83,13 @@ const whyPoints = [
 const steps = [
   { icon: Rocket, title: "Launch", desc: "Onboard your products and go live in days." },
   { icon: Headset, title: "Confirm", desc: "Our agents qualify and lock in every order." },
-  { icon: Truck, title: "Deliver", desc: "We pick, ship and deliver across Pakistan." },
+  { icon: Truck, title: "Deliver", desc: "We pick, ship and deliver across Lebanon." },
   { icon: Banknote, title: "Get Paid", desc: "COD collected, reconciled, and paid to you." },
 ];
 
 const systemFeatures = [
   { icon: Package, title: "Order Tracking", desc: "Live status from import to delivery, every step logged." },
-  { icon: Banknote, title: "Cash Tracking", desc: "Every PKR accounted for — invoices, payouts, adjustments." },
+  { icon: Banknote, title: "Cash Tracking", desc: "Every USD accounted for — invoices, payouts, adjustments." },
   { icon: BarChart3, title: "Analytics", desc: "Confirmation, delivery and finance dashboards in one place." },
 ];
 
@@ -155,7 +155,7 @@ export default function LandingPage() {
         <div className="relative w-full">
           <img
             src={heroImg}
-            alt="Scalers — Scale Beyond Borders. Launch & scale your COD business in Pakistan."
+            alt="Scalers — Scale Beyond Borders. Launch & scale your COD business in Lebanon."
             width={1536}
             height={1024}
             className="w-screen h-auto block"
@@ -184,7 +184,7 @@ export default function LandingPage() {
         {/* Full-bleed background image */}
         <img
           src={opportunityImg}
-          alt="Pakistan growth opportunity"
+          alt="Lebanon growth opportunity"
           loading="lazy"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -202,13 +202,13 @@ export default function LandingPage() {
               The Opportunity
             </div>
             <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 text-white leading-[1.05]">
-              Pakistan = Your Next{" "}
+              Lebanon = Your Next{" "}
               <span className="bg-gradient-to-r from-blue-300 via-blue-400 to-blue-600 bg-clip-text text-transparent">
                 Growth Engine
               </span>
             </h2>
             <p className="text-white/75 text-lg md:text-xl leading-relaxed max-w-2xl">
-              While everyone fights over saturated markets, Pakistan is wide open — ready, willing and waiting.
+              While everyone fights over saturated markets, Lebanon is wide open — ready, willing and waiting.
             </p>
           </div>
 
@@ -457,12 +457,12 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6 text-center">
           <div className="text-blue-300 text-xs uppercase tracking-[0.2em] font-semibold mb-4">The Vision</div>
           <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-            Start in Pakistan.
+            Start in Lebanon.
             <br />
             <span className="bg-gradient-to-r from-blue-300 via-blue-400 to-blue-600 bg-clip-text text-transparent">Expand Everywhere.</span>
           </h2>
           <p className="text-white/70 text-lg max-w-2xl mx-auto mb-14">
-            Pakistan is the launchpad. The infrastructure is the rocket. The world is the destination.
+            Lebanon is the launchpad. The infrastructure is the rocket. The world is the destination.
           </p>
           <div className="relative max-w-5xl mx-auto">
             <div className="absolute inset-0 -m-8 bg-[radial-gradient(closest-side,rgba(56,128,255,0.45),transparent_70%)] blur-3xl" />
@@ -489,7 +489,7 @@ export default function LandingPage() {
                 Ready to <span className="bg-gradient-to-r from-blue-300 to-blue-500 bg-clip-text text-transparent">Scale?</span>
               </h2>
               <p className="text-white/75 text-lg md:text-xl max-w-2xl mx-auto mb-10">
-                Enter Pakistan in days, not months. Plug into our infrastructure and start shipping.
+                Enter Lebanon in days, not months. Plug into our infrastructure and start shipping.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <a
@@ -525,7 +525,7 @@ export default function LandingPage() {
               </div>
             </div>
             <p className="text-sm text-white/55 max-w-xs">
-              3PL & e-commerce infrastructure helping sellers enter Pakistan and scale COD businesses.
+              3PL & e-commerce infrastructure helping sellers enter Lebanon and scale COD businesses.
             </p>
           </div>
 

@@ -52,6 +52,8 @@ CREATE INDEX idx_order_follow_ups_order_id ON public.order_follow_ups(order_id);
 CREATE INDEX idx_order_follow_ups_status ON public.order_follow_ups(follow_up_status);
 
 -- RPC: Get follow ups data with computed shipped_at from order_history
+DROP FUNCTION IF EXISTS public.get_follow_ups_data();
+
 CREATE OR REPLACE FUNCTION public.get_follow_ups_data()
 RETURNS TABLE (
   order_id TEXT,

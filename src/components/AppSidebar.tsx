@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { features, type FeatureKey } from "@/config/features";
 import {
   Sidebar,
   SidebarContent,
@@ -22,28 +23,44 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUnseen: number, productUnseen: number, supportUnread: number, agentNewOrders: number, pendingAdjustments: number, followUpPending: number) => [
+type NavItem = {
+  title: string;
+  url: string;
+  icon: any;
+  badge?: number;
+  permission?: string;
+  sellerVisible?: boolean;
+  sellerOnly?: boolean;
+  adminOnly?: boolean;
+  agentOnly?: boolean;
+  followUpOnly?: boolean;
+  adminAgentOnly?: boolean;
+  beta?: boolean;
+  feature?: FeatureKey;
+};
+
+const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUnseen: number, productUnseen: number, supportUnread: number, agentNewOrders: number, pendingAdjustments: number, followUpPending: number): NavItem[] => [
   { title: "dashboard", url: "/", icon: LayoutDashboard },
   { title: "orders", url: "/orders", icon: ShoppingCart, badge: orderCount, permission: "access_to_orders", sellerVisible: true },
   { title: "analytics", url: "/seller-analytics", icon: BarChart3, sellerOnly: true, beta: true },
-  { title: "Follow Ups", url: "/follow-ups", icon: ClipboardCheck, adminOnly: true },
+  { title: "Follow Ups", url: "/follow-ups", icon: ClipboardCheck, adminOnly: true, feature: "followUps" },
   { title: "products", url: "/products", icon: BoxIcon, permission: "access_to_products", sellerVisible: true, badge: productUnseen > 0 ? productUnseen : undefined },
   
-  { title: "sourcing", url: "/sourcing", icon: Package2, permission: "access_to_sourcing", badge: adminSourcingUnseen > 0 ? adminSourcingUnseen : undefined },
-  { title: "Support", url: "/support", icon: MessageSquare, permission: "access_to_settings", badge: supportUnread > 0 ? supportUnread : undefined },
-  { title: "Alerts", url: "/alerts", icon: Megaphone, permission: "access_to_settings" },
+  { title: "sourcing", url: "/sourcing", icon: Package2, permission: "access_to_sourcing", badge: adminSourcingUnseen > 0 ? adminSourcingUnseen : undefined, feature: "sourcing" },
+  { title: "Support", url: "/support", icon: MessageSquare, permission: "access_to_settings", badge: supportUnread > 0 ? supportUnread : undefined, feature: "support" },
+  { title: "Alerts", url: "/alerts", icon: Megaphone, permission: "access_to_settings", feature: "alerts" },
   { title: "invoices", url: "/invoices", icon: FileText, permission: "access_to_settings", sellerVisible: true },
   { title: "Adjustments", url: "/adjustments", icon: ArrowUpDown, permission: "access_to_settings", badge: pendingAdjustments > 0 ? pendingAdjustments : undefined },
-  { title: "sourcing", url: "/seller-sourcing", icon: Package2, sellerOnly: true, badge: sourcingUnseen > 0 ? sourcingUnseen : undefined },
+  { title: "sourcing", url: "/seller-sourcing", icon: Package2, sellerOnly: true, badge: sourcingUnseen > 0 ? sourcingUnseen : undefined, feature: "sourcing" },
   { title: "sheets", url: "/sheets", icon: FileSpreadsheet, sellerOnly: true },
   { title: "simulation", url: "/simulation", icon: Calculator, sellerOnly: true },
   { title: "settings", url: "/seller-settings", icon: Settings, sellerOnly: true },
-  { title: "My Dashboard", url: "/agent-dashboard", icon: LayoutDashboard, agentOnly: true },
-  { title: "Process Orders", url: "/agent-orders", icon: Play, agentOnly: true, badge: agentNewOrders > 0 ? agentNewOrders : undefined },
-  { title: "Confirmed Orders", url: "/agent-confirmed", icon: ListChecks, agentOnly: true },
-  { title: "Dashboard", url: "/follow-up/dashboard", icon: LayoutDashboard, followUpOnly: true },
-  { title: "Follow Ups", url: "/follow-up/queue", icon: ClipboardCheck, followUpOnly: true, badge: followUpPending > 0 ? followUpPending : undefined },
-  { title: "Control", url: "/follow-up/control", icon: ListChecks, followUpOnly: true },
+  { title: "My Dashboard", url: "/agent-dashboard", icon: LayoutDashboard, agentOnly: true, feature: "agentAssignment" },
+  { title: "Process Orders", url: "/agent-orders", icon: Play, agentOnly: true, badge: agentNewOrders > 0 ? agentNewOrders : undefined, feature: "agentAssignment" },
+  { title: "Confirmed Orders", url: "/agent-confirmed", icon: ListChecks, agentOnly: true, feature: "agentAssignment" },
+  { title: "Dashboard", url: "/follow-up/dashboard", icon: LayoutDashboard, followUpOnly: true, feature: "followUps" },
+  { title: "Follow Ups", url: "/follow-up/queue", icon: ClipboardCheck, followUpOnly: true, badge: followUpPending > 0 ? followUpPending : undefined, feature: "followUps" },
+  { title: "Control", url: "/follow-up/control", icon: ListChecks, followUpOnly: true, feature: "followUps" },
 ];
 
 const analyticsSubItems = [
@@ -51,15 +68,15 @@ const analyticsSubItems = [
   { title: "delivery", url: "/analytics/delivery", icon: Package, permission: "access_to_analytics" },
   { title: "seller", url: "/analytics/seller", icon: Store, permission: "access_to_analytics" },
   { title: "finance", url: "/analytics/finance", icon: DollarSign, permission: "access_to_analytics" },
-  { title: "follow_up", url: "/analytics/follow-up", icon: PhoneForwarded, permission: "access_to_analytics" },
-  { title: "Agent Monitoring", url: "/analytics/agent-monitoring", icon: Activity, permission: "access_to_analytics" },
+  { title: "follow_up", url: "/analytics/follow-up", icon: PhoneForwarded, permission: "access_to_analytics", feature: "followUps" as FeatureKey },
+  { title: "Agent Monitoring", url: "/analytics/agent-monitoring", icon: Activity, permission: "access_to_analytics", feature: "agentAssignment" as FeatureKey },
 ];
 
 const settingsSubItems = [
   { title: "users", url: "/users", icon: Users, permission: "access_to_users" },
   { title: "Rates", url: "/rates", icon: BadgeDollarSign, permission: "access_to_settings" },
   { title: "integrations", url: "/integrations", icon: Link2, permission: "access_to_settings" },
-  { title: "System Health", url: "/system-health", icon: Activity, permission: "access_to_settings" },
+  { title: "System Health", url: "/system-health", icon: Activity, permission: "access_to_settings", feature: "orioSync" as FeatureKey },
 ];
 
 const getWhatsappSubItems = (inboxUnread: number) => [
@@ -105,7 +122,7 @@ export function AppSidebar() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: isSeller && !!authUser,
+    enabled: features.sourcing && isSeller && !!authUser,
     refetchInterval: 15000,
   });
 
@@ -120,7 +137,7 @@ export function AppSidebar() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: isAdmin && !!authUser,
+    enabled: features.sourcing && isAdmin && !!authUser,
     refetchInterval: 15000,
   });
 
@@ -149,7 +166,7 @@ export function AppSidebar() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: isAdmin && !!authUser,
+    enabled: features.support && isAdmin && !!authUser,
     refetchInterval: 10000,
   });
 
@@ -164,7 +181,7 @@ export function AppSidebar() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: isAgent && !!authUser,
+    enabled: features.agentAssignment && isAgent && !!authUser,
     refetchInterval: 15000,
   });
 
@@ -178,7 +195,7 @@ export function AppSidebar() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: isAdmin && !!authUser,
+    enabled: features.whatsapp && isAdmin && !!authUser,
     refetchInterval: 15000,
   });
 
@@ -231,14 +248,15 @@ export function AppSidebar() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: isFollowUp && !!authUser,
+    enabled: features.followUps && isFollowUp && !!authUser,
     refetchInterval: 15000,
   });
 
   const navItems = getNavItems(orderCount, sourcingUnseen, adminSourcingUnseen, productUnseen, supportUnread, agentNewOrders, pendingAdjustments, followUpPending);
   const whatsappSubItems = getWhatsappSubItems(whatsappInboxUnread);
 
-  const visibleItems = navItems.filter((item: any) => {
+  const visibleItems = navItems.filter((item: NavItem) => {
+    if (item.feature && !features[item.feature]) return false;
     if (item.followUpOnly) return isFollowUp;
     if (item.agentOnly) return isAgent;
     if (item.sellerOnly) return isSeller;
@@ -249,11 +267,11 @@ export function AppSidebar() {
     if (isSeller) return !item.permission || item.sellerVisible;
     return !item.permission || hasPermission(item.permission);
   });
-  const visibleAnalyticsItems = analyticsSubItems.filter((item) => hasPermission(item.permission));
+  const visibleAnalyticsItems = analyticsSubItems.filter((item) => (!item.feature || features[item.feature]) && hasPermission(item.permission));
   const showAnalytics = visibleAnalyticsItems.length > 0;
   const isAnalyticsActive = location.pathname.startsWith("/analytics");
 
-  const visibleSettingsItems = settingsSubItems.filter((item) => hasPermission(item.permission));
+  const visibleSettingsItems = settingsSubItems.filter((item) => (!item.feature || features[item.feature]) && hasPermission(item.permission));
   const showSettings = hasPermission("access_to_settings") || hasPermission("access_to_users");
   const isSettingsActive = ["/settings", "/users", "/integrations", "/rates", "/system-health"].some((p) =>
     location.pathname.startsWith(p)
@@ -338,7 +356,7 @@ export function AppSidebar() {
                     </SidebarMenuItem>
 
                     {/* WhatsApp Automation dropdown — injected right after Follow Ups */}
-                    {item.url === '/follow-ups' && isAdmin && (
+                    {features.whatsapp && item.url === '/follow-ups' && isAdmin && (
                       <Collapsible defaultOpen={location.pathname.startsWith("/whatsapp")} className="group/whatsapp">
                         <SidebarMenuItem>
                           <CollapsibleTrigger asChild>

@@ -1,4 +1,6 @@
 -- 1) Update RPC to filter by delivery_status (shipped pipeline) instead of shipping_status='booked'
+DROP FUNCTION IF EXISTS public.get_follow_ups_data();
+
 CREATE OR REPLACE FUNCTION public.get_follow_ups_data()
 RETURNS TABLE(order_id text, customer_name text, customer_phone text, customer_city text, delivery_status text, shipping_status text, orio_order_id integer, orio_consignment_no text, shipped_at timestamp with time zone, days_since_shipped integer, follow_up_status text, follow_up_updated_at timestamp with time zone, follow_up_updated_by uuid, order_created_at timestamp with time zone, order_updated_at timestamp with time zone, seller_id uuid, seller_name text, agent_id uuid, agent_name text, follow_up_assigned_to uuid, follow_up_note text)
 LANGUAGE plpgsql

@@ -192,7 +192,7 @@ export default function OrderDetail() {
           {shippingCost > 0 && (
             <div className="rounded-lg border bg-muted/30 p-3 text-center">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Shipping</p>
-              <p className="text-sm font-semibold tabular-nums mt-0.5">{shippingCost} PKR</p>
+              <p className="text-sm font-semibold tabular-nums mt-0.5">{shippingCost} USD</p>
             </div>
           )}
           {fragile && (
@@ -231,15 +231,15 @@ export default function OrderDetail() {
             <div key={i} className="flex items-center justify-between p-4">
               <div>
                 <p className="font-medium">{p.name}</p>
-                <p className="text-sm text-muted-foreground">Qty: {p.qty} × {p.price.toLocaleString()} PKR</p>
+                <p className="text-sm text-muted-foreground">Qty: {p.qty} × {p.price.toLocaleString()} USD</p>
               </div>
-              <p className="font-medium tabular-nums">{(p.qty * p.price).toLocaleString()} PKR</p>
+              <p className="font-medium tabular-nums">{(p.qty * p.price).toLocaleString()} USD</p>
             </div>
           ))}
         </div>
         <div className="p-4 border-t flex justify-between items-center bg-muted/30">
           <span className="font-semibold">Total</span>
-          <span className="text-lg font-semibold tabular-nums">{total.toLocaleString()} PKR</span>
+          <span className="text-lg font-semibold tabular-nums">{total.toLocaleString()} USD</span>
         </div>
       </div>
 

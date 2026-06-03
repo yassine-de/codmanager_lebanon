@@ -426,11 +426,11 @@ const AgentConfirmedOrders = () => {
                             <Package className="h-3 w-3 text-muted-foreground" /> {order.product_name} ×{order.quantity}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right font-semibold">{order.total_amount} PKR</TableCell>
+                        <TableCell className="text-right font-semibold">{order.total_amount} USD</TableCell>
                         <TableCell>
                           {order.last_price != null && Number(order.last_price) > 0 ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-accent/60 px-1.5 py-0.5 rounded">
-                              <DollarSign className="h-3 w-3" /> {order.last_price} PKR
+                              <DollarSign className="h-3 w-3" /> {order.last_price} USD
                             </span>
                           ) : (
                             <span className="text-[10px] text-muted-foreground">—</span>
@@ -562,7 +562,7 @@ const AgentConfirmedOrders = () => {
                             }}
                           >
                             <span className="truncate font-medium">{sp.name}</span>
-                            <span className="text-muted-foreground shrink-0">{sp.price} PKR</span>
+                            <span className="text-muted-foreground shrink-0">{sp.price} USD</span>
                           </button>
                         ))}
                       </div>
@@ -602,7 +602,7 @@ const AgentConfirmedOrders = () => {
                 </div>
               </div>
               <div className="text-xs text-muted-foreground">
-                Total: <span className="font-semibold text-foreground">{(editForm.price * editForm.quantity).toFixed(2)} PKR</span>
+                Total: <span className="font-semibold text-foreground">{(editForm.price * editForm.quantity).toFixed(2)} USD</span>
               </div>
 
               {/* Last Price & Offers */}
@@ -610,7 +610,7 @@ const AgentConfirmedOrders = () => {
                 <div className="rounded-md bg-accent/60 border border-accent px-2.5 py-1.5 flex items-center gap-2">
                   <DollarSign className="h-3 w-3 text-primary shrink-0" />
                   <span className="text-[10px] text-muted-foreground">Last sold at</span>
-                  <span className="text-xs font-bold text-primary tabular-nums">{editOrder.last_price} PKR</span>
+                  <span className="text-xs font-bold text-primary tabular-nums">{editOrder.last_price} USD</span>
                 </div>
               )}
               {editOrder?.offers && editOrder.offers.trim() && (

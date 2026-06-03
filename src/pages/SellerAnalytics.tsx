@@ -1078,7 +1078,7 @@ export default function SellerAnalytics() {
                               : row.revenue >= 1_000
                               ? `${(row.revenue / 1_000).toFixed(0)}k`
                               : row.revenue.toLocaleString()}{" "}
-                            <span className="text-muted-foreground font-normal">PKR</span>
+                            <span className="text-muted-foreground font-normal">USD</span>
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
