@@ -3,7 +3,7 @@ export const features = {
   whatsappAi: false,
   whatsappCampaigns: false,
   followUps: false,
-  agentAssignment: false,
+  agentAssignment: true,
   freightForwarder: false,
   orioSync: false,
 
