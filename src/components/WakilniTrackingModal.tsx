@@ -10,6 +10,7 @@ interface WakilniTrackingModalProps {
   sellerId?: string | null;
   open: boolean;
   onClose: () => void;
+  onStatusSync?: () => void;
 }
 
 interface WakilniTrackingPayload {
@@ -21,9 +22,11 @@ interface WakilniTrackingPayload {
   comments?: string[];
   logs?: { status?: string; status_code?: string | number; created_at?: string }[];
   raw?: unknown;
+  delivery_status?: string;
+  local_status_updated?: boolean;
 }
 
-export default function WakilniTrackingModal({ trackingId, wakilniOrderId, systemId, sellerId, open, onClose }: WakilniTrackingModalProps) {
+export default function WakilniTrackingModal({ trackingId, wakilniOrderId, systemId, sellerId, open, onClose, onStatusSync }: WakilniTrackingModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<WakilniTrackingPayload | null>(null);
@@ -36,16 +39,19 @@ export default function WakilniTrackingModal({ trackingId, wakilniOrderId, syste
 
     supabase.functions
       .invoke("wakilni-sync", {
-        body: { action: "track", tracking_id: trackingId, wakilni_order_id: wakilniOrderId },
+        body: { action: "track", tracking_id: trackingId, wakilni_order_id: wakilniOrderId, local_order_id: sellerId, system_id: systemId },
       })
       .then(({ data, error: fnError }) => {
         if (fnError) setError(fnError.message);
         else if (data?.error) setError(data.error);
-        else setPayload(data);
+        else {
+          setPayload(data);
+          if (data?.local_status_updated) onStatusSync?.();
+        }
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [open, trackingId, wakilniOrderId]);
+  }, [open, trackingId, wakilniOrderId, sellerId, systemId, onStatusSync]);
 
   const titleId = payload?.tracking_id || trackingId || wakilniOrderId || "Wakilni";
   const logs = payload?.logs || [];

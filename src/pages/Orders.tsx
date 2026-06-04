@@ -1182,7 +1182,11 @@ export default function Orders() {
           systemId={trackingTarget.systemId}
           sellerId={trackingTarget.sellerId}
           open={!!trackingTarget}
-          onClose={() => setTrackingTarget(null)}
+          onClose={() => {
+            setTrackingTarget(null);
+            setRefreshKey(k => k + 1);
+          }}
+          onStatusSync={() => setRefreshKey(k => k + 1)}
         />
       )}
 

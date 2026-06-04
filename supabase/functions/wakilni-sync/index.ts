@@ -318,7 +318,80 @@ async function syncOrder(supabase: ReturnType<typeof createClient>, orderId: str
   }
 }
 
-async function trackOrder(trackingId?: string | null, wakilniOrderId?: string | null) {
+function mapWakilniDeliveryStatus(status?: string | null, statusCode?: string | number | null) {
+  const normalized = String(status || "").toLowerCase().trim();
+  const code = String(statusCode ?? "").trim();
+
+  if (["6"].includes(code) || ["declined", "rejected", "refused", "cancelled", "canceled"].some((s) => normalized.includes(s))) {
+    return "rejected";
+  }
+  if (normalized.includes("delivered")) return "delivered";
+  if (normalized.includes("return")) return "returned";
+  if (normalized.includes("failed")) return "failed_attempt";
+  if (normalized.includes("out for delivery") || normalized.includes("with courier")) return "with_courier";
+  if (normalized.includes("transit")) return "in_transit";
+  if (normalized.includes("picked") || normalized.includes("pickup") || normalized.includes("shipped")) return "shipped";
+  if (normalized.includes("pending") || normalized.includes("created")) return "booked";
+
+  return null;
+}
+
+async function updateLocalOrderStatus(
+  supabase: ReturnType<typeof createClient>,
+  result: any,
+  identifiers: { trackingId?: string | null; wakilniOrderId?: string | null; localOrderId?: string | null; systemId?: string | number | null },
+) {
+  const mappedStatus = mapWakilniDeliveryStatus(result.status, result.status_code);
+  if (!mappedStatus) return result;
+
+  let query = supabase.from("orders").select("id, order_id, delivery_status").limit(1);
+  if (identifiers.trackingId) {
+    query = query.eq("wakilni_tracking_id", identifiers.trackingId);
+  } else if (identifiers.wakilniOrderId) {
+    query = query.eq("wakilni_order_id", identifiers.wakilniOrderId);
+  } else if (identifiers.localOrderId) {
+    query = query.eq("order_id", identifiers.localOrderId);
+  } else if (identifiers.systemId) {
+    query = query.eq("system_id", identifiers.systemId);
+  } else {
+    return { ...result, delivery_status: mappedStatus };
+  }
+
+  const { data: rows } = await query;
+  const order = rows?.[0];
+  if (!order) return { ...result, delivery_status: mappedStatus };
+
+  if (order.delivery_status !== mappedStatus) {
+    await supabase
+      .from("orders")
+      .update({
+        delivery_status: mappedStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", order.id);
+
+    await supabase.from("order_history").insert({
+      order_id: order.order_id,
+      changed_by: null,
+      changed_by_role: "system",
+      field_changed: "delivery_status",
+      old_value: order.delivery_status,
+      new_value: mappedStatus,
+      action_type: "wakilni_tracking_sync",
+    });
+  }
+
+  return {
+    ...result,
+    delivery_status: mappedStatus,
+    local_order_id: order.order_id,
+    local_status_updated: order.delivery_status !== mappedStatus,
+  };
+}
+
+async function trackOrder(supabase: ReturnType<typeof createClient>, body: any) {
+  const trackingId = body.tracking_id || body.trackingId || null;
+  const wakilniOrderId = body.wakilni_order_id || body.wakilniOrderId || null;
   const token = await getWakilniToken();
   const result: any = {
     tracking_id: trackingId || null,
@@ -375,7 +448,12 @@ async function trackOrder(trackingId?: string | null, wakilniOrderId?: string | 
     throw new Error(`${result.status_error}; ${result.details_error}`);
   }
 
-  return result;
+  return await updateLocalOrderStatus(supabase, result, {
+    trackingId,
+    wakilniOrderId,
+    localOrderId: body.local_order_id || body.localOrderId || null,
+    systemId: body.system_id || body.systemId || null,
+  });
 }
 
 Deno.serve(async (req) => {
@@ -392,7 +470,7 @@ Deno.serve(async (req) => {
       if (!orderId) throw new Error("order_id required");
       result = await syncOrder(supabase, String(orderId));
     } else if (action === "track") {
-      result = await trackOrder(body.tracking_id || body.trackingId, body.wakilni_order_id || body.wakilniOrderId);
+      result = await trackOrder(supabase, body);
     } else {
       throw new Error(`Unknown action: ${action}`);
     }
