@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { pkrToUsd } from "@/lib/currency";
+import { formatUSD } from "@/lib/currency";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, ShoppingCart, CheckCircle2, Truck, Package, TrendingUp, ImageOff, Sparkles, RefreshCw, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -265,13 +265,11 @@ export default function ProductDetail() {
         />
         <KPICard
           label="Total Sales"
-          value={`${(stats?.totalSales ?? 0).toLocaleString()} Rs`}
-          suffix={`= ${pkrToUsd(stats?.totalSales ?? 0).toFixed(1)} $`}
+          value={formatUSD(stats?.totalSales ?? 0)}
         />
         <KPICard
           label="Avg. Order Value"
-          value={`${(stats?.avgOrderValue ?? 0).toLocaleString()} Rs`}
-          suffix={`= ${pkrToUsd(stats?.avgOrderValue ?? 0).toFixed(1)} $`}
+          value={formatUSD(stats?.avgOrderValue ?? 0)}
         />
         <KPICard
           label="Confirmed"

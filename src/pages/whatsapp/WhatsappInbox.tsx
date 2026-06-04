@@ -2338,7 +2338,7 @@ export default function WhatsappInbox() {
                   </div>
                   <div>
                     <div className="text-[11px] text-muted-foreground">Total</div>
-                    <div className="font-semibold">Rs {Number(order.total_amount || 0).toLocaleString()}</div>
+                    <div className="font-semibold">{Number(order.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD</div>
                   </div>
                   <div>
                     <div className="text-[11px] text-muted-foreground">City</div>

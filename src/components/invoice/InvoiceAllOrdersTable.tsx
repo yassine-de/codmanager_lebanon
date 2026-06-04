@@ -136,7 +136,7 @@ export function InvoiceAllOrdersTable({ orders, invoiceStatus }: Props) {
               <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Product</th>
               <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Qty</th>
               <th className="text-center px-3 py-2 font-semibold text-muted-foreground">Status</th>
-              <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Amount (Rs)</th>
+              <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Amount (USD)</th>
             </tr>
           </thead>
           <tbody>

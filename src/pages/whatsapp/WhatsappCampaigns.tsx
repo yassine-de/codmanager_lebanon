@@ -643,7 +643,7 @@ function CreateCampaignDialog({
                   id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. April Promo - Karachi"
+                  placeholder="e.g. April Promo - Beirut"
                   className="mt-1.5"
                 />
               </div>

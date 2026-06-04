@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Calculator, Package, TrendingUp, TrendingDown, DollarSign, ShoppingCart, Truck, Weight, Users, Target, BarChart3, Zap, ArrowRight, CalendarIcon } from "lucide-react";
-import { USD_TO_PKR } from "@/lib/currency";
 import { formatPKT as format } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -213,7 +212,7 @@ export default function Simulation() {
       if (!selectedProduct) return null;
       const buyingPrice = selectedProduct.landed_price ? Number(selectedProduct.landed_price) : Math.round(Number(selectedProduct.price) * 0.4);
       return {
-        sellingPrice: Number(selectedProduct.price) / USD_TO_PKR,
+        sellingPrice: Number(selectedProduct.price),
         buyingPrice,
         confirmationRate: orderMetrics.confirmationRate,
         deliveryRate: orderMetrics.deliveryRate,
@@ -317,7 +316,7 @@ export default function Simulation() {
                       <SelectItem key={p.id} value={p.id} className="text-sm">
                         <div className="flex items-center gap-2">
                           {p.image_url && <img src={p.image_url} alt="" className="w-5 h-5 rounded object-cover" />}
-                          {p.name} — {p.price.toLocaleString()} Rs ({(p.price / USD_TO_PKR).toFixed(2)} $)
+                          {p.name} — {p.price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
                         </div>
                       </SelectItem>
                     ))}

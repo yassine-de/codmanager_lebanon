@@ -612,12 +612,10 @@ export default function Products() {
                           </td>
                         )}
                         <td className="py-2 px-3 text-right tabular-nums text-xs font-medium">
-                          <div>{product.price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} $</div>
-                          <div className="text-[10px] text-muted-foreground">{(product.price * 290).toLocaleString()} Rs</div>
+                          <div>{product.price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD</div>
                         </td>
                         <td className="py-2 px-3 text-right tabular-nums text-xs font-medium">
-                          <div>{product.lastSellingPrice.toLocaleString()} Rs</div>
-                          <div className="text-[10px] text-muted-foreground">{(product.lastSellingPrice / 290).toFixed(2)} $</div>
+                          <div>{product.lastSellingPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD</div>
                         </td>
                         <td className="py-2 px-3 text-center tabular-nums text-xs">{product.totalQty}</td>
                         <td className="py-2 px-3 text-center">
