@@ -26,6 +26,9 @@ const isValidUrl = (str: string): boolean => {
 const isSupabaseStorageUrl = (url: string): boolean =>
   /supabase\.co\/storage\/v1\/object\/public\//i.test(url);
 
+const hasInternalStoredImage = (url: string): boolean =>
+  isSupabaseStorageUrl(url);
+
 interface EditProductModalProps {
   product: Product | null;
   open: boolean;
@@ -42,6 +45,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
   const [seller, setSeller] = useState("");
   const [sku, setSku] = useState("");
   const [image, setImage] = useState("");
+  const [storedImageUrl, setStoredImageUrl] = useState("");
   const [price, setPrice] = useState(0);
   const [totalQty, setTotalQty] = useState(0);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
@@ -78,6 +82,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
 
   const dbUpdateMutation = useMutation({
     mutationFn: async () => {
+      const imageValue = image.trim() || storedImageUrl || product!.image || "";
       const updateData: Record<string, unknown> = {
         name: name.trim(),
         price: lastSellingPrice,
@@ -97,7 +102,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
         })),
         product_url: storeLink.trim(),
         video_url: videoLink.trim(),
-        image_url: image.trim(),
+        image_url: imageValue,
         updated_at: new Date().toISOString(),
       };
 
@@ -145,7 +150,9 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
     setName(product.name);
     setSeller(product.seller);
     setSku(product.sku);
-    setImage(isSupabaseStorageUrl(product.image) ? "" : product.image);
+    const internalImage = hasInternalStoredImage(product.image) ? product.image : "";
+    setStoredImageUrl(internalImage);
+    setImage(internalImage ? "" : product.image);
     setPrice(product.price);
     setTotalQty(product.totalQty);
     setVariants(product.variants.map(v => ({ ...v })));
@@ -341,7 +348,17 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Image URL</Label>
-                  <Input value={image} onChange={e => setImage(e.target.value)} placeholder="https://..." className="h-9 text-sm" />
+                  <Input
+                    value={image}
+                    onChange={e => setImage(e.target.value)}
+                    placeholder={storedImageUrl ? "Stored product image (hidden)" : "https://..."}
+                    className="h-9 text-sm"
+                  />
+                  {storedImageUrl && !image.trim() && (
+                    <p className="text-[11px] text-muted-foreground">
+                      The stored image is preserved. Paste a new URL only if you want to replace it.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
