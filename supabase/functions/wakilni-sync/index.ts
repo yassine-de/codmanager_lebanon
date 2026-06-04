@@ -126,11 +126,17 @@ function splitName(name: string | null | undefined) {
 }
 
 function normalizePhone(phone: string | null | undefined) {
-  const digits = String(phone || "").replace(/[^\d+]/g, "");
+  const digits = normalizePhoneDigits(String(phone || "")).replace(/[^\d+]/g, "");
   if (digits.startsWith("+")) return digits;
   if (digits.startsWith("961")) return `+${digits}`;
   if (digits.startsWith("0")) return `+961${digits.slice(1)}`;
   return digits ? `+961${digits}` : "";
+}
+
+function normalizePhoneDigits(raw: string): string {
+  return String(raw || "")
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
 }
 
 function pickId(payload: any) {

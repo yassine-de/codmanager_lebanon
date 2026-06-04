@@ -36,11 +36,17 @@ interface FlowEdge {
 }
 
 function normalizePhone(phone: string, defaultCC: string) {
-  let p = (phone || "").replace(/\D/g, "");
+  let p = normalizePhoneDigits(phone).replace(/\D/g, "");
   if (!p) return "";
   if (p.startsWith("00")) p = p.slice(2);
   if (p.startsWith("0")) p = defaultCC + p.slice(1);
   return p;
+}
+
+function normalizePhoneDigits(raw: string): string {
+  return String(raw || "")
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
 }
 
 function render(template: string, vars: Record<string, any>) {

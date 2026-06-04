@@ -16,7 +16,14 @@ function hasLetters(phone: string): boolean {
 
 /** Strip spaces, dashes, dots, parentheses */
 function cleanPhone(raw: string): string {
-  return raw.replace(/[\s\-\.\(\)]/g, "");
+  return normalizePhoneDigits(raw).replace(/[\s\-\.\(\)]/g, "");
+}
+
+/** Convert Arabic and Persian numerals to ASCII digits. */
+function normalizePhoneDigits(raw: string): string {
+  return String(raw || "")
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
 }
 
 /**
