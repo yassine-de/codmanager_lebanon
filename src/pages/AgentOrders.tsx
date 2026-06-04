@@ -880,7 +880,6 @@ const AgentOrders = () => {
         ...item,
         variantName,
         variantSku: String(variant?.sku || ""),
-        price: variant?.price != null ? Number(variant.price) : item.price,
       };
     }));
   };
