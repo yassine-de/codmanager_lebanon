@@ -6,12 +6,12 @@ interface DataVisibilityContextType {
 }
 
 const DataVisibilityContext = createContext<DataVisibilityContextType>({
-  isDataVisible: false,
+  isDataVisible: true,
   toggleDataVisibility: () => {},
 });
 
 export function DataVisibilityProvider({ children }: { children: React.ReactNode }) {
-  const [isDataVisible, setIsDataVisible] = useState(false);
+  const [isDataVisible, setIsDataVisible] = useState(true);
 
   const toggleDataVisibility = () => setIsDataVisible((prev) => !prev);
 
