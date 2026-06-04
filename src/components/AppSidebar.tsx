@@ -58,6 +58,7 @@ const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUn
   { title: "My Dashboard", url: "/agent-dashboard", icon: LayoutDashboard, agentOnly: true, feature: "agentAssignment" },
   { title: "Process Orders", url: "/agent-orders", icon: Play, agentOnly: true, badge: agentNewOrders > 0 ? agentNewOrders : undefined, feature: "agentAssignment" },
   { title: "Confirmed Orders", url: "/agent-confirmed", icon: ListChecks, agentOnly: true, feature: "agentAssignment" },
+  { title: "products", url: "/products", icon: BoxIcon, agentOnly: true },
   { title: "Dashboard", url: "/follow-up/dashboard", icon: LayoutDashboard, followUpOnly: true, feature: "followUps" },
   { title: "Follow Ups", url: "/follow-up/queue", icon: ClipboardCheck, followUpOnly: true, badge: followUpPending > 0 ? followUpPending : undefined, feature: "followUps" },
   { title: "Control", url: "/follow-up/control", icon: ListChecks, followUpOnly: true, feature: "followUps" },

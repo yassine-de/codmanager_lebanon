@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { formatPKT as format } from "@/lib/timezone";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Filter, X, Pencil, Plus, Package, ImageOff, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Layers, Eye } from "lucide-react";
+import { Search, Filter, X, Pencil, Plus, Package, ImageOff, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Layers, Eye, ExternalLink, Video } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,6 +23,7 @@ export default function Products() {
   const queryClient = useQueryClient();
   const isAdmin = authUser?.role === "admin";
   const isSeller = authUser?.role === "seller";
+  const isAgent = authUser?.role === "agent";
   const [localProducts, setLocalProducts] = useState<Product[]>([]);
 
   // Fetch DB products (RLS ensures sellers only see their own)
@@ -63,7 +64,21 @@ export default function Products() {
 
       return allRows;
     },
+    enabled: !isAgent,
     refetchInterval: 10000,
+  });
+
+  const { data: agentProductScope = [] } = useQuery({
+    queryKey: ["agent-product-scope", authUser?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agent_products")
+        .select("product_name")
+        .eq("agent_id", authUser!.id);
+      if (error) throw error;
+      return (data || []).map((row) => row.product_name).filter(Boolean);
+    },
+    enabled: isAgent && !!authUser?.id,
   });
 
   const productOrderStatsMap = useMemo(() => {
@@ -253,8 +268,14 @@ export default function Products() {
     return c;
   }, [appliedSeller, appliedStatus, appliedWhatsapp]);
 
+  const visibleProducts = useMemo(() => {
+    if (!isAgent || agentProductScope.length === 0) return products;
+    const allowedNames = new Set(agentProductScope);
+    return products.filter((p) => allowedNames.has(p.name));
+  }, [products, isAgent, agentProductScope]);
+
   const filtered = useMemo(() => {
-    return products.filter((p) => {
+    return visibleProducts.filter((p) => {
       if (appliedSeller !== "all" && p.seller !== appliedSeller) return false;
       if (appliedStatus !== "all") {
         const isActive = !!(p as any).active;
@@ -277,7 +298,7 @@ export default function Products() {
       }
       return true;
     });
-  }, [products, appliedSeller, appliedStatus, search]);
+  }, [visibleProducts, appliedSeller, appliedStatus, appliedWhatsapp, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = useMemo(() => {
@@ -445,6 +466,69 @@ export default function Products() {
             <>
               {/* Desktop */}
               <div className="overflow-x-auto hidden md:block">
+                {isAgent ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="text-left py-2.5 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">ID</th>
+                      <th className="text-left py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Image</th>
+                      <th className="text-left py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">SKU</th>
+                      <th className="text-left py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Name</th>
+                      <th className="text-right py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Price</th>
+                      <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Page Link</th>
+                      <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Video Link</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginated.map((product) => (
+                      <tr key={product.id} className="border-b last:border-b-0 hover:bg-muted/30 transition-colors">
+                        <td className="py-2 px-4 font-mono text-xs text-muted-foreground">{product.displayId || product.id.slice(0, 8)}</td>
+                        <td className="py-2 px-3">
+                          {product.image ? (
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              className="w-9 h-9 rounded-md object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center">
+                              <ImageOff className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 font-mono text-xs">{product.sku}</td>
+                        <td className="py-2 px-3 text-xs font-medium max-w-[260px] truncate">{product.name}</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-xs font-medium">
+                          {product.lastSellingPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          {product.storeLink ? (
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-primary hover:bg-primary/10" asChild>
+                              <a href={product.storeLink} target="_blank" rel="noopener noreferrer" aria-label="Open product page">
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            </Button>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          {product.videoLink ? (
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-primary hover:bg-primary/10" asChild>
+                              <a href={product.videoLink} target="_blank" rel="noopener noreferrer" aria-label="Open product video">
+                                <Video className="h-3.5 w-3.5" />
+                              </a>
+                            </Button>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                ) : (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/30">
@@ -621,6 +705,7 @@ export default function Products() {
                     })}
                   </tbody>
                 </table>
+                )}
               </div>
 
               {/* Mobile Cards */}
@@ -652,22 +737,40 @@ export default function Products() {
                             {(product as any).active ? "Active" : "Inactive"}
                           </span>
                         </div>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-warning hover:bg-warning/10 shrink-0"
-                          onClick={() => setEditProduct(product)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        {!isAgent && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-warning hover:bg-warning/10 shrink-0"
+                            onClick={() => setEditProduct(product)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
-                      <div className="flex items-center gap-3 mt-2 text-xs">
-                        <span className="font-medium">{product.price}</span>
-                        <span className="text-muted-foreground">Selling: {product.lastSellingPrice}</span>
-                        <span className="text-muted-foreground">Qty: {product.totalQty}</span>
-                        <span className="text-destructive">Returned: {product.cancelled}</span>
-                        <span className="text-muted-foreground">Avail: {product.available}</span>
-                      </div>
+                      {isAgent ? (
+                        <div className="flex items-center gap-2 mt-2 text-xs">
+                          <span className="font-medium">{product.lastSellingPrice.toLocaleString()} USD</span>
+                          {product.storeLink && (
+                            <a href={product.storeLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary">
+                              <ExternalLink className="h-3 w-3" /> Page
+                            </a>
+                          )}
+                          {product.videoLink && (
+                            <a href={product.videoLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary">
+                              <Video className="h-3 w-3" /> Video
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 mt-2 text-xs">
+                          <span className="font-medium">{product.price}</span>
+                          <span className="text-muted-foreground">Selling: {product.lastSellingPrice}</span>
+                          <span className="text-muted-foreground">Qty: {product.totalQty}</span>
+                          <span className="text-destructive">Returned: {product.cancelled}</span>
+                          <span className="text-muted-foreground">Avail: {product.available}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

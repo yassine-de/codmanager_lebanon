@@ -23,6 +23,19 @@ const statusOptions: { value: string; label: string }[] = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
+const variantSkuSuffix = (variant: any, index: number) => {
+  const raw = String(variant?.name || variant?.group || `VAR${index + 1}`);
+  return raw.toUpperCase().replace(/[^A-Z0-9]+/g, "") || `VAR${index + 1}`;
+};
+
+const ensureVariantSkus = (variants: any[] | null | undefined, productSku: string) => {
+  if (!Array.isArray(variants)) return null;
+  return variants.map((variant, index) => ({
+    ...variant,
+    sku: String(variant?.sku || "").trim() || `${productSku}-${variantSkuSuffix(variant, index)}`,
+  }));
+};
+
 interface EditSourcingModalProps {
   request: DbSourcingRequest | null;
   open: boolean;
@@ -241,7 +254,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
       product_url: "",
       sourcing_request_id: request.id,
       weight: productWeight || null,
-      variants: request.variants || null,
+      variants: ensureVariantSkus(request.variants as any[] | null, sku),
     };
     const { error } = await supabase.from("products").insert(insertData as any);
     if (error) throw new Error(`Product creation failed: ${error.message}`);

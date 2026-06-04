@@ -87,6 +87,14 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
         quantity: totalQty,
         weight: weight || null,
         weight_kg: weight ? parseFloat(weight) : null,
+        variants: variants.map(v => ({
+          ...v,
+          id: v.id,
+          name: v.name.trim(),
+          sku: v.sku.trim(),
+          price: Number(v.price) || 0,
+          quantity: Number(v.quantity) || 0,
+        })),
         product_url: storeLink.trim(),
         video_url: videoLink.trim(),
         image_url: image.trim(),
@@ -199,6 +207,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
     }
     variants.forEach((v, i) => {
       if (!v.name.trim()) errs[`v_name_${i}`] = "Required";
+      if (!v.sku.trim()) errs[`v_sku_${i}`] = "Required";
       if (v.price <= 0) errs[`v_price_${i}`] = "Must be > 0";
     });
     offers.forEach((o, i) => {
@@ -229,7 +238,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
         variants: variants.map(v => ({
           ...v,
           name: v.name.trim(),
-          sku: v.sku.trim() || `${sku}-${v.name.trim().toUpperCase().replace(/\s/g, '')}`,
+          sku: v.sku.trim(),
         })),
         storeLink: storeLink.trim(),
         videoLink: videoLink.trim(),
@@ -588,18 +597,23 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">SKU <span className="text-muted-foreground/60">(auto if empty)</span></Label>
+                        <Label className={`text-[10px] text-muted-foreground ${errors[`v_sku_${i}`] ? "text-destructive" : ""}`}>SKU *</Label>
                         <div className="relative">
-                          <Input value={variant.sku} onChange={e => updateVariant(i, "sku", e.target.value)} placeholder={`${sku}-${variant.name.toUpperCase().replace(/\s/g, '') || '...'}`} className="h-8 text-xs pr-8" />
-                          {(variant.sku || `${sku}-${variant.name.toUpperCase().replace(/\s/g, '')}`) && (
+                          <Input
+                            value={variant.sku}
+                            onChange={e => updateVariant(i, "sku", e.target.value)}
+                            placeholder="e.g. QH.001-BLC"
+                            className={`h-8 text-xs pr-8 ${errors[`v_sku_${i}`] ? "border-destructive" : ""}`}
+                            disabled={isSeller}
+                          />
+                          {variant.sku && (
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
                               className="absolute right-0 top-0 h-8 w-8 text-muted-foreground hover:text-foreground"
                               onClick={() => {
-                                const variantSku = variant.sku || `${sku}-${variant.name.toUpperCase().replace(/\s/g, '')}`;
-                                navigator.clipboard.writeText(variantSku);
+                                navigator.clipboard.writeText(variant.sku);
                                 toast.success("Variant SKU copied");
                               }}
                             >
@@ -607,6 +621,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                             </Button>
                           )}
                         </div>
+                        {errors[`v_sku_${i}`] && <p className="text-[11px] text-destructive">{errors[`v_sku_${i}`]}</p>}
                       </div>
                     </div>
                   ))}
