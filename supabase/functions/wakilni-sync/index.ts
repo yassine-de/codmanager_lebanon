@@ -112,7 +112,9 @@ function normalizePhone(phone: string | null | undefined) {
 function pickId(payload: any) {
   return payload?.data?.id
     || payload?.data?.order_id
+    || payload?.data?.delivery_id
     || payload?.order_id
+    || payload?.delivery_id
     || payload?.id
     || payload?.delivery?.id
     || payload?.data?.delivery?.id
@@ -150,35 +152,47 @@ function startBulkPayload() {
   };
 }
 
-function deliveryPayload(order: any) {
+function deliveryPayload(order: any, product: any) {
   const { firstName, lastName } = splitName(order.customer_name);
   const totalAmount = Number(order.total_amount ?? order.price * order.quantity ?? 0);
+  const quantity = Number(order.quantity || 1);
   const area = String(order.customer_city || order.customer_address || "Lebanon").trim();
+  const sku = String(product?.sku || product?.display_id || order.order_id || "").trim();
+  const productName = String(product?.name || order.product_name || "Product").trim();
+  const packageComment = sku ? `${quantity} ${sku}` : `${quantity} ${productName}`;
+  const orderRef = Number(String(order.order_id || "").replace(/\D/g, "")) || Date.now();
 
   return {
     get_order_details: true,
     get_barcode: false,
-    waybill: order.order_id,
-    receiver_id: order.customer_phone || order.id,
+    waybill: String(order.order_id),
+    receiver_id: orderRef,
     receiver_first_name: firstName,
     receiver_last_name: lastName,
     receiver_phone_number: normalizePhone(order.customer_phone),
-    receiver_gender: 1,
+    receiver_gender: "1",
     receiver_email: "",
     receiver_secondary_phone_number: "",
-    receiver_location_id: Number(order.wakilni_receiver_location_id || 0),
-    receiver_longitude: "",
-    receiver_latitude: "",
+    receiver_location_id: Number(order.wakilni_receiver_location_id || orderRef),
+    receiver_longitude: 0,
+    receiver_latitude: 0,
     receiver_building: "",
-    receiver_floor: "",
+    receiver_floor: 0,
     receiver_directions: order.customer_address || area || "-",
     receiver_area: area,
     currency: 1,
     cash_collection_type_id: totalAmount > 0 ? 52 : 54,
-    type_id: 58,
-    amount: totalAmount,
-    cash_collection_amount: totalAmount,
-    description: `${order.product_name || "Product"} x ${order.quantity || 1}`,
+    collection_amount: totalAmount,
+    note: packageComment,
+    car_needed: false,
+    packages: [
+      {
+        quantity,
+        type_id: 58,
+        name: sku || productName,
+        sku,
+      },
+    ],
   };
 }
 
@@ -226,6 +240,13 @@ async function syncOrder(supabase: ReturnType<typeof createClient>, orderId: str
     .eq("id", order.id);
 
   try {
+    const { data: product } = await supabase
+      .from("products")
+      .select("name, sku, display_id")
+      .eq("seller_id", order.seller_id)
+      .eq("name", order.product_name)
+      .maybeSingle();
+
     const token = await getWakilniToken();
     const startResponse = await wakilniRequestWithFallback(["/clients/start_bulk", "/start_bulk"], token, startBulkPayload());
     const bulkId = pickBulkId(startResponse);
@@ -234,7 +255,7 @@ async function syncOrder(supabase: ReturnType<typeof createClient>, orderId: str
     const addResponse = await wakilniRequestWithFallback(
       [`/clients/add_delivery/${bulkId}`, `/add_delivery/${bulkId}`],
       token,
-      deliveryPayload(order)
+      deliveryPayload(order, product)
     );
     const endResponse = await wakilniRequestWithFallback([`/clients/end_bulk/${bulkId}`, `/end_bulk/${bulkId}`], token);
     const wakilniOrderId = pickId(addResponse);
