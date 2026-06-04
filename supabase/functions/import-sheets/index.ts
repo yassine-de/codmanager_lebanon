@@ -241,10 +241,18 @@ Deno.serve(async (req) => {
 
     const { data: allProducts } = await supabase
       .from("products")
-      .select("sku, seller_id, name, price, weight, product_url, video_url, active");
+      .select("sku, seller_id, name, price, weight, product_url, video_url, active, variants");
 
-    const skuMap = new Map<string, typeof allProducts extends (infer T)[] ? T : never>();
-    allProducts?.forEach((p) => skuMap.set(p.sku.toLowerCase(), p));
+    type ProductRow = typeof allProducts extends (infer T)[] ? T : never;
+    const skuMap = new Map<string, { product: ProductRow; variant?: Record<string, unknown> }>();
+    allProducts?.forEach((p) => {
+      if (p.sku) skuMap.set(String(p.sku).toLowerCase(), { product: p });
+      const variants = Array.isArray((p as any).variants) ? (p as any).variants : [];
+      variants.forEach((variant: Record<string, unknown>) => {
+        const variantSku = String(variant?.sku || "").trim();
+        if (variantSku) skuMap.set(variantSku.toLowerCase(), { product: p, variant });
+      });
+    });
 
     const results: Record<string, { imported: number; errors: number; skipped: number }> = {};
 
@@ -335,7 +343,9 @@ Deno.serve(async (req) => {
         const normalizedPhone = phoneResult.phone;
 
         // Check SKU exists and belongs to this seller
-        const product = skuMap.get(sku.toLowerCase());
+        const skuMatch = skuMap.get(sku.toLowerCase());
+        const product = skuMatch?.product;
+        const variant = skuMatch?.variant;
         if (!product || product.seller_id !== sheet.seller_id) {
           await supabase.from("integration_errors").insert({
             sheet_id: sheet.id,
@@ -407,6 +417,8 @@ Deno.serve(async (req) => {
           customer_address: orderData.address,
           customer_city: orderData.city,
           product_name: product.name,
+          variant_name: variant ? String(variant.name || "") || null : null,
+          variant_sku: variant ? String(variant.sku || sku) : (sku !== product.sku ? sku : null),
           product_url: product.product_url || "",
           video_url: product.video_url || "",
           quantity: orderData.quantity,

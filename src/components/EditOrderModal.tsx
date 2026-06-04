@@ -59,13 +59,13 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
   const { data: sellerProducts } = useQuery({
     queryKey: ['seller-products', authUser?.id],
     queryFn: async () => {
-      const { data } = await supabase.from('products').select('name').eq('seller_id', authUser!.id);
-      return data?.map(p => p.name) || [];
+      const { data } = await supabase.from('products').select('name, price, variants').eq('seller_id', authUser!.id);
+      return data || [];
     },
     enabled: isSeller && !!authUser?.id,
   });
 
-  const availableProductNames = isSeller ? (sellerProducts || []) : productNames;
+  const availableProductNames = isSeller ? ((sellerProducts || []).map((p: any) => p.name)) : productNames;
 
   const [customer, setCustomer] = useState('');
   const [phone, setPhone] = useState('');
@@ -75,7 +75,7 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
   const [confirmationStatus, setConfirmationStatus] = useState<ConfirmationStatus>('new');
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus>('pending');
   const [notes, setNotes] = useState('');
-  const [products, setProducts] = useState<{ name: string; qty: number; price: number }[]>([]);
+  const [products, setProducts] = useState<{ name: string; qty: number; price: number; variantName?: string | null; variantSku?: string | null }[]>([]);
   const [upsell, setUpsell] = useState(false);
 
   useEffect(() => {
@@ -93,7 +93,23 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
   }, [open, order]);
 
   const updateProduct = (idx: number, field: string, value: string | number) => {
-    setProducts(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
+    setProducts(prev => prev.map((p, i) => {
+      if (i !== idx) return p;
+      if (field === "name") return { ...p, name: String(value), variantName: null, variantSku: null };
+      return { ...p, [field]: value };
+    }));
+  };
+
+  const updateVariant = (idx: number, variantName: string) => {
+    const product = products[idx];
+    const productDetails = (sellerProducts || []).find((p: any) => p.name === product.name) as any;
+    const variant = ((productDetails?.variants || []) as any[]).find(v => String(v.name) === variantName);
+    setProducts(prev => prev.map((p, i) => i === idx ? {
+      ...p,
+      variantName,
+      variantSku: String(variant?.sku || ""),
+      price: variant?.price != null ? Number(variant.price) : p.price,
+    } : p));
   };
 
   const removeProduct = (idx: number) => {
@@ -102,7 +118,7 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
   };
 
   const addProduct = () => {
-    setProducts(prev => [...prev, { name: availableProductNames[0] || '', qty: 1, price: 100 }]);
+    setProducts(prev => [...prev, { name: availableProductNames[0] || '', qty: 1, price: 100, variantName: null, variantSku: null }]);
   };
 
   const total = products.reduce((s, p) => s + p.qty * p.price, 0);
@@ -218,6 +234,27 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
                         </SelectContent>
                       </Select>
                     </div>
+                    {(() => {
+                      const productDetails = (sellerProducts || []).find((sp: any) => sp.name === p.name) as any;
+                      const variants = ((productDetails?.variants || []) as any[]).filter(v => v?.name);
+                      if (!isSeller || variants.length === 0) return null;
+                      return (
+                        <div className="w-36">
+                          <Select value={p.variantName || ""} onValueChange={v => updateVariant(idx, v)}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Variant" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {variants.map((variant) => (
+                                <SelectItem key={variant.id || variant.sku || variant.name} value={String(variant.name)}>
+                                  {variant.name}{variant.sku ? ` · ${variant.sku}` : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })()}
                     <div className="w-20">
                       <Input
                         type="number"

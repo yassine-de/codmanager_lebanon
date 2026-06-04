@@ -21,7 +21,7 @@ interface CreateOrderModalProps {
 export default function CreateOrderModal({ open, onOpenChange, onCreated }: CreateOrderModalProps) {
   const { authUser } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState<{ id: string; name: string; price: number }[]>([]);
+  const [products, setProducts] = useState<{ id: string; name: string; price: number; sku?: string | null; variants?: any[] | null }[]>([]);
 
   // Form state
   const [customerName, setCustomerName] = useState("");
@@ -29,8 +29,8 @@ export default function CreateOrderModal({ open, onOpenChange, onCreated }: Crea
   const [customerCity, setCustomerCity] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [note, setNote] = useState("");
-  const [items, setItems] = useState<{ productName: string; quantity: number; price: number }[]>([
-    { productName: "", quantity: 1, price: 0 },
+  const [items, setItems] = useState<{ productName: string; quantity: number; price: number; variantName?: string; variantSku?: string }[]>([
+    { productName: "", quantity: 1, price: 0, variantName: "", variantSku: "" },
   ]);
 
   // Fetch seller's products
@@ -39,7 +39,7 @@ export default function CreateOrderModal({ open, onOpenChange, onCreated }: Crea
     const fetchProducts = async () => {
       const { data } = await supabase
         .from("products")
-        .select("id, name, price")
+        .select("id, name, price, sku, variants")
         .eq("seller_id", authUser.id);
       setProducts(data || []);
     };
@@ -51,12 +51,28 @@ export default function CreateOrderModal({ open, onOpenChange, onCreated }: Crea
   const handleProductChange = (index: number, productName: string) => {
     const product = products.find(p => p.name === productName);
     setItems(prev => prev.map((item, i) =>
-      i === index ? { ...item, productName, price: product ? Number(product.price) : item.price } : item
+      i === index ? { ...item, productName, price: product ? Number(product.price) : item.price, variantName: "", variantSku: "" } : item
+    ));
+  };
+
+  const handleVariantChange = (index: number, variantName: string) => {
+    const item = items[index];
+    const product = products.find(p => p.name === item.productName);
+    const variant = ((product?.variants || []) as any[]).find(v => String(v.name) === variantName);
+    setItems(prev => prev.map((it, idx) =>
+      idx === index
+        ? {
+            ...it,
+            variantName,
+            variantSku: String(variant?.sku || ""),
+            price: variant?.price != null ? Number(variant.price) : it.price,
+          }
+        : it
     ));
   };
 
   const addItem = () => {
-    setItems(prev => [...prev, { productName: "", quantity: 1, price: 0 }]);
+    setItems(prev => [...prev, { productName: "", quantity: 1, price: 0, variantName: "", variantSku: "" }]);
   };
 
   const removeItem = (index: number) => {
@@ -70,7 +86,7 @@ export default function CreateOrderModal({ open, onOpenChange, onCreated }: Crea
     setCustomerCity("");
     setCustomerAddress("");
     setNote("");
-    setItems([{ productName: "", quantity: 1, price: 0 }]);
+    setItems([{ productName: "", quantity: 1, price: 0, variantName: "", variantSku: "" }]);
   };
 
   const handleSubmit = async () => {
@@ -81,6 +97,15 @@ export default function CreateOrderModal({ open, onOpenChange, onCreated }: Crea
     }
     if (!items[0]?.productName) {
       toast.error("Please select at least one product");
+      return;
+    }
+    const missingVariant = items.find((item) => {
+      const product = products.find(p => p.name === item.productName);
+      const variants = ((product?.variants || []) as any[]).filter(v => v?.name);
+      return variants.length > 0 && !item.variantName;
+    });
+    if (missingVariant) {
+      toast.error("Please select a variant for products that have variants");
       return;
     }
 
@@ -104,6 +129,8 @@ export default function CreateOrderModal({ open, onOpenChange, onCreated }: Crea
         customer_city: customerCity,
         customer_address: customerAddress.trim(),
         product_name: mainItem.productName,
+        variant_name: mainItem.variantName || null,
+        variant_sku: mainItem.variantSku || null,
         quantity: totalQty,
         price: mainItem.price,
         total_amount: totalAmount,
@@ -191,6 +218,28 @@ export default function CreateOrderModal({ open, onOpenChange, onCreated }: Crea
                     </SelectContent>
                   </Select>
                 </div>
+                {(() => {
+                  const product = products.find(p => p.name === item.productName);
+                  const variants = ((product?.variants || []) as any[]).filter(v => v?.name);
+                  if (variants.length === 0) return null;
+                  return (
+                    <div className="w-36 space-y-1">
+                      <Label className="text-xs">Variant</Label>
+                      <Select value={item.variantName || ""} onValueChange={v => handleVariantChange(i, v)}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Select variant" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {variants.map((variant) => (
+                            <SelectItem key={variant.id || variant.sku || variant.name} value={String(variant.name)}>
+                              {variant.name}{variant.sku ? ` · ${variant.sku}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })()}
                 <div className="w-16 space-y-1">
                   <Label className="text-xs">Qty</Label>
                   <Input type="number" min={1} value={item.quantity}

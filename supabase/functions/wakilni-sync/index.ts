@@ -181,8 +181,8 @@ function deliveryPayload(order: any, product: any) {
   const totalAmount = Number(order.total_amount ?? order.price * order.quantity ?? 0);
   const quantity = Number(order.quantity || 1);
   const area = String(order.customer_city || order.customer_address || "Lebanon").trim();
-  const sku = String(product?.sku || product?.display_id || order.order_id || "").trim();
-  const productName = String(product?.name || order.product_name || "Product").trim();
+  const sku = String(order.variant_sku || product?.sku || product?.display_id || order.order_id || "").trim();
+  const productName = String(order.variant_name ? `${order.product_name} ${order.variant_name}` : (product?.name || order.product_name || "Product")).trim();
   const description = sku ? `${quantity}pc ${productName} ${sku}` : `${quantity}pc ${productName}`;
   const orderRef = Number(String(order.order_id || "").replace(/\D/g, "")) || Date.now();
 

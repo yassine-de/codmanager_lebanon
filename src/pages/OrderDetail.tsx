@@ -46,7 +46,13 @@ export default function OrderDetail() {
         phone: data.customer_phone,
         city: data.customer_city,
         address: data.customer_address || "",
-        products: [{ name: data.product_name, qty: data.quantity, price: Number(data.price) }],
+        products: [{
+          name: data.product_name,
+          qty: data.quantity,
+          price: Number(data.price),
+          variantName: (data as any).variant_name || null,
+          variantSku: (data as any).variant_sku || null,
+        }],
         total: Number(data.total_amount),
         confirmationStatus: data.confirmation_status,
         deliveryStatus: data.delivery_status || "pending",
@@ -230,7 +236,14 @@ export default function OrderDetail() {
           {products.map((p: any, i: number) => (
             <div key={i} className="flex items-center justify-between p-4">
               <div>
-                <p className="font-medium">{p.name}</p>
+                <p className="font-medium">
+                  {p.name}
+                  {(p.variantName || p.variantSku) && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      {p.variantName || p.variantSku}{p.variantSku && p.variantName ? ` · ${p.variantSku}` : ""}
+                    </span>
+                  )}
+                </p>
                 <p className="text-sm text-muted-foreground">Qty: {p.qty} × {p.price.toLocaleString()} USD</p>
               </div>
               <p className="font-medium tabular-nums">{(p.qty * p.price).toLocaleString()} USD</p>

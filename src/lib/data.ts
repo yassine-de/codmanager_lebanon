@@ -20,7 +20,7 @@ export interface Order {
   phone: string;
   city: string;
   address: string;
-  products: { name: string; qty: number; price: number }[];
+  products: { name: string; qty: number; price: number; variantName?: string | null; variantSku?: string | null }[];
   total: number;
   paidAmount: number;
   status: OrderStatus;

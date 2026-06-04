@@ -56,6 +56,8 @@ interface DbOrder {
   customer_city: string;
   customer_address: string | null;
   product_name: string;
+  variant_name: string | null;
+  variant_sku: string | null;
   quantity: number;
   price: number;
   total_amount: number;
@@ -102,11 +104,11 @@ const AgentOrders = () => {
   const [editingCustomer, setEditingCustomer] = useState(false);
 
   // Editable order items
-  const [editItems, setEditItems] = useState<{ name: string; qty: number; price: number }[]>([]);
+  const [editItems, setEditItems] = useState<{ name: string; qty: number; price: number; variantName?: string | null; variantSku?: string | null }[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [isManualPrice, setIsManualPrice] = useState(false);
   const [manualTotal, setManualTotal] = useState(0);
-  const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; product_url: string | null; video_url: string | null }[]>([]);
+  const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; sku?: string | null; variants?: any[] | null; product_url: string | null; video_url: string | null }[]>([]);
   const [historicalOffers, setHistoricalOffers] = useState<string | null>(null);
   const [historicalLastPrice, setHistoricalLastPrice] = useState<number | null>(null);
 
@@ -231,7 +233,7 @@ const AgentOrders = () => {
   const activeItems = editItems.length > 0
     ? editItems
     : currentOrder
-      ? [{ name: currentOrder.product_name, qty: currentOrder.quantity, price: Number(currentOrder.price) }]
+      ? [{ name: currentOrder.product_name, qty: currentOrder.quantity, price: Number(currentOrder.price), variantName: currentOrder.variant_name, variantSku: currentOrder.variant_sku }]
       : [];
   const autoTotal = activeItems.reduce((s, p) => s + p.qty * p.price, 0);
   const orderTotal = isManualPrice ? manualTotal : autoTotal;
@@ -413,7 +415,7 @@ const AgentOrders = () => {
     if (orderTimerRef.current) clearInterval(orderTimerRef.current);
     orderTimerRef.current = setInterval(() => setOrderElapsedSec((seconds) => seconds + 1), 1000);
 
-    setEditItems([{ name: order.product_name, qty: order.quantity, price: Number(order.price) }]);
+    setEditItems([{ name: order.product_name, qty: order.quantity, price: Number(order.price), variantName: order.variant_name, variantSku: order.variant_sku }]);
     const savedManual = !!(order as any).is_manual_price;
     const savedTotal = Number(order.total_amount) || Number(order.price) * order.quantity;
     setIsManualPrice(savedManual);
@@ -432,7 +434,7 @@ const AgentOrders = () => {
 
     supabase
       .from("products")
-      .select("id, name, price, last_price, offers, product_url, video_url, display_id")
+      .select("id, name, sku, price, variants, last_price, offers, product_url, video_url, display_id")
       .eq("seller_id", order.seller_id)
       .then(({ data }) => {
         if (currentOrderRef.current?.id !== activeOrderId) return;
@@ -598,6 +600,8 @@ const AgentOrders = () => {
         customer_city: editCustomer.city,
         customer_address: editCustomer.address,
         product_name: activeItems[0]?.name || currentOrder.product_name,
+        variant_name: activeItems[0]?.variantName || null,
+        variant_sku: activeItems[0]?.variantSku || null,
         quantity: activeItems.reduce((sum, item) => sum + item.qty, 0),
         price: activeItems[0]?.price || currentOrder.price,
         total_amount: orderTotal,
@@ -663,6 +667,17 @@ const AgentOrders = () => {
           p_valid_order_id: currentOrder.id,
           p_agent_id: authUser.id,
         });
+      }
+
+      if ((updateData.variant_name ?? null) !== (currentOrder.variant_name ?? null) || (updateData.variant_sku ?? null) !== (currentOrder.variant_sku ?? null)) {
+        const { error: variantError } = await supabase
+          .from("orders")
+          .update({
+            variant_name: updateData.variant_name,
+            variant_sku: updateData.variant_sku,
+          } as any)
+          .eq("id", currentOrder.id);
+        if (variantError) throw variantError;
       }
 
       // Use SECURITY DEFINER RPC to bypass RLS entirely.
@@ -757,6 +772,8 @@ const AgentOrders = () => {
       trackChange("customer_city", currentOrder.customer_city, editCustomer.city);
       trackChange("customer_address", currentOrder.customer_address, editCustomer.address);
       trackChange("product_name", currentOrder.product_name, activeItems[0]?.name);
+      trackChange("variant_name", currentOrder.variant_name, activeItems[0]?.variantName);
+      trackChange("variant_sku", currentOrder.variant_sku, activeItems[0]?.variantSku);
       trackChange("quantity", currentOrder.quantity, activeItems.reduce((sum, item) => sum + item.qty, 0));
       trackChange("price", currentOrder.price, activeItems[0]?.price);
       trackChange("total_amount", currentOrder.total_amount, orderTotal);
@@ -852,6 +869,20 @@ const AgentOrders = () => {
 
   const updateItem = (index: number, field: "qty" | "price", value: number) => {
     setEditItems((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+  };
+
+  const updateItemVariant = (index: number, variantName: string) => {
+    setEditItems((items) => items.map((item, itemIndex) => {
+      if (itemIndex !== index) return item;
+      const product = sellerProducts.find(p => p.name === item.name);
+      const variant = ((product?.variants || []) as any[]).find(v => String(v.name) === variantName);
+      return {
+        ...item,
+        variantName,
+        variantSku: String(variant?.sku || ""),
+        price: variant?.price != null ? Number(variant.price) : item.price,
+      };
+    }));
   };
 
   const removeItem = (index: number) => {
@@ -980,7 +1011,7 @@ const AgentOrders = () => {
                   if (dup.id !== currentOrder.id) {
                     setCurrentOrder({ ...dup, _isDuplicate: true, _duplicateGroup: currentOrder._duplicateGroup });
                     currentOrderRef.current = dup;
-                    setEditItems([{ name: dup.product_name, qty: dup.quantity, price: Number(dup.price) }]);
+                    setEditItems([{ name: dup.product_name, qty: dup.quantity, price: Number(dup.price), variantName: dup.variant_name, variantSku: dup.variant_sku }]);
                     setEditCustomer({ name: dup.customer_name, phone: dup.customer_phone, city: dup.customer_city, address: dup.customer_address || "" });
                   }
                 }}
@@ -1151,10 +1182,38 @@ const AgentOrders = () => {
                   <div key={i} className="p-3 rounded-lg bg-muted/40 border border-border/50 space-y-2">
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0 space-y-1.5">
-                        <p className="text-sm font-semibold truncate">{op.name}</p>
+                        <p className="text-sm font-semibold truncate">
+                          {op.name}
+                          {(op.variantName || op.variantSku) && (
+                            <span className="ml-1 text-xs font-normal text-muted-foreground">
+                              ({op.variantName || op.variantSku}{op.variantSku && op.variantName ? ` · ${op.variantSku}` : ""})
+                            </span>
+                          )}
+                        </p>
 
                         {editMode ? (
                           <div className="flex items-center gap-2">
+                            {(() => {
+                              const variants = ((matchedProduct as any)?.variants || []).filter((v: any) => v?.name);
+                              if (variants.length === 0) return null;
+                              return (
+                                <div className="space-y-0.5">
+                                  <Label className="text-[9px] text-muted-foreground">Variant</Label>
+                                  <Select value={op.variantName || ""} onValueChange={(value) => updateItemVariant(i, value)}>
+                                    <SelectTrigger className="h-7 w-32 text-xs">
+                                      <SelectValue placeholder="Variant" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {variants.map((variant: any) => (
+                                        <SelectItem key={variant.id || variant.sku || variant.name} value={String(variant.name)} className="text-xs">
+                                          {variant.name}{variant.sku ? ` · ${variant.sku}` : ""}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              );
+                            })()}
                             <div className="space-y-0.5">
                               <Label className="text-[9px] text-muted-foreground">Qty</Label>
                               <Input
@@ -1301,7 +1360,7 @@ const AgentOrders = () => {
                             key={sp.id}
                             className="w-full text-left px-3 py-2 rounded-md hover:bg-accent text-xs flex items-center justify-between gap-2 transition-colors"
                             onClick={() => {
-                              setEditItems(prev => [...prev, { name: sp.name, qty: 1, price: sp.price }]);
+                              setEditItems(prev => [...prev, { name: sp.name, qty: 1, price: sp.price, variantName: null, variantSku: null }]);
                             }}
                           >
                             <span className="truncate font-medium">{sp.name}</span>

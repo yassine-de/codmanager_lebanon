@@ -396,7 +396,13 @@ export default function Orders() {
         phone: o.customer_phone,
         city: o.customer_city,
         address: o.customer_address || "",
-        products: [{ name: o.product_name, qty: o.quantity, price: Number(o.price) }],
+        products: [{
+          name: o.product_name,
+          qty: o.quantity,
+          price: Number(o.price),
+          variantName: (o as any).variant_name || null,
+          variantSku: (o as any).variant_sku || null,
+        }],
         total: Number(o.total_amount),
         paidAmount: 0,
         status: (o.confirmation_status === "confirmed" ? o.delivery_status : o.confirmation_status) as any,
@@ -996,7 +1002,11 @@ export default function Orders() {
                   {isCol('customer') && <td className="py-2.5 px-4 text-xs">{order.customer}</td>}
                   {isCol('city') && <td className="py-2.5 px-4 text-xs text-muted-foreground">{order.city}</td>}
                   {isCol('phone') && <td className="py-2.5 px-4 text-xs text-muted-foreground tabular-nums">{order.phone}</td>}
-                  {isCol('product') && <td className="py-2.5 px-4 text-xs text-muted-foreground">{order.products.map(p => p.qty > 1 ? `${p.qty}x ${p.name}` : p.name).join(', ')}</td>}
+                  {isCol('product') && <td className="py-2.5 px-4 text-xs text-muted-foreground">{order.products.map(p => {
+                    const variant = p.variantName || p.variantSku;
+                    const label = variant ? `${p.name} (${variant})` : p.name;
+                    return p.qty > 1 ? `${p.qty}x ${label}` : label;
+                  }).join(', ')}</td>}
                   {isCol('amount') && <td className="py-2.5 px-4 text-xs font-medium tabular-nums text-right">{order.total.toLocaleString()} USD</td>}
 {isCol('confirmationStatus') && <td className="py-2.5 px-4">{(() => {
                     const isWhatsapp = (order.confirmationChannel || 'agent') === 'whatsapp';
@@ -1111,7 +1121,10 @@ export default function Orders() {
                 <span className="text-sm">{order.customer}</span>
                 <span className="text-xs text-muted-foreground">{order.city}</span>
               </div>
-              <div className="text-xs text-muted-foreground mb-2">{order.products.map(p => p.name).join(', ')}</div>
+              <div className="text-xs text-muted-foreground mb-2">{order.products.map(p => {
+                const variant = p.variantName || p.variantSku;
+                return variant ? `${p.name} (${variant})` : p.name;
+              }).join(', ')}</div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <StatusBadge {...confirmationConfig[order.confirmationStatus]} attemptCount={order.confirmationStatus === 'no_answer' ? order.attemptCount : undefined} />
@@ -1193,6 +1206,8 @@ export default function Orders() {
               price: updated.products[0]?.price || 0,
               total_amount: updated.total,
               product_name: updated.products[0]?.name || '',
+              variant_name: updated.products[0]?.variantName || null,
+              variant_sku: updated.products[0]?.variantSku || null,
               updated_at: new Date().toISOString(),
             };
 
