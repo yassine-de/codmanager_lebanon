@@ -9,13 +9,7 @@ export interface Notification {
   type: "order" | "system" | "alert";
 }
 
-const initialNotifications: Notification[] = [
-  { id: "1", title: "New Order", message: "Order COD-1042 received from Amine Shop", time: "2 min ago", read: false, type: "order" },
-  { id: "2", title: "Delivery Confirmed", message: "Order COD-1038 delivered successfully", time: "15 min ago", read: false, type: "order" },
-  { id: "3", title: "Integration Error", message: "Sheet sync failed for Atlas Store", time: "1h ago", read: false, type: "alert" },
-  { id: "4", title: "New User", message: "Sara M. joined as agent", time: "3h ago", read: false, type: "system" },
-  { id: "5", title: "Stock Alert", message: "Argan Oil Set is running low", time: "5h ago", read: true, type: "alert" },
-];
+const initialNotifications: Notification[] = [];
 
 interface NotificationContextType {
   notifications: Notification[];
