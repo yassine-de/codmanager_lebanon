@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, RefreshCw, Search, Eye, ExternalLink, AlertTriangle, Loader2, Mail, Save, FileSpreadsheet, Database, Copy, Check, Globe, Key, Hash, Clock } from "lucide-react";
+import { Plus, Pencil, Trash2, RefreshCw, Search, Eye, ExternalLink, AlertTriangle, Loader2, Mail, Save, FileSpreadsheet, Database, Copy, Check, Globe, Key, Hash, Clock, Truck } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -71,6 +71,10 @@ const Integrations = () => {
   const [sheetImportInterval, setSheetImportInterval] = useState("5");
   const [sheetImportLastRun, setSheetImportLastRun] = useState("");
   const [sheetImportSaving, setSheetImportSaving] = useState(false);
+  const [wakilniStatusInterval, setWakilniStatusInterval] = useState("30");
+  const [wakilniLastStatusSync, setWakilniLastStatusSync] = useState("");
+  const [wakilniStatusSaving, setWakilniStatusSaving] = useState(false);
+  const [wakilniStatusSyncing, setWakilniStatusSyncing] = useState(false);
 
   // Service account email
   const [serviceEmail, setServiceEmail] = useState("");
@@ -139,6 +143,54 @@ const Integrations = () => {
       toast.success("Import interval saved");
     }
     setSheetImportSaving(false);
+  };
+
+  const fetchWakilniStatusSettings = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("key, value")
+      .in("key", ["wakilni_status_sync_interval_minutes", "wakilni_last_status_sync"]);
+
+    data?.forEach((d) => {
+      if (d.key === "wakilni_status_sync_interval_minutes") setWakilniStatusInterval(d.value || "30");
+      if (d.key === "wakilni_last_status_sync") setWakilniLastStatusSync(d.value || "");
+    });
+  };
+
+  const saveWakilniStatusSettings = async () => {
+    const interval = Math.max(1, Math.min(1440, Number(wakilniStatusInterval) || 30));
+    setWakilniStatusSaving(true);
+    const { error } = await supabase
+      .from("app_settings")
+      .upsert(
+        { key: "wakilni_status_sync_interval_minutes", value: String(interval), updated_at: new Date().toISOString() },
+        { onConflict: "key" }
+      );
+
+    if (error) {
+      toast.error("Error saving Wakilni interval");
+    } else {
+      setWakilniStatusInterval(String(interval));
+      toast.success("Wakilni status interval saved");
+    }
+    setWakilniStatusSaving(false);
+  };
+
+  const triggerWakilniStatusSync = async () => {
+    setWakilniStatusSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("wakilni-sync", {
+        body: { action: "sync-statuses", manual: true },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Wakilni status sync: ${data?.checked || 0} checked, ${data?.updated || 0} updated`);
+      fetchWakilniStatusSettings();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Wakilni status sync failed");
+    } finally {
+      setWakilniStatusSyncing(false);
+    }
   };
 
   const fetchApiConfig = async () => {
@@ -263,6 +315,7 @@ const Integrations = () => {
     fetchSellers();
     fetchServiceEmail();
     fetchSheetImportSettings();
+    fetchWakilniStatusSettings();
     if (features.orioSync) {
       fetchApiConfig();
     } else {
@@ -541,6 +594,49 @@ const Integrations = () => {
           </div>
           <Button size="sm" className="h-9 text-xs gap-1.5" onClick={saveSheetImportSettings} disabled={sheetImportSaving}>
             {sheetImportSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+            Save
+          </Button>
+        </div>
+      </div>
+
+      <div className="bg-card border rounded-xl p-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="bg-primary/10 rounded-lg p-2">
+            <Truck className="w-4 h-4 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs font-semibold">Wakilni Status Sync</p>
+            <p className="text-xs text-muted-foreground">
+              Active booked shipments are checked against Wakilni by this interval.
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Last status sync: {wakilniLastStatusSync ? formatDistanceToNow(new Date(wakilniLastStatusSync), { addSuffix: true }) : "Never"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-end gap-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Interval</Label>
+            <Select value={wakilniStatusInterval} onValueChange={setWakilniStatusInterval}>
+              <SelectTrigger className="h-9 w-[150px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">Every 5 minutes</SelectItem>
+                <SelectItem value="10">Every 10 minutes</SelectItem>
+                <SelectItem value="15">Every 15 minutes</SelectItem>
+                <SelectItem value="30">Every 30 minutes</SelectItem>
+                <SelectItem value="60">Every hour</SelectItem>
+                <SelectItem value="120">Every 2 hours</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5" onClick={triggerWakilniStatusSync} disabled={wakilniStatusSyncing}>
+            {wakilniStatusSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            Sync Now
+          </Button>
+          <Button size="sm" className="h-9 text-xs gap-1.5" onClick={saveWakilniStatusSettings} disabled={wakilniStatusSaving}>
+            {wakilniStatusSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
             Save
           </Button>
         </div>

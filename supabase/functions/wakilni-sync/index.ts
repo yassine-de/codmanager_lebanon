@@ -318,6 +318,17 @@ async function syncOrder(supabase: ReturnType<typeof createClient>, orderId: str
   }
 }
 
+async function getSettingMap(supabase: ReturnType<typeof createClient>, keys: string[]) {
+  const { data } = await supabase
+    .from("app_settings")
+    .select("key, value")
+    .in("key", keys);
+
+  const map = new Map<string, string>();
+  data?.forEach((row: any) => map.set(row.key, row.value));
+  return map;
+}
+
 function mapWakilniDeliveryStatus(status?: string | null, statusCode?: string | number | null) {
   const normalized = String(status || "").toLowerCase().trim();
   const code = String(statusCode ?? "").trim();
@@ -456,6 +467,87 @@ async function trackOrder(supabase: ReturnType<typeof createClient>, body: any) 
   });
 }
 
+async function syncActiveStatuses(supabase: ReturnType<typeof createClient>, manual = false) {
+  const settings = await getSettingMap(supabase, [
+    "wakilni_api_enabled",
+    "wakilni_status_sync_interval_minutes",
+    "wakilni_last_status_sync",
+  ]);
+
+  if (String(settings.get("wakilni_api_enabled") || "true").toLowerCase() !== "true") {
+    return { skipped: true, reason: "Wakilni API is disabled" };
+  }
+
+  const intervalMinutes = Math.max(
+    1,
+    Math.min(1440, Number(settings.get("wakilni_status_sync_interval_minutes") || 30) || 30),
+  );
+  const lastRunRaw = settings.get("wakilni_last_status_sync");
+  const lastRunAt = lastRunRaw ? new Date(lastRunRaw) : null;
+  const now = new Date();
+
+  if (!manual && lastRunAt && !Number.isNaN(lastRunAt.getTime())) {
+    const nextRunAt = new Date(lastRunAt.getTime() + intervalMinutes * 60_000);
+    if (now < nextRunAt) {
+      return {
+        skipped: true,
+        reason: "Status sync interval not reached",
+        interval_minutes: intervalMinutes,
+        last_run_at: lastRunRaw,
+        next_run_at: nextRunAt.toISOString(),
+      };
+    }
+  }
+
+  const { data: orders, error } = await supabase
+    .from("orders")
+    .select("id, order_id, system_id, wakilni_order_id, wakilni_tracking_id, delivery_status")
+    .not("wakilni_tracking_id", "is", null)
+    .in("delivery_status", ["booked", "shipped", "in_transit", "with_courier", "failed_attempt"])
+    .order("wakilni_synced_at", { ascending: true, nullsFirst: true })
+    .limit(100);
+
+  if (error) throw error;
+
+  const results = [];
+  for (const order of orders || []) {
+    try {
+      const result = await trackOrder(supabase, {
+        tracking_id: order.wakilni_tracking_id,
+        wakilni_order_id: order.wakilni_order_id,
+        local_order_id: order.order_id,
+        system_id: order.system_id,
+      });
+      results.push({
+        order_id: order.order_id,
+        status: result.status,
+        delivery_status: result.delivery_status,
+        updated: !!result.local_status_updated,
+      });
+    } catch (error) {
+      results.push({
+        order_id: order.order_id,
+        error: String((error as Error)?.message || error).slice(0, 500),
+      });
+    }
+  }
+
+  await supabase
+    .from("app_settings")
+    .upsert(
+      { key: "wakilni_last_status_sync", value: now.toISOString(), updated_at: now.toISOString() },
+      { onConflict: "key" },
+    );
+
+  return {
+    success: true,
+    interval_minutes: intervalMinutes,
+    checked: results.length,
+    updated: results.filter((result: any) => result.updated).length,
+    results,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -471,6 +563,8 @@ Deno.serve(async (req) => {
       result = await syncOrder(supabase, String(orderId));
     } else if (action === "track") {
       result = await trackOrder(supabase, body);
+    } else if (action === "sync-statuses") {
+      result = await syncActiveStatuses(supabase, body.manual === true);
     } else {
       throw new Error(`Unknown action: ${action}`);
     }
