@@ -28,7 +28,7 @@ import CreateOrderModal from "@/components/CreateOrderModal";
 import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetFilter";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import OrioTrackingModal from "@/components/OrioTrackingModal";
+import WakilniTrackingModal from "@/components/WakilniTrackingModal";
 import { FinancialIndicators } from "@/components/FinancialIndicators";
 
 /* ── Status badge configs ── */
@@ -105,12 +105,12 @@ function StatusBadge({ label, cls, attemptCount }: { label: string; cls: string;
 }
 
 /* ── Column definitions ── */
-type ColumnKey = 'systemId' | 'id' | 'orioId' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'amount' | 'confirmationStatus' | 'channel' | 'deliveryStatus' | 'subStatus' | 'attempts' | 'financial';
+type ColumnKey = 'systemId' | 'id' | 'wakilniId' | 'createdAt' | 'updatedAt' | 'seller' | 'customer' | 'city' | 'phone' | 'product' | 'amount' | 'confirmationStatus' | 'channel' | 'deliveryStatus' | 'subStatus' | 'attempts' | 'financial';
 
 const allColumns: { key: ColumnKey; label: string; defaultVisible: boolean; adminOnly?: boolean }[] = [
   { key: 'systemId', label: 'System ID', defaultVisible: true, adminOnly: true },
   { key: 'id', label: 'Seller ID', defaultVisible: true },
-  { key: 'orioId', label: 'ORIO ID', defaultVisible: true, adminOnly: true },
+  { key: 'wakilniId', label: 'Wakilni ID', defaultVisible: true, adminOnly: true },
   { key: 'createdAt', label: 'Created', defaultVisible: true },
   { key: 'updatedAt', label: 'Updated', defaultVisible: true },
   { key: 'customer', label: 'Client', defaultVisible: true },
@@ -213,7 +213,7 @@ export default function Orders() {
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [historyOrder, setHistoryOrder] = useState<Order | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [trackingTarget, setTrackingTarget] = useState<{ orioId: number; systemId?: number | null; sellerId?: string | null } | null>(null);
+  const [trackingTarget, setTrackingTarget] = useState<{ trackingId?: string | null; wakilniOrderId?: string | null; systemId?: number | null; sellerId?: string | null } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sellerNames, setSellerNames] = useState<string[]>([]);
@@ -415,6 +415,9 @@ export default function Orders() {
         attemptCount: o.attempt_count || 0,
         orioOrderId: o.orio_order_id || null,
         orioShippingStatus: o.orio_shipping_status || null,
+        wakilniOrderId: (o as any).wakilni_order_id || null,
+        wakilniTrackingId: (o as any).wakilni_tracking_id || null,
+        wakilniSyncStatus: (o as any).wakilni_sync_status || null,
         confirmationChannel: o.confirmation_channel || 'agent',
         whatsappStatus: o.whatsapp_status || null,
         invoiceId: o.invoice_id || null,
@@ -899,7 +902,7 @@ export default function Orders() {
                   <span className="inline-flex items-center gap-1">System ID {sortKey === 'systemId' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}</span>
                 </th>}
                 {isCol('id') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Seller ID</th>}
-                {isAdmin && isCol('orioId') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">ORIO ID</th>}
+                {isAdmin && isCol('wakilniId') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Wakilni ID</th>}
                 {isCol('createdAt') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('createdAt')}>
                   <span className="inline-flex items-center gap-1">Created {sortKey === 'createdAt' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}</span>
                 </th>}
@@ -962,15 +965,26 @@ export default function Orders() {
                       </button>
                     </td>
                   )}
-                  {isAdmin && isCol('orioId') && (
+                  {isAdmin && isCol('wakilniId') && (
                     <td className="py-2.5 px-4 text-xs" onClick={(e) => e.stopPropagation()}>
-                      {order.orioOrderId ? (
-                        <button
-                          onClick={() => setTrackingTarget({ orioId: order.orioOrderId!, systemId: (order as any).systemId ?? null, sellerId: order.id })}
-                          className="text-[hsl(210,60%,52%)] hover:underline font-medium"
-                        >
-                          {order.orioOrderId}
-                        </button>
+                      {(order as any).wakilniTrackingId || (order as any).wakilniOrderId ? (
+                        (() => {
+                          const fullId = String((order as any).wakilniTrackingId || (order as any).wakilniOrderId);
+                          return (
+                            <button
+                              onClick={() => setTrackingTarget({
+                                trackingId: (order as any).wakilniTrackingId ?? null,
+                                wakilniOrderId: (order as any).wakilniOrderId ?? null,
+                                systemId: (order as any).systemId ?? null,
+                                sellerId: order.id,
+                              })}
+                              className="text-[hsl(210,60%,52%)] hover:underline font-medium tabular-nums"
+                              title={fullId}
+                            >
+                              {fullId.slice(-5)}
+                            </button>
+                          );
+                        })()
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -1147,10 +1161,11 @@ export default function Orders() {
         </div>
       </div>
 
-      {/* ORIO Tracking Modal */}
+      {/* Wakilni Tracking Modal */}
       {trackingTarget && (
-        <OrioTrackingModal
-          orioOrderId={trackingTarget.orioId}
+        <WakilniTrackingModal
+          trackingId={trackingTarget.trackingId}
+          wakilniOrderId={trackingTarget.wakilniOrderId}
           systemId={trackingTarget.systemId}
           sellerId={trackingTarget.sellerId}
           open={!!trackingTarget}

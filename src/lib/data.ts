@@ -42,6 +42,9 @@ export interface Order {
   invoiceStatus?: string | null;
   orioOrderId?: number | null;
   orioShippingStatus?: string | null;
+  wakilniOrderId?: string | null;
+  wakilniTrackingId?: string | null;
+  wakilniSyncStatus?: string | null;
   confirmationChannel?: string | null;
   whatsappStatus?: string | null;
 }

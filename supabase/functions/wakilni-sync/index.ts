@@ -64,6 +64,30 @@ async function wakilniRequestWithFallback(paths: string[], token: string, body?:
   throw lastError || new Error(`Wakilni request failed for ${paths.join(", ")}`);
 }
 
+async function wakilniGet(path: string, token: string) {
+  const response = await fetch(`${WAKILNI_BASE}${path}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+
+  const text = await response.text();
+  let payload: any;
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch {
+    payload = { raw: text };
+  }
+
+  if (!response.ok || payload?.success === false || payload?.status === false) {
+    throw new Error(`Wakilni ${path} failed: ${response.status} ${JSON.stringify(payload).slice(0, 800)}`);
+  }
+
+  return payload;
+}
+
 async function getWakilniToken() {
   const key = Deno.env.get("WAKILNI_API_KEY");
   const secret = Deno.env.get("WAKILNI_API_SECRET");
@@ -294,6 +318,66 @@ async function syncOrder(supabase: ReturnType<typeof createClient>, orderId: str
   }
 }
 
+async function trackOrder(trackingId?: string | null, wakilniOrderId?: string | null) {
+  const token = await getWakilniToken();
+  const result: any = {
+    tracking_id: trackingId || null,
+    order_id: wakilniOrderId || null,
+    logs: [],
+    comments: [],
+  };
+
+  if (trackingId) {
+    try {
+      const statusPayload = await wakilniRequest(`/clients/tracking/orders/${encodeURIComponent(trackingId)}`, token);
+      result.status = statusPayload.status_code || statusPayload.status || statusPayload.message;
+      result.status_code = statusPayload.status;
+      result.completed_on = statusPayload.completed_on || null;
+      result.raw_status = statusPayload;
+    } catch (error) {
+      result.status_error = String((error as Error)?.message || error);
+    }
+  }
+
+  const query = new URLSearchParams();
+  if (trackingId) query.set("tracking_id", trackingId);
+  if (wakilniOrderId) query.set("order_id", wakilniOrderId);
+  if (query.toString()) {
+    try {
+      const details = await wakilniGet(`/clients/orders/status?${query.toString()}`, token);
+      const data = details?.data || details?.order || details;
+      result.raw_details = details;
+      result.status = data?.status_code || data?.status || result.status;
+      result.status_code = data?.status_id || data?.status || result.status_code;
+      result.completed_on = data?.completed_on || data?.updated_at || result.completed_on || null;
+
+      const possibleLogs = data?.logs || data?.tracking || data?.history || details?.logs || details?.tracking || [];
+      if (Array.isArray(possibleLogs)) {
+        result.logs = possibleLogs.map((event: any) => ({
+          status: event.status || event.name || event.description || event.status_code,
+          status_code: event.status_id || event.code,
+          created_at: event.created_at || event.date || event.datetime || event.completed_on,
+        }));
+      }
+
+      const possibleComments = data?.comments || data?.comment || details?.comments || details?.comment;
+      result.comments = Array.isArray(possibleComments)
+        ? possibleComments.map((comment: any) => String(comment?.comment || comment?.text || comment))
+        : possibleComments
+          ? [String(possibleComments)]
+          : [];
+    } catch (error) {
+      result.details_error = String((error as Error)?.message || error);
+    }
+  }
+
+  if (!result.status && result.status_error && result.details_error) {
+    throw new Error(`${result.status_error}; ${result.details_error}`);
+  }
+
+  return result;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -303,10 +387,16 @@ Deno.serve(async (req) => {
     const action = body.action || "sync-order";
     const orderId = body.order_id || body.orderId;
 
-    if (action !== "sync-order") throw new Error(`Unknown action: ${action}`);
-    if (!orderId) throw new Error("order_id required");
+    let result: unknown;
+    if (action === "sync-order") {
+      if (!orderId) throw new Error("order_id required");
+      result = await syncOrder(supabase, String(orderId));
+    } else if (action === "track") {
+      result = await trackOrder(body.tracking_id || body.trackingId, body.wakilni_order_id || body.wakilniOrderId);
+    } else {
+      throw new Error(`Unknown action: ${action}`);
+    }
 
-    const result = await syncOrder(supabase, String(orderId));
     return jsonResponse(result);
   } catch (error) {
     const message = String(error?.message || error);
