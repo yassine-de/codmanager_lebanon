@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import WakilniTrackingModal from "@/components/WakilniTrackingModal";
 
 const confirmationBadge: Record<string, { label: string; className: string }> = {
   confirmed: { label: "✅ Confirmed", className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
@@ -77,6 +78,7 @@ const AgentConfirmedOrders = () => {
   const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
   const [editOrder, setEditOrder] = useState<any>(null);
+  const [trackingTarget, setTrackingTarget] = useState<{ trackingId?: string | null; wakilniOrderId?: string | null; systemId?: number | null; sellerId?: string | null } | null>(null);
   const [reclaimingId, setReclaimingId] = useState<string | null>(null);
   const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; product_url: string | null; video_url: string | null }[]>([]);
   const [editForm, setEditForm] = useState<EditForm>({
@@ -377,6 +379,7 @@ const AgentConfirmedOrders = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-[11px] w-[100px]">Order ID</TableHead>
+                  <TableHead className="text-[11px]">Wakilni ID</TableHead>
                   <TableHead className="text-[11px]">Customer</TableHead>
                   <TableHead className="text-[11px]">City</TableHead>
                   <TableHead className="text-[11px]">Product</TableHead>
@@ -392,13 +395,13 @@ const AgentConfirmedOrders = () => {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-sm text-muted-foreground py-12">
+                    <TableCell colSpan={12} className="text-center text-sm text-muted-foreground py-12">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : filteredOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-sm text-muted-foreground py-12">
+                    <TableCell colSpan={12} className="text-center text-sm text-muted-foreground py-12">
                       No orders found
                     </TableCell>
                   </TableRow>
@@ -410,6 +413,30 @@ const AgentConfirmedOrders = () => {
                     return (
                       <TableRow key={order.id} className="text-xs">
                         <TableCell className="font-mono font-semibold text-primary">{order.order_id}</TableCell>
+                        <TableCell>
+                          {order.wakilni_tracking_id || order.wakilni_order_id ? (
+                            (() => {
+                              const fullId = String(order.wakilni_tracking_id || order.wakilni_order_id);
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => setTrackingTarget({
+                                    trackingId: order.wakilni_tracking_id ?? null,
+                                    wakilniOrderId: order.wakilni_order_id ?? null,
+                                    systemId: order.system_id ?? null,
+                                    sellerId: order.order_id,
+                                  })}
+                                  className="font-mono text-[11px] font-semibold text-primary hover:underline tabular-nums"
+                                  title={fullId}
+                                >
+                                  {fullId.slice(-5)}
+                                </button>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div>
                             <p className="font-medium">{order.customer_name}</p>
@@ -489,6 +516,21 @@ const AgentConfirmedOrders = () => {
           </div>
         </CardContent>
       </Card>
+
+      {trackingTarget && (
+        <WakilniTrackingModal
+          trackingId={trackingTarget.trackingId}
+          wakilniOrderId={trackingTarget.wakilniOrderId}
+          systemId={trackingTarget.systemId}
+          sellerId={trackingTarget.sellerId}
+          open={!!trackingTarget}
+          onClose={() => {
+            setTrackingTarget(null);
+            queryClient.invalidateQueries({ queryKey: ["agent-treated-orders", userId] });
+          }}
+          onStatusSync={() => queryClient.invalidateQueries({ queryKey: ["agent-treated-orders", userId] })}
+        />
+      )}
 
       <Dialog open={!!editOrder} onOpenChange={(open) => !open && setEditOrder(null)}>
         <DialogContent className="sm:max-w-lg">
