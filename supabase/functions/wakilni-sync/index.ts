@@ -213,7 +213,7 @@ function deliveryPayload(order: any, product: any) {
       {
         quantity,
         type_id: 58,
-        name: sku || productName,
+        name: "Regular Box",
         sku,
       },
     ],
