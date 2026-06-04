@@ -159,7 +159,7 @@ function deliveryPayload(order: any, product: any) {
   const area = String(order.customer_city || order.customer_address || "Lebanon").trim();
   const sku = String(product?.sku || product?.display_id || order.order_id || "").trim();
   const productName = String(product?.name || order.product_name || "Product").trim();
-  const packageComment = sku ? `${quantity} ${sku}` : `${quantity} ${productName}`;
+  const description = sku ? `${quantity}pc ${productName} ${sku}` : `${quantity}pc ${productName}`;
   const orderRef = Number(String(order.order_id || "").replace(/\D/g, "")) || Date.now();
 
   return {
@@ -183,7 +183,7 @@ function deliveryPayload(order: any, product: any) {
     currency: 1,
     cash_collection_type_id: totalAmount > 0 ? 52 : 54,
     collection_amount: totalAmount,
-    note: packageComment,
+    note: description,
     car_needed: false,
     packages: [
       {
