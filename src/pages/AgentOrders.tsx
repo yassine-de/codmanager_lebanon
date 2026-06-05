@@ -909,7 +909,6 @@ const AgentOrders = () => {
           </p>
         </div>
         <Button
-          type="button"
           size="lg"
           className="gap-2 text-base px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all"
           onClick={handleStart}
