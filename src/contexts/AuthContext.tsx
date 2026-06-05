@@ -29,9 +29,30 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_RETRY_DELAYS_MS = [0, 800, 1600, 3000, 5000];
+const AGENT_AUTH_CACHE_KEY = "codmanager:lastAgentAuthUser";
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getCachedAgentAuthUser(userId: string): AuthUser | null {
+  try {
+    const raw = localStorage.getItem(AGENT_AUTH_CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as AuthUser;
+    return cached?.id === userId && cached.role === "agent" ? cached : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheAgentAuthUser(details: AuthUser) {
+  if (details.role !== "agent") return;
+  try {
+    localStorage.setItem(AGENT_AUTH_CACHE_KEY, JSON.stringify(details));
+  } catch {
+    // Auth still works without the local fallback.
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -67,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw profileResult.error || roleResult.error || permsResult.error;
     }
 
-    return {
+    const details: AuthUser = {
       id: supabaseUser.id,
       email: profileResult.data?.email || supabaseUser.email || "",
       name: profileResult.data?.name || fallbackName,
@@ -76,6 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       phone: profileResult.data?.phone || "",
       active: profileResult.data?.active ?? true,
     };
+
+    cacheAgentAuthUser(details);
+    return details;
   };
 
   const fetchUserDetailsWithRetry = async (supabaseUser: User): Promise<AuthUser> => {
@@ -104,6 +128,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthUser(details);
     } catch (err) {
       console.error("Error refreshing user details:", err);
+      const cachedAgent = getCachedAgentAuthUser(user.id);
+      if (cachedAgent) {
+        setAuthUser(cachedAgent);
+        setAuthError(null);
+        return;
+      }
       setAuthError("We couldn't load your account permissions. Please check your connection and try again.");
     } finally {
       setLoading(false);
@@ -135,9 +165,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthUser(details);
     } catch (err) {
       console.error("Error retrying auth load:", err);
+      const cachedAgent = getCachedAgentAuthUser(sessionUser.id);
       setUser(sessionUser);
-      setAuthUser(null);
-      setAuthError("We couldn't load your account permissions. Please check your connection and try again.");
+      if (cachedAgent) {
+        setAuthUser(cachedAgent);
+        setAuthError(null);
+      } else {
+        setAuthUser(null);
+        setAuthError("We couldn't load your account permissions. Please check your connection and try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -166,9 +202,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (err) {
           console.error("Error fetching user details:", err);
           if (!isMounted) return;
+          const cachedAgent = getCachedAgentAuthUser(sessionUser.id);
           setUser(sessionUser);
-          setAuthUser(null);
-          setAuthError("We couldn't load your account permissions. Please check your connection and try again.");
+          if (cachedAgent) {
+            setAuthUser(cachedAgent);
+            setAuthError(null);
+          } else {
+            setAuthUser(null);
+            setAuthError("We couldn't load your account permissions. Please check your connection and try again.");
+          }
           setLoading(false);
           return;
         }
@@ -232,6 +274,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setAuthUser(null);
     setAuthError(null);
+    try {
+      localStorage.removeItem(AGENT_AUTH_CACHE_KEY);
+    } catch {}
     signingOutRef.current = false;
   };
 
