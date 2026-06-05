@@ -17,11 +17,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { CitySelect } from "@/components/CitySelect";
 import { formatPKT as format } from "@/lib/timezone";
+import { appendAgentDebugLog, downloadAgentDebugLog } from "@/lib/agent-debug-log";
 import { toast } from "sonner";
 import {
   Play, ChevronRight, Phone, PhoneOff, MessageCircle, User, MapPin, Package, DollarSign,
   Video, Store, Tag, StickyNote, CalendarIcon, ExternalLink, AlertCircle, Zap,
-  Pencil, Plus, Trash2, X, Check, Loader2, Clock, RotateCcw, Copy, AlertTriangle
+  Pencil, Plus, Trash2, X, Check, Loader2, Clock, RotateCcw, Copy, AlertTriangle, Download
 } from "lucide-react";
 
 
@@ -312,6 +313,7 @@ const AgentOrders = () => {
   const fetchFreshAssignedOrder = useCallback(async (orderId: string): Promise<DbOrder | null> => {
     if (!authUser) return null;
 
+    appendAgentDebugLog("agent.fetch_fresh_order_start", { orderId, agentId: authUser.id });
     const { data, error } = await supabase
       .from("orders")
       .select("*")
@@ -321,9 +323,11 @@ const AgentOrders = () => {
 
     if (error) {
       console.error("[AgentOrders] Failed to fetch fresh assigned order", error);
+      appendAgentDebugLog("agent.fetch_fresh_order_error", { orderId, message: error.message }, "error");
       return null;
     }
 
+    appendAgentDebugLog("agent.fetch_fresh_order_done", { orderId, found: !!data });
     return (data as DbOrder | null) || null;
   }, [authUser]);
 
@@ -372,6 +376,11 @@ const AgentOrders = () => {
   const claimOrderAtomic = useCallback(async (orderType: string): Promise<DbOrder | null> => {
     if (!authUser) return null;
 
+    appendAgentDebugLog("agent.claim_order_start", {
+      orderType,
+      agentId: authUser.id,
+      assignedProductCount: assignedProducts?.length ?? "all",
+    });
     const { data, error } = await supabase.rpc("claim_next_order", {
       p_agent_id: authUser.id,
       p_product_names: assignedProducts || null,
@@ -380,12 +389,21 @@ const AgentOrders = () => {
 
     if (error) {
       console.error("[AgentOrders] claim_next_order error", error);
+      appendAgentDebugLog("agent.claim_order_error", { orderType, message: error.message }, "error");
       return null;
     }
 
     const rows = data as DbOrder[] | null;
-    if (!rows || rows.length === 0) return null;
+    if (!rows || rows.length === 0) {
+      appendAgentDebugLog("agent.claim_order_empty", { orderType });
+      return null;
+    }
 
+    appendAgentDebugLog("agent.claim_order_done", {
+      orderType,
+      orderId: rows[0]?.id,
+      displayOrderId: rows[0]?.order_id,
+    });
     return enrichClaimedOrder(rows[0], orderType);
   }, [authUser, assignedProducts, enrichClaimedOrder]);
 
@@ -436,8 +454,13 @@ const AgentOrders = () => {
       .from("products")
       .select("id, name, sku, price, variants, last_price, offers, product_url, video_url, display_id")
       .eq("seller_id", order.seller_id)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (currentOrderRef.current?.id !== activeOrderId) return;
+        if (error) {
+          appendAgentDebugLog("agent.product_catalog_error", { orderId: order.id, message: error.message }, "error");
+          return;
+        }
+        appendAgentDebugLog("agent.product_catalog_done", { orderId: order.id, productCount: data?.length || 0 });
         setSellerProducts((data || []).map((product) => ({
           ...product,
           price: Number(product.price),
@@ -456,8 +479,13 @@ const AgentOrders = () => {
       .order("confirmed_at", { ascending: false })
       .limit(1)
       .maybeSingle()
-      .then(({ data: historicalOrder }) => {
+      .then(({ data: historicalOrder, error }) => {
         if (currentOrderRef.current?.id !== activeOrderId) return;
+        if (error) {
+          appendAgentDebugLog("agent.history_error", { orderId: order.id, message: error.message }, "error");
+          return;
+        }
+        appendAgentDebugLog("agent.history_done", { orderId: order.id, found: !!historicalOrder });
         if (historicalOrder) {
           if (historicalOrder.offers && String(historicalOrder.offers).trim()) {
             setHistoricalOffers(String(historicalOrder.offers));
@@ -520,12 +548,31 @@ const AgentOrders = () => {
   const handleStart = async () => {
     if (loading || claiming) return; // prevent double click
     setLoading(true);
+    appendAgentDebugLog("agent.start_clicked", {
+      agentId: authUser?.id || null,
+      role: authUser?.role || null,
+      newOrderCount,
+      retryCount,
+      duplicateCount,
+    });
     try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      appendAgentDebugLog(
+        "agent.start_session_check",
+        {
+          hasSession: !!sessionData.session,
+          userId: sessionData.session?.user?.id || null,
+          error: sessionError?.message || null,
+        },
+        sessionError ? "error" : "info",
+      );
+
       clearActiveOrderState();
       const claimedOrder = await claimNextAvailableOrder();
 
       if (!claimedOrder) {
         setStarted(false);
+        appendAgentDebugLog("agent.start_no_order");
         await refreshAvailableCounts();
         toast.info("No orders to process right now! 🎉");
         return;
@@ -533,12 +580,18 @@ const AgentOrders = () => {
 
       initOrderState(claimedOrder);
       setStarted(true);
+      appendAgentDebugLog("agent.start_order_ready", {
+        orderId: claimedOrder.id,
+        displayOrderId: claimedOrder.order_id,
+      });
       await refreshAvailableCounts();
       toast.success(`Order ${claimedOrder.order_id} claimed — Let's go! 🚀`);
     } catch (error: any) {
       console.error("[AgentOrders] Failed to start confirmation flow", error);
+      appendAgentDebugLog("agent.start_error", { message: error?.message || String(error) }, "error");
       toast.error(error?.message || "Failed to load orders");
     } finally {
+      appendAgentDebugLog("agent.start_finished");
       setLoading(false);
     }
   };
@@ -916,6 +969,10 @@ const AgentOrders = () => {
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
           Start Smart Confirmation
+        </Button>
+        <Button type="button" variant="outline" size="sm" className="gap-2" onClick={downloadAgentDebugLog}>
+          <Download className="h-4 w-4" />
+          Download Debug Log
         </Button>
       </div>
     );

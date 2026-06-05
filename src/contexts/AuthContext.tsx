@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import { appendAgentDebugLog } from "@/lib/agent-debug-log";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -56,6 +57,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     } catch (err) {
       console.error("Error fetching user details:", err);
+      appendAgentDebugLog(
+        "auth.fetch_user_details_error",
+        { userId: supabaseUser.id, message: err instanceof Error ? err.message : String(err) },
+        "error",
+      );
       return {
         id: supabaseUser.id,
         email: supabaseUser.email || "",
@@ -104,11 +110,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      appendAgentDebugLog("auth.state_change", {
+        event,
+        hasSession: !!session,
+        userId: session?.user?.id || null,
+        email: session?.user?.email || null,
+      });
       void syncAuthState(session?.user ?? null);
     });
 
     void supabase.auth.getSession().then(({ data: { session } }) => {
+      appendAgentDebugLog("auth.initial_session", {
+        hasSession: !!session,
+        userId: session?.user?.id || null,
+        email: session?.user?.email || null,
+      });
       void syncAuthState(session?.user ?? null);
     });
 
@@ -119,12 +136,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    appendAgentDebugLog("auth.sign_in_start", { email });
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
+    if (error) {
+      appendAgentDebugLog("auth.sign_in_error", { email, message: error.message }, "error");
+      return { error: error.message };
+    }
+    appendAgentDebugLog("auth.sign_in_success", { email });
     return { error: null };
   };
 
   const signOut = async () => {
+    appendAgentDebugLog("auth.sign_out_start", { userId: user?.id || null });
     await supabase.auth.signOut();
     setUser(null);
     setAuthUser(null);

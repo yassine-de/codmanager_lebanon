@@ -8,6 +8,7 @@ import { Package, LogIn, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { appendAgentDebugLog, downloadAgentDebugLog } from "@/lib/agent-debug-log";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -30,10 +31,13 @@ const Login = () => {
       return;
     }
     setIsLoading(true);
+    appendAgentDebugLog("login.submit_start", { email });
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
+      appendAgentDebugLog("login.submit_error", { email, message: error.message }, "error");
       toast.error(error.message);
     } else {
+      appendAgentDebugLog("login.submit_success", { email });
       toast.success("Connexion réussie");
     }
     setIsLoading(false);
@@ -118,6 +122,15 @@ const Login = () => {
                 Sign in
               </Button>
             </form>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-4 w-full text-xs text-muted-foreground"
+              onClick={downloadAgentDebugLog}
+            >
+              Download Debug Log
+            </Button>
           </CardContent>
         </Card>
       </div>
