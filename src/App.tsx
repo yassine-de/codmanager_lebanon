@@ -50,7 +50,7 @@ import WhatsappAutomations from "./pages/whatsapp/WhatsappAutomations";
 import WhatsappAutomationBuilder from "./pages/whatsapp/WhatsappAutomationBuilder";
 import WhatsappCampaigns from "./pages/whatsapp/WhatsappCampaigns";
 import NotFound from "./pages/NotFound";
-import { Loader2 } from "lucide-react";
+import { RefreshCw, WifiOff } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isFeatureEnabled, type FeatureKey } from "@/config/features";
 
@@ -122,6 +122,30 @@ function ProtectedRoute({ children, permission }: { children: React.ReactNode; p
   return <>{children}</>;
 }
 
+function AuthLoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-6">
+      <div className="w-full max-w-md rounded-lg border bg-card p-6 text-center shadow-sm">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+          <WifiOff className="h-6 w-6" />
+        </div>
+        <h1 className="text-xl font-semibold text-foreground">Connection is unstable</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          We could not load your account permissions. Check the internet connection and try again.
+        </p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Try again
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FeatureRoute({ children, feature }: { children: React.ReactNode; feature: FeatureKey }) {
   if (!isFeatureEnabled(feature)) {
     return <Navigate to="/" replace />;
@@ -131,9 +155,17 @@ function FeatureRoute({ children, feature }: { children: React.ReactNode; featur
 }
 
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const { user, authUser, loading, authError, retryAuth } = useAuth();
 
   if (loading) {
+    return <AppSkeleton />;
+  }
+
+  if (user && authError) {
+    return <AuthLoadError onRetry={() => void retryAuth()} />;
+  }
+
+  if (user && !authUser) {
     return <AppSkeleton />;
   }
 

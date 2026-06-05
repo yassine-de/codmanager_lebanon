@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -19,18 +19,31 @@ interface AuthContextType {
   user: User | null;
   authUser: AuthUser | null;
   loading: boolean;
+  authError: string | null;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   hasPermission: (key: string) => boolean;
   refreshUser: () => Promise<void>;
+  retryAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AUTH_RETRY_DELAYS_MS = [0, 800, 1600, 3000, 5000];
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const authUserRef = useRef<AuthUser | null>(null);
+
+  useEffect(() => {
+    authUserRef.current = authUser;
+  }, [authUser]);
 
   const fetchUserDetails = async (supabaseUser: User): Promise<AuthUser> => {
     const fallbackName =
@@ -38,42 +51,87 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ? supabaseUser.user_metadata.name
         : supabaseUser.email?.split("@")[0] || "User";
 
-    try {
-      const [{ data: profile }, { data: roleData }, { data: permsData }] = await Promise.all([
-        supabase.from("profiles").select("*").eq("user_id", supabaseUser.id).maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", supabaseUser.id).maybeSingle(),
-        supabase.from("user_permissions").select("permission_key").eq("user_id", supabaseUser.id),
-      ]);
+    const [profileResult, roleResult, permsResult] = await Promise.all([
+      supabase.from("profiles").select("*").eq("user_id", supabaseUser.id).maybeSingle(),
+      supabase.from("user_roles").select("role").eq("user_id", supabaseUser.id).maybeSingle(),
+      supabase.from("user_permissions").select("permission_key").eq("user_id", supabaseUser.id),
+    ]);
 
-      return {
-        id: supabaseUser.id,
-        email: profile?.email || supabaseUser.email || "",
-        name: profile?.name || fallbackName,
-        role: roleData?.role || "custom",
-        permissions: permsData?.map((p) => p.permission_key) || [],
-        phone: profile?.phone || "",
-        active: profile?.active ?? true,
-      };
-    } catch (err) {
-      console.error("Error fetching user details:", err);
-      return {
-        id: supabaseUser.id,
-        email: supabaseUser.email || "",
-        name: fallbackName,
-        role: "custom",
-        permissions: [],
-        phone: "",
-        active: true,
-      };
+    if (profileResult.error || roleResult.error || permsResult.error) {
+      throw profileResult.error || roleResult.error || permsResult.error;
     }
+
+    return {
+      id: supabaseUser.id,
+      email: profileResult.data?.email || supabaseUser.email || "",
+      name: profileResult.data?.name || fallbackName,
+      role: roleResult.data?.role || "custom",
+      permissions: permsResult.data?.map((p) => p.permission_key) || [],
+      phone: profileResult.data?.phone || "",
+      active: profileResult.data?.active ?? true,
+    };
+  };
+
+  const fetchUserDetailsWithRetry = async (supabaseUser: User): Promise<AuthUser> => {
+    let lastError: unknown;
+
+    for (const delayMs of AUTH_RETRY_DELAYS_MS) {
+      if (delayMs > 0) await wait(delayMs);
+
+      try {
+        return await fetchUserDetails(supabaseUser);
+      } catch (err) {
+        lastError = err;
+        console.warn("Retrying user details after auth load error:", err);
+      }
+    }
+
+    throw lastError;
   };
 
   const refreshUser = async () => {
     if (!user) return;
     setLoading(true);
-    const details = await fetchUserDetails(user);
-    setAuthUser(details);
-    setLoading(false);
+    setAuthError(null);
+    try {
+      const details = await fetchUserDetailsWithRetry(user);
+      setAuthUser(details);
+    } catch (err) {
+      console.error("Error refreshing user details:", err);
+      setAuthError("We couldn't load your account permissions. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const retryAuth = async () => {
+    setLoading(true);
+    setAuthError(null);
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const sessionUser = session?.user ?? null;
+    if (!sessionUser) {
+      setUser(null);
+      setAuthUser(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const details = await fetchUserDetailsWithRetry(sessionUser);
+      setUser(sessionUser);
+      setAuthUser(details);
+    } catch (err) {
+      console.error("Error retrying auth load:", err);
+      setUser(sessionUser);
+      setAuthUser(null);
+      setAuthError("We couldn't load your account permissions. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -83,14 +141,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isMounted) return;
 
       if (sessionUser) {
+        setLoading(true);
+        setAuthError(null);
+        const currentAuthUser = authUserRef.current;
         // If same user is already fully loaded, skip refetch
-        if (authUser?.id === sessionUser.id && authUser.role !== "custom") {
+        if (currentAuthUser?.id === sessionUser.id && currentAuthUser.role !== "custom") {
           setUser(sessionUser);
           setLoading(false);
           return;
         }
         // Fetch ALL user data before rendering UI
-        const details = await fetchUserDetails(sessionUser);
+        let details: AuthUser;
+        try {
+          details = await fetchUserDetailsWithRetry(sessionUser);
+        } catch (err) {
+          console.error("Error fetching user details:", err);
+          if (!isMounted) return;
+          setUser(sessionUser);
+          setAuthUser(null);
+          setAuthError("We couldn't load your account permissions. Please check your connection and try again.");
+          setLoading(false);
+          return;
+        }
         if (!isMounted) return;
         setUser(sessionUser);
         setAuthUser(details);
@@ -98,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUser(null);
         setAuthUser(null);
+        setAuthError(null);
         setLoading(false);
       }
     };
@@ -128,6 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setAuthUser(null);
+    setAuthError(null);
   };
 
   const hasPermission = (key: string) => {
@@ -138,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, authUser, loading, signIn, signOut, hasPermission, refreshUser }}
+      value={{ user, authUser, loading, authError, signIn, signOut, hasPermission, refreshUser, retryAuth }}
     >
       {children}
     </AuthContext.Provider>
