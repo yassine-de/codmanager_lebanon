@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -26,37 +26,11 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const AUTH_USER_CACHE_KEY = "codmanager:lastAuthUser";
-
-function getCachedAuthUser(userId: string): AuthUser | null {
-  try {
-    const raw = localStorage.getItem(AUTH_USER_CACHE_KEY);
-    if (!raw) return null;
-    const cached = JSON.parse(raw) as AuthUser;
-    return cached?.id === userId && cached.role !== "custom" ? cached : null;
-  } catch {
-    return null;
-  }
-}
-
-function cacheAuthUser(details: AuthUser) {
-  if (details.role === "custom") return;
-  try {
-    localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(details));
-  } catch {
-    // Storage can be unavailable in private mode; auth still works without cache.
-  }
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const authUserRef = useRef<AuthUser | null>(null);
-
-  useEffect(() => {
-    authUserRef.current = authUser;
-  }, [authUser]);
 
   const fetchUserDetails = async (supabaseUser: User): Promise<AuthUser> => {
     const fallbackName =
@@ -64,41 +38,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ? supabaseUser.user_metadata.name
         : supabaseUser.email?.split("@")[0] || "User";
 
-    const [profileResult, roleResult, permsResult] = await Promise.all([
-      supabase.from("profiles").select("*").eq("user_id", supabaseUser.id).maybeSingle(),
-      supabase.from("user_roles").select("role").eq("user_id", supabaseUser.id).maybeSingle(),
-      supabase.from("user_permissions").select("permission_key").eq("user_id", supabaseUser.id),
-    ]);
+    try {
+      const [{ data: profile }, { data: roleData }, { data: permsData }] = await Promise.all([
+        supabase.from("profiles").select("*").eq("user_id", supabaseUser.id).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", supabaseUser.id).maybeSingle(),
+        supabase.from("user_permissions").select("permission_key").eq("user_id", supabaseUser.id),
+      ]);
 
-    if (profileResult.error || roleResult.error || permsResult.error) {
-      throw profileResult.error || roleResult.error || permsResult.error;
+      return {
+        id: supabaseUser.id,
+        email: profile?.email || supabaseUser.email || "",
+        name: profile?.name || fallbackName,
+        role: roleData?.role || "custom",
+        permissions: permsData?.map((p) => p.permission_key) || [],
+        phone: profile?.phone || "",
+        active: profile?.active ?? true,
+      };
+    } catch (err) {
+      console.error("Error fetching user details:", err);
+      return {
+        id: supabaseUser.id,
+        email: supabaseUser.email || "",
+        name: fallbackName,
+        role: "custom",
+        permissions: [],
+        phone: "",
+        active: true,
+      };
     }
-
-    const details = {
-      id: supabaseUser.id,
-      email: profileResult.data?.email || supabaseUser.email || "",
-      name: profileResult.data?.name || fallbackName,
-      role: roleResult.data?.role || "custom",
-      permissions: permsResult.data?.map((p) => p.permission_key) || [],
-      phone: profileResult.data?.phone || "",
-      active: profileResult.data?.active ?? true,
-    };
-
-    cacheAuthUser(details);
-    return details;
   };
 
   const refreshUser = async () => {
     if (!user) return;
     setLoading(true);
-    try {
-      const details = await fetchUserDetails(user);
-      setAuthUser(details);
-    } catch (err) {
-      console.error("Error refreshing user details:", err);
-      const cached = authUserRef.current?.id === user.id ? authUserRef.current : getCachedAuthUser(user.id);
-      if (cached) setAuthUser(cached);
-    }
+    const details = await fetchUserDetails(user);
+    setAuthUser(details);
     setLoading(false);
   };
 
@@ -109,30 +83,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isMounted) return;
 
       if (sessionUser) {
-        const currentAuthUser = authUserRef.current;
         // If same user is already fully loaded, skip refetch
-        if (currentAuthUser?.id === sessionUser.id && currentAuthUser.role !== "custom") {
+        if (authUser?.id === sessionUser.id && authUser.role !== "custom") {
           setUser(sessionUser);
           setLoading(false);
           return;
         }
         // Fetch ALL user data before rendering UI
-        let details: AuthUser;
-        try {
-          details = await fetchUserDetails(sessionUser);
-        } catch (err) {
-          console.error("Error fetching user details:", err);
-          const cached = getCachedAuthUser(sessionUser.id);
-          details = cached || {
-            id: sessionUser.id,
-            email: sessionUser.email || "",
-            name: sessionUser.user_metadata?.name || sessionUser.email?.split("@")[0] || "User",
-            role: "custom",
-            permissions: [],
-            phone: "",
-            active: true,
-          };
-        }
+        const details = await fetchUserDetails(sessionUser);
         if (!isMounted) return;
         setUser(sessionUser);
         setAuthUser(details);
@@ -168,9 +126,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    try {
-      localStorage.removeItem(AUTH_USER_CACHE_KEY);
-    } catch {}
     setUser(null);
     setAuthUser(null);
   };
