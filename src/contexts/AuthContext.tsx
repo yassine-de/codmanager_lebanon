@@ -40,6 +40,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const authUserRef = useRef<AuthUser | null>(null);
+  const userRef = useRef<User | null>(null);
+  const signingOutRef = useRef(false);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   useEffect(() => {
     authUserRef.current = authUser;
@@ -114,8 +120,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const sessionUser = session?.user ?? null;
     if (!sessionUser) {
-      setUser(null);
-      setAuthUser(null);
+      if (!userRef.current) {
+        setUser(null);
+        setAuthUser(null);
+      }
+      setAuthError("We couldn't restore your session. Please check your connection and try again.");
       setLoading(false);
       return;
     }
@@ -143,10 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (sessionUser) {
         setLoading(true);
         setAuthError(null);
+        setUser(sessionUser);
         const currentAuthUser = authUserRef.current;
         // If same user is already fully loaded, skip refetch
         if (currentAuthUser?.id === sessionUser.id && currentAuthUser.role !== "custom") {
-          setUser(sessionUser);
           setLoading(false);
           return;
         }
@@ -168,6 +177,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthUser(details);
         setLoading(false);
       } else {
+        if (!signingOutRef.current && userRef.current) {
+          setLoading(true);
+
+          for (const delayMs of [800, 1600, 3000]) {
+            await wait(delayMs);
+            const {
+              data: { session },
+            } = await supabase.auth.getSession();
+
+            if (session?.user) {
+              void syncAuthState(session.user);
+              return;
+            }
+          }
+        }
+
         setUser(null);
         setAuthUser(null);
         setAuthError(null);
@@ -198,10 +223,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    signingOutRef.current = true;
     await supabase.auth.signOut();
     setUser(null);
     setAuthUser(null);
     setAuthError(null);
+    signingOutRef.current = false;
   };
 
   const hasPermission = (key: string) => {
