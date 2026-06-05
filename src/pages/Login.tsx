@@ -15,7 +15,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
-  const { user, loading } = useAuth();
+  const { user, loading, signIn } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,7 +32,7 @@ const Login = () => {
     }
     setIsLoading(true);
     appendAgentDebugLog("login.submit_start", { email });
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await signIn(email, password);
     if (error) {
       appendAgentDebugLog("login.submit_error", { email, message: error.message }, "error");
       toast.error(error.message);

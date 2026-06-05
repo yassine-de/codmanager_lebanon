@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -32,6 +32,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const authUserRef = useRef<AuthUser | null>(null);
+  const loadingUserDetailsForRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    authUserRef.current = authUser;
+  }, [authUser]);
 
   const fetchUserDetails = async (supabaseUser: User): Promise<AuthUser> => {
     const fallbackName =
@@ -89,18 +95,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isMounted) return;
 
       if (sessionUser) {
+        const currentAuthUser = authUserRef.current;
         // If same user is already fully loaded, skip refetch
-        if (authUser?.id === sessionUser.id && authUser.role !== "custom") {
+        if (currentAuthUser?.id === sessionUser.id && currentAuthUser.role !== "custom") {
           setUser(sessionUser);
           setLoading(false);
           return;
         }
+        if (loadingUserDetailsForRef.current === sessionUser.id) {
+          setUser(sessionUser);
+          return;
+        }
         // Fetch ALL user data before rendering UI
-        const details = await fetchUserDetails(sessionUser);
-        if (!isMounted) return;
-        setUser(sessionUser);
-        setAuthUser(details);
-        setLoading(false);
+        loadingUserDetailsForRef.current = sessionUser.id;
+        window.setTimeout(() => {
+          void (async () => {
+            const details = await fetchUserDetails(sessionUser);
+            loadingUserDetailsForRef.current = null;
+            if (!isMounted) return;
+            setUser(sessionUser);
+            setAuthUser(details);
+            setLoading(false);
+          })();
+        }, 0);
       } else {
         setUser(null);
         setAuthUser(null);
@@ -117,6 +134,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userId: session?.user?.id || null,
         email: session?.user?.email || null,
       });
+      if (event === "TOKEN_REFRESHED" && session?.user) {
+        const currentAuthUser = authUserRef.current;
+        setUser(session.user);
+        if (currentAuthUser?.id === session.user.id && currentAuthUser.role !== "custom") {
+          setLoading(false);
+          return;
+        }
+      }
       void syncAuthState(session?.user ?? null);
     });
 
