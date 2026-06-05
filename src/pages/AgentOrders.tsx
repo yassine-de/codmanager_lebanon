@@ -250,7 +250,11 @@ const AgentOrders = () => {
       .eq("confirmation_status", "new")
       .is("agent_id", null);
     if (productNames) newQuery = newQuery.in("product_name", productNames);
-    const { data: newOrders } = await newQuery;
+    const { data: newOrders, error: newOrdersError } = await newQuery;
+    if (newOrdersError) {
+      appendAgentDebugLog("agent.count_new_orders_error", { message: newOrdersError.message }, "error");
+      return;
+    }
 
     const normalizedNewOrders = newOrders || [];
     setNewOrderCount(normalizedNewOrders.length);
@@ -274,7 +278,10 @@ const AgentOrders = () => {
       .lt("attempt_count", NO_ANSWER_MAX_ATTEMPTS)
       .or(`last_attempt_at.is.null,last_attempt_at.lte.${cooldownCutoff}`);
     if (productNames) noAnswerQuery = noAnswerQuery.in("product_name", productNames);
-    const { count: noAnswerCount } = await noAnswerQuery;
+    const { count: noAnswerCount, error: noAnswerError } = await noAnswerQuery;
+    if (noAnswerError) {
+      appendAgentDebugLog("agent.count_no_answer_error", { message: noAnswerError.message }, "error");
+    }
 
     // Postponed: own orders + orphaned (original agent offline) — count both
     let postponedOwnQuery = supabase
@@ -285,7 +292,10 @@ const AgentOrders = () => {
       .eq("original_agent_id", authUser.id)
       .lte("postpone_date", nowIso);
     if (productNames) postponedOwnQuery = postponedOwnQuery.in("product_name", productNames);
-    const { count: postponedOwnCount } = await postponedOwnQuery;
+    const { count: postponedOwnCount, error: postponedError } = await postponedOwnQuery;
+    if (postponedError) {
+      appendAgentDebugLog("agent.count_postponed_error", { message: postponedError.message }, "error");
+    }
 
     setRetryCount((noAnswerCount || 0) + (postponedOwnCount || 0));
   }, [authUser, assignedProducts]);
@@ -965,7 +975,7 @@ const AgentOrders = () => {
           size="lg"
           className="gap-2 text-base px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all"
           onClick={handleStart}
-          disabled={(newOrderCount === 0 && retryCount === 0) || loading || claiming}
+          disabled={loading || claiming}
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
           Start Smart Confirmation
