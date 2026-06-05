@@ -191,6 +191,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               return;
             }
           }
+
+          setAuthError("We couldn't restore your session. Please check your connection and try again.");
+          setLoading(false);
+          return;
         }
 
         setUser(null);
