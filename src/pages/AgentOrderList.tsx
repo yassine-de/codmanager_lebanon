@@ -249,6 +249,11 @@ export default function AgentOrderList() {
     }));
   };
 
+  const productOptionPrice = (product: ProductRow) => {
+    if (product.id === form.product_id) return parseMoney(form.total_amount);
+    return product.last_price ?? product.price;
+  };
+
   const saveOrder = async () => {
     if (!selectedOrder || !authUser) return;
     setSaving(true);
@@ -356,11 +361,10 @@ export default function AgentOrderList() {
         </div>
 
         <div className="overflow-x-auto">
-          <Table className="min-w-[1280px]">
+          <Table className="min-w-[1180px]">
             <TableHeader>
               <TableRow className="bg-muted/40">
                 <TableHead className="w-[120px] px-6 uppercase tracking-wider">Order ID</TableHead>
-                <TableHead className="w-[110px] uppercase tracking-wider">Sheet ID</TableHead>
                 <TableHead className="w-[170px] uppercase tracking-wider">Order Date</TableHead>
                 <TableHead className="w-[120px] uppercase tracking-wider">Status</TableHead>
                 <TableHead className="w-[220px] uppercase tracking-wider">Product Name</TableHead>
@@ -374,14 +378,14 @@ export default function AgentOrderList() {
             <TableBody>
               {ordersQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                     Loading orders...
                   </TableCell>
                 </TableRow>
               ) : orders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                     No new orders found.
                   </TableCell>
                 </TableRow>
@@ -389,7 +393,6 @@ export default function AgentOrderList() {
                 orders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="px-6 font-medium">#{order.system_id || order.order_id}</TableCell>
-                    <TableCell className="font-medium text-muted-foreground">{order.order_id}</TableCell>
                     <TableCell className="text-muted-foreground">{formatDate(order.created_at)}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={statusClass[order.confirmation_status] || statusClass.new}>
@@ -420,7 +423,7 @@ export default function AgentOrderList() {
       </div>
 
       <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-5xl max-h-[calc(100vh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl">
               Edit Order #{selectedOrder?.system_id || selectedOrder?.order_id}
@@ -452,7 +455,7 @@ export default function AgentOrderList() {
                   <SelectItem value="custom">{form.product_name || "Current product"}</SelectItem>
                   {productsForOrder.map((product) => (
                     <SelectItem key={product.id} value={product.id}>
-                      {product.name} - {formatMoney(product.last_price ?? product.price)}
+                      {product.name} - {formatMoney(productOptionPrice(product))}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -538,7 +541,7 @@ export default function AgentOrderList() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t pt-4">
+          <div className="sticky bottom-0 -mx-6 -mb-6 flex justify-end gap-3 border-t bg-background px-6 py-4">
             <Button variant="outline" onClick={() => setSelectedOrder(null)} disabled={saving}>Cancel</Button>
             <Button onClick={saveOrder} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
