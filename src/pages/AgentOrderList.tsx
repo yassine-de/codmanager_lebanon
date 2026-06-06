@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Loader2, MessageCircle, Pencil, RefreshCcw, Video } from "lucide-react";
+import { ExternalLink, Loader2, MessageCircle, Pencil, Plus, RefreshCcw, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { CitySelect } from "@/components/CitySelect";
 import { useToast } from "@/hooks/use-toast";
+import CreateOrderModal from "@/components/CreateOrderModal";
 
 type OrderRow = {
   id: string;
@@ -73,6 +74,10 @@ const statusOptions = [
   { value: "confirmed", label: "Confirmed" },
   { value: "postponed", label: "Postponed" },
   { value: "no_answer", label: "No Answer" },
+  ...Array.from({ length: 9 }, (_, index) => ({
+    value: `no_answer_${index + 1}`,
+    label: `No Answer ${index + 1}`,
+  })),
   { value: "cancelled", label: "Cancelled" },
   { value: "wrong_number", label: "Wrong Number" },
 ];
@@ -84,6 +89,12 @@ const statusClass: Record<string, string> = {
   no_answer: "bg-blue-500/10 text-blue-700 border-blue-500/20",
   cancelled: "bg-destructive/10 text-destructive border-destructive/20",
   wrong_number: "bg-rose-500/10 text-rose-700 border-rose-500/20",
+};
+
+const getStatusLabel = (status: string) => statusOptions.find((option) => option.value === status)?.label || status;
+const getStatusClass = (status: string) => {
+  if (status.startsWith("no_answer_")) return statusClass.no_answer;
+  return statusClass[status] || statusClass.new;
 };
 
 const formatDate = (value: string) =>
@@ -144,6 +155,13 @@ export default function AgentOrderList() {
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
   const [form, setForm] = useState<EditForm>(createEmptyForm);
   const [saving, setSaving] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [pageSize, setPageSize] = useState("10");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [productFilter, setProductFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [search, setSearch] = useState("");
 
   const ordersQuery = useQuery({
     queryKey: ["agent-direct-orders"],
@@ -151,7 +169,6 @@ export default function AgentOrderList() {
       const { data, error } = await supabase
         .from("orders")
         .select("id,system_id,order_id,created_at,updated_at,confirmation_status,customer_name,customer_phone,customer_city,customer_address,product_name,product_url,video_url,variant_name,variant_sku,quantity,price,total_amount,note,seller_id,agent_id,original_agent_id")
-        .eq("confirmation_status", "new")
         .order("created_at", { ascending: true });
 
       if (error) throw error;
@@ -254,6 +271,41 @@ export default function AgentOrderList() {
     return product.last_price ?? product.price;
   };
 
+  const productNames = useMemo(() => {
+    const names = new Set((ordersQuery.data || []).map((order) => order.product_name).filter(Boolean));
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [ordersQuery.data]);
+
+  const filteredOrders = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+    const toTime = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
+
+    return (ordersQuery.data || []).filter((order) => {
+      if (statusFilter !== "all" && order.confirmation_status !== statusFilter) return false;
+      if (productFilter !== "all" && order.product_name !== productFilter) return false;
+
+      const createdTime = new Date(order.created_at).getTime();
+      if (fromTime && createdTime < fromTime) return false;
+      if (toTime && createdTime > toTime) return false;
+
+      if (!normalizedSearch) return true;
+      return [
+        order.order_id,
+        String(order.system_id || ""),
+        order.product_name,
+        order.customer_name,
+        order.customer_phone,
+        order.customer_city,
+      ].some((value) => value.toLowerCase().includes(normalizedSearch));
+    });
+  }, [dateFrom, dateTo, ordersQuery.data, productFilter, search, statusFilter]);
+
+  const visibleOrders = useMemo(
+    () => filteredOrders.slice(0, Number(pageSize) || 10),
+    [filteredOrders, pageSize]
+  );
+
   const saveOrder = async () => {
     if (!selectedOrder || !authUser) return;
     setSaving(true);
@@ -337,8 +389,6 @@ export default function AgentOrderList() {
     }
   };
 
-  const orders = ordersQuery.data || [];
-
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between gap-4">
@@ -346,15 +396,71 @@ export default function AgentOrderList() {
           <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
           <p className="text-sm text-muted-foreground">Manage new orders directly from the list.</p>
         </div>
-        <Button variant="outline" onClick={() => ordersQuery.refetch()} disabled={ordersQuery.isFetching}>
-          <RefreshCcw className={`mr-2 h-4 w-4 ${ordersQuery.isFetching ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm text-muted-foreground">Show</span>
+        <Select value={pageSize} onValueChange={setPageSize}>
+          <SelectTrigger className="h-11 w-[86px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="10">10</SelectItem>
+            <SelectItem value="25">25</SelectItem>
+            <SelectItem value="50">50</SelectItem>
+            <SelectItem value="100">100</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="h-11 w-[165px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            {statusOptions.map((status) => (
+              <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={productFilter} onValueChange={setProductFilter}>
+          <SelectTrigger className="h-11 min-w-[260px] flex-1 max-w-[380px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Products</SelectItem>
+            {productNames.map((productName) => (
+              <SelectItem key={productName} value={productName}>{productName}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="h-11 w-[158px]" />
+        <span className="text-sm text-muted-foreground">to</span>
+        <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="h-11 w-[158px]" />
+
+        <div className="ml-auto flex items-center gap-3">
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search..."
+            className="h-11 w-[250px]"
+          />
+          <Button variant="outline" onClick={() => ordersQuery.refetch()} disabled={ordersQuery.isFetching} className="h-11">
+            <RefreshCcw className={`mr-2 h-4 w-4 ${ordersQuery.isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button className="h-11 bg-red-600 px-5 hover:bg-red-700" onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            ADD ORDER
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card overflow-hidden">
         <div className="flex items-center justify-between border-b px-4 py-3">
-          <span className="text-sm font-medium">{orders.length} orders</span>
+          <span className="text-sm font-medium">{filteredOrders.length} orders</span>
           {ordersQuery.isError && (
             <span className="text-sm text-destructive">Could not load orders.</span>
           )}
@@ -383,20 +489,20 @@ export default function AgentOrderList() {
                     Loading orders...
                   </TableCell>
                 </TableRow>
-              ) : orders.length === 0 ? (
+              ) : visibleOrders.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                    No new orders found.
+                    No orders found.
                   </TableCell>
                 </TableRow>
               ) : (
-                orders.map((order) => (
+                visibleOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="px-6 font-medium">#{order.system_id || order.order_id}</TableCell>
                     <TableCell className="text-muted-foreground">{formatDate(order.created_at)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={statusClass[order.confirmation_status] || statusClass.new}>
-                        {statusOptions.find((s) => s.value === order.confirmation_status)?.label || order.confirmation_status}
+                      <Badge variant="outline" className={getStatusClass(order.confirmation_status)}>
+                        {getStatusLabel(order.confirmation_status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-medium" dir="auto">{order.product_name}</TableCell>
@@ -550,6 +656,15 @@ export default function AgentOrderList() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CreateOrderModal
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => {
+          ordersQuery.refetch();
+          queryClient.invalidateQueries({ queryKey: ["agent-new-orders-count"] });
+        }}
+      />
     </div>
   );
 }

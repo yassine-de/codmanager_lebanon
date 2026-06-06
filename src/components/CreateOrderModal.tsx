@@ -21,7 +21,7 @@ interface CreateOrderModalProps {
 export default function CreateOrderModal({ open, onOpenChange, onCreated }: CreateOrderModalProps) {
   const { authUser } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState<{ id: string; name: string; price: number; sku?: string | null; variants?: any[] | null }[]>([]);
+  const [products, setProducts] = useState<{ id: string; seller_id: string; name: string; price: number; sku?: string | null; variants?: any[] | null }[]>([]);
 
   // Form state
   const [customerName, setCustomerName] = useState("");
@@ -39,9 +39,11 @@ export default function CreateOrderModal({ open, onOpenChange, onCreated }: Crea
     const fetchProducts = async () => {
       const { data } = await supabase
         .from("products")
-        .select("id, name, price, sku, variants")
-        .eq("seller_id", authUser.id);
-      setProducts(data || []);
+        .select("id, seller_id, name, price, sku, variants")
+        .eq("active", true)
+        .order("name", { ascending: true });
+      const visibleProducts = authUser.role === "agent" ? data : (data || []).filter((product) => product.seller_id === authUser.id);
+      setProducts(visibleProducts || []);
     };
     fetchProducts();
   }, [authUser, open]);
@@ -111,19 +113,21 @@ export default function CreateOrderModal({ open, onOpenChange, onCreated }: Crea
 
     setLoading(true);
     try {
-      // Generate order ID
+      // For now, create one order row per item (first item as main)
+      const mainItem = items[0];
+      const mainProduct = products.find((product) => product.name === mainItem.productName);
+      const sellerId = authUser.role === "agent" ? mainProduct?.seller_id : authUser.id;
+      if (!sellerId) throw new Error("Seller not found for selected product");
+      const totalQty = items.reduce((s, i) => s + i.quantity, 0);
+
       const { data: orderId, error: idError } = await supabase.rpc("generate_order_id", {
-        p_seller_id: authUser.id,
+        p_seller_id: sellerId,
       });
       if (idError) throw idError;
 
-      // For now, create one order row per item (first item as main)
-      const mainItem = items[0];
-      const totalQty = items.reduce((s, i) => s + i.quantity, 0);
-
       const { error } = await supabase.from("orders").insert({
         order_id: orderId,
-        seller_id: authUser.id,
+        seller_id: sellerId,
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim(),
         customer_city: customerCity,
@@ -136,6 +140,7 @@ export default function CreateOrderModal({ open, onOpenChange, onCreated }: Crea
         total_amount: totalAmount,
         note: note.trim() || null,
         confirmation_status: "new",
+        confirmation_channel: "agent",
       });
 
       if (error) throw error;
