@@ -287,7 +287,7 @@ export default function AgentOrderList() {
 
       if (form.confirmation_status === "confirmed") {
         updateData.confirmed_at = now;
-        updateData.delivery_status = "pending";
+        updateData.delivery_status = "booked";
       }
 
       const { error } = await supabase
@@ -297,7 +297,27 @@ export default function AgentOrderList() {
 
       if (error) throw error;
 
-      toast({ title: "Order saved" });
+      let showedSyncToast = false;
+
+      if (form.confirmation_status === "confirmed") {
+        const { data: wakilniResult, error: wakilniError } = await supabase.functions.invoke("wakilni-sync", {
+          body: { action: "sync-order", order_id: selectedOrder.id },
+        });
+
+        if (wakilniError || (wakilniResult as any)?.error) {
+          showedSyncToast = true;
+          toast({
+            title: "Order saved, Wakilni sync failed",
+            description: (wakilniError as any)?.message || (wakilniResult as any)?.error || "Please sync again later.",
+            variant: "destructive",
+          });
+        } else if (!(wakilniResult as any)?.skipped) {
+          showedSyncToast = true;
+          toast({ title: "Order sent to Wakilni" });
+        }
+      }
+
+      if (!showedSyncToast) toast({ title: "Order saved" });
       setSelectedOrder(null);
       await queryClient.invalidateQueries({ queryKey: ["agent-direct-orders"] });
       await queryClient.invalidateQueries({ queryKey: ["agent-new-orders-count"] });
