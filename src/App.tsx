@@ -30,7 +30,7 @@ import SellerSettings from "./pages/SellerSettings";
 import SellerProductAnalytics from "./pages/SellerProductAnalytics";
 import RatesManagement from "./pages/RatesManagement";
 import AgentDashboard from "./pages/AgentDashboard";
-import AgentOrders from "./pages/AgentOrders";
+import AgentOrderList from "./pages/AgentOrderList";
 import AgentConfirmedOrders from "./pages/AgentConfirmedOrders";
 import Support from "./pages/Support";
 import Alerts from "./pages/Alerts";
@@ -174,7 +174,7 @@ function AppRoutes() {
         <Route path="/seller-settings" element={<ProtectedRoute><SellerSettings /></ProtectedRoute>} />
         <Route path="/seller-analytics" element={<ProtectedRoute><SellerProductAnalytics /></ProtectedRoute>} />
         <Route path="/agent-dashboard" element={<FeatureRoute feature="agentAssignment"><ProtectedRoute><AgentDashboard /></ProtectedRoute></FeatureRoute>} />
-        <Route path="/agent-orders" element={<FeatureRoute feature="agentAssignment"><ProtectedRoute><AgentOrders /></ProtectedRoute></FeatureRoute>} />
+        <Route path="/agent-orders" element={<FeatureRoute feature="agentAssignment"><ProtectedRoute><AgentOrderList /></ProtectedRoute></FeatureRoute>} />
         <Route path="/agent-confirmed" element={<FeatureRoute feature="agentAssignment"><ProtectedRoute><AgentConfirmedOrders /></ProtectedRoute></FeatureRoute>} />
         <Route path="/support" element={<FeatureRoute feature="support"><ProtectedRoute permission="access_to_settings"><Support /></ProtectedRoute></FeatureRoute>} />
         <Route path="/alerts" element={<FeatureRoute feature="alerts"><ProtectedRoute permission="access_to_settings"><Alerts /></ProtectedRoute></FeatureRoute>} />

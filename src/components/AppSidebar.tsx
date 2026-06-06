@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { LayoutDashboard, ShoppingCart, Package, BarChart3, Package2, BoxIcon, Settings, Users, ChevronDown, Link2, CheckSquare, Store, DollarSign, PhoneForwarded, FileText, FileSpreadsheet, Calculator, Headphones, Play, ListChecks, BadgeDollarSign, MessageSquare, Megaphone, ArrowUpDown, Activity, ClipboardCheck, Inbox, CheckCircle2, Zap, Sparkles, Send } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Package, BarChart3, Package2, BoxIcon, Settings, Users, ChevronDown, Link2, CheckSquare, Store, DollarSign, PhoneForwarded, FileText, FileSpreadsheet, Calculator, Headphones, ListChecks, BadgeDollarSign, MessageSquare, Megaphone, ArrowUpDown, Activity, ClipboardCheck, Inbox, CheckCircle2, Zap, Sparkles, Send } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -56,7 +56,7 @@ const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUn
   { title: "simulation", url: "/simulation", icon: Calculator, sellerOnly: true },
   { title: "settings", url: "/seller-settings", icon: Settings, sellerOnly: true },
   { title: "My Dashboard", url: "/agent-dashboard", icon: LayoutDashboard, agentOnly: true, feature: "agentAssignment" },
-  { title: "Process Orders", url: "/agent-orders", icon: Play, agentOnly: true, badge: agentNewOrders > 0 ? agentNewOrders : undefined, feature: "agentAssignment" },
+  { title: "Orders", url: "/agent-orders", icon: ShoppingCart, agentOnly: true, badge: agentNewOrders > 0 ? agentNewOrders : undefined, feature: "agentAssignment" },
   { title: "Confirmed Orders", url: "/agent-confirmed", icon: ListChecks, agentOnly: true, feature: "agentAssignment" },
   { title: "products", url: "/products", icon: BoxIcon, agentOnly: true },
   { title: "Dashboard", url: "/follow-up/dashboard", icon: LayoutDashboard, followUpOnly: true, feature: "followUps" },
@@ -177,8 +177,7 @@ export function AppSidebar() {
       const { count, error } = await supabase
         .from("orders")
         .select("*", { count: "exact", head: true })
-        .eq("confirmation_status", "new")
-        .is("agent_id", null);
+        .eq("confirmation_status", "new");
       if (error) throw error;
       return count || 0;
     },
