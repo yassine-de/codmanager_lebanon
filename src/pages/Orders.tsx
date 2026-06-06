@@ -283,10 +283,24 @@ export default function Orders() {
     const selected = getSelectedOrderObjects();
     if (selected.length === 0) return;
     const orderIds = selected.map(o => o.id);
+    const updateData: any = { [field]: newValue, updated_at: new Date().toISOString() };
+
+    if (field === "confirmation_status" && newValue === "new") {
+      Object.assign(updateData, {
+        delivery_status: "pending",
+        wakilni_order_id: null,
+        wakilni_tracking_id: null,
+        wakilni_bulk_id: null,
+        wakilni_sync_status: null,
+        wakilni_sync_error: null,
+        wakilni_synced_at: null,
+        wakilni_response: null,
+      });
+    }
     
     const { error } = await supabase
       .from("orders")
-      .update({ [field]: newValue, updated_at: new Date().toISOString() } as any)
+      .update(updateData)
       .in("order_id", orderIds);
     
     if (error) {
@@ -1214,6 +1228,19 @@ export default function Orders() {
               variant_sku: updated.products[0]?.variantSku || null,
               updated_at: new Date().toISOString(),
             };
+
+            if (updated.confirmationStatus === 'new') {
+              Object.assign(dbUpdate, {
+                delivery_status: 'pending',
+                wakilni_order_id: null,
+                wakilni_tracking_id: null,
+                wakilni_bulk_id: null,
+                wakilni_sync_status: null,
+                wakilni_sync_error: null,
+                wakilni_synced_at: null,
+                wakilni_response: null,
+              });
+            }
 
             const { error } = await supabase
               .from('orders')

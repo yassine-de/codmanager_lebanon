@@ -347,6 +347,22 @@ export default function AgentOrderList() {
         updateData.delivery_status = "booked";
       }
 
+      if (form.confirmation_status === "new") {
+        Object.assign(updateData, {
+          delivery_status: "pending",
+          confirmed_at: null,
+          agent_id: null,
+          assigned_at: null,
+          wakilni_order_id: null,
+          wakilni_tracking_id: null,
+          wakilni_bulk_id: null,
+          wakilni_sync_status: null,
+          wakilni_sync_error: null,
+          wakilni_synced_at: null,
+          wakilni_response: null,
+        });
+      }
+
       const { error } = await supabase
         .from("orders")
         .update(updateData)
