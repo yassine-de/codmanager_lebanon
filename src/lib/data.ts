@@ -1,6 +1,6 @@
 export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled' | 'returned' | 'postponed' | 'no_answer' | 'double' | 'wrong_number' | 'in_transit' | 'with_courier' | 'failed';
 
-export type ConfirmationStatus = 'new' | 'new_wts' | 'confirmed' | 'no_answer' | 'postponed' | 'cancelled' | 'wrong_number' | 'double';
+export type ConfirmationStatus = 'new' | 'new_wts' | 'confirmed' | 'no_answer' | 'no_answer_1' | 'no_answer_2' | 'no_answer_3' | 'no_answer_4' | 'no_answer_5' | 'no_answer_6' | 'no_answer_7' | 'no_answer_8' | 'no_answer_9' | 'postponed' | 'cancelled' | 'wrong_number' | 'double';
 export type DeliveryStatus = 'pending' | 'booked' | 'shipped' | 'in_transit' | 'with_courier' | 'delivered' | 'returned' | 'cancelled' | 'no_answer' | 'postponed' | 'failed' | 'failed_attempt' | 'ready_for_return' | 'rejected' | 'return';
 
 export interface OrderHistoryEvent {
