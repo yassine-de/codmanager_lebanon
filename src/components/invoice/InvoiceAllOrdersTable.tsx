@@ -7,6 +7,9 @@ import { Search, Copy, Check, AlertTriangle, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
+const DELIVERY_FEE_PER_ORDER = 9.5;
+const COD_FEE_RATE = 0.05;
+
 interface Order {
   id: string;
   order_id: string;
@@ -137,17 +140,20 @@ export function InvoiceAllOrdersTable({ orders, invoiceStatus }: Props) {
               <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Qty</th>
               <th className="text-center px-3 py-2 font-semibold text-muted-foreground">Status</th>
               <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Amount (USD)</th>
+              <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Delivery Fee</th>
+              <th className="text-right px-3 py-2 font-semibold text-muted-foreground">COD Fee</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-6 text-muted-foreground">No orders found</td>
+                <td colSpan={8} className="text-center py-6 text-muted-foreground">No orders found</td>
               </tr>
             ) : (
               filtered.map((o, i) => {
                 const displayStatus = getDisplayStatus(o);
                 const amountUsd = o.total_amount ?? o.price * o.quantity;
+                const codFee = amountUsd * COD_FEE_RATE;
                 const isReturnedAfterDelivery = o.was_delivered && o.delivery_status !== "delivered";
                 return (
                   <tr
@@ -208,6 +214,8 @@ export function InvoiceAllOrdersTable({ orders, invoiceStatus }: Props) {
                       </div>
                     </td>
                     <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{formatUSD(amountUsd)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-destructive">-{formatUSD(DELIVERY_FEE_PER_ORDER)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-destructive">-{formatUSD(codFee)}</td>
                   </tr>
                 );
               })

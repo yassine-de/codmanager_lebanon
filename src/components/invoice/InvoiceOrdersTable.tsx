@@ -6,6 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 
+const DELIVERY_FEE_PER_ORDER = 9.5;
+const COD_FEE_RATE = 0.05;
+
 interface Order {
   id: string;
   order_id: string;
@@ -52,6 +55,8 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
   }, [orders, search, productFilter]);
 
   const totalRevenueUsd = filtered.reduce((sum, o) => sum + (o.total_amount ?? o.price * o.quantity), 0);
+  const totalDeliveryFees = filtered.length * DELIVERY_FEE_PER_ORDER;
+  const totalCodFees = filtered.reduce((sum, o) => sum + (o.total_amount ?? o.price * o.quantity) * COD_FEE_RATE, 0);
 
   return (
     <div>
@@ -90,18 +95,21 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
               <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Qty</th>
               <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Weight</th>
               <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Amount (USD)</th>
+              <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Delivery Fee</th>
+              <th className="text-right px-3 py-2 font-semibold text-muted-foreground">COD Fee</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-6 text-muted-foreground">No orders found</td>
+                <td colSpan={8} className="text-center py-6 text-muted-foreground">No orders found</td>
               </tr>
             ) : (
               filtered.map((o, i) => {
                 const wKg = o.weight_kg ?? productWeightMap[o.product_name] ?? 0;
                 const totalWeight = o.total_weight_kg ?? (wKg * o.quantity);
                 const amountUsd = o.total_amount ?? o.price * o.quantity;
+                const codFee = amountUsd * COD_FEE_RATE;
                 return (
                   <tr
                     key={o.id}
@@ -137,6 +145,8 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
                     <td className="px-3 py-1.5 text-right tabular-nums">{o.quantity}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{totalWeight > 0 ? `${totalWeight.toFixed(1)} KG` : "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{formatUSD(amountUsd)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-destructive">-{formatUSD(DELIVERY_FEE_PER_ORDER)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-destructive">-{formatUSD(codFee)}</td>
                   </tr>
                 );
               })
@@ -150,6 +160,8 @@ export function InvoiceOrdersTable({ orders, productWeightMap }: Props) {
         <span className="text-xs text-muted-foreground">{filtered.length} order{filtered.length !== 1 ? "s" : ""}</span>
         <div className="text-right">
           <span className="text-sm font-bold text-primary tabular-nums">{formatUSD(totalRevenueUsd)}</span>
+          <span className="text-sm font-bold text-destructive tabular-nums ml-2">-{formatUSD(totalDeliveryFees)}</span>
+          <span className="text-sm font-bold text-destructive tabular-nums ml-2">-{formatUSD(totalCodFees)}</span>
         </div>
       </div>
     </div>

@@ -2,6 +2,8 @@ import type { InvoiceSummaryResponse } from "./invoice-summary";
 
 const usd  = (n: number) => `$${Math.abs(n).toFixed(2)}`;
 const sign = (n: number) => (n >= 0 ? `+$${n.toFixed(2)}` : `-$${Math.abs(n).toFixed(2)}`);
+const DELIVERY_FEE_PER_ORDER = 9.5;
+const COD_FEE_RATE = 0.05;
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -18,16 +20,21 @@ export function downloadInvoicePDF(summary: InvoiceSummaryResponse, sellerName: 
 
   /* ── Delivered orders rows ── */
   const orderRows = summary.delivered_orders.length
-    ? summary.delivered_orders.map((o, i) => `
+    ? summary.delivered_orders.map((o, i) => {
+      const amount = o.amount_usd ?? o.total_amount ?? o.price * o.quantity;
+      return `
         <tr class="${i % 2 ? "s" : ""}">
           <td class="mono">${o.order_id}</td>
           <td>${o.customer_name}</td>
           <td class="muted">${o.customer_phone}</td>
           <td>${o.product_name}</td>
           <td class="r">${o.quantity}</td>
-          <td class="r g">${usd(o.amount_usd)}</td>
-        </tr>`).join("")
-    : `<tr><td colspan="6" class="empty">No delivered orders</td></tr>`;
+          <td class="r g">${usd(amount)}</td>
+          <td class="r r-val">${usd(DELIVERY_FEE_PER_ORDER)}</td>
+          <td class="r r-val">${usd(amount * COD_FEE_RATE)}</td>
+        </tr>`;
+    }).join("")
+    : `<tr><td colspan="8" class="empty">No delivered orders</td></tr>`;
 
 
   const html = `<!DOCTYPE html>
@@ -138,7 +145,7 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
     <table>
       <thead>
         <tr>
-          <th>Order ID</th><th>Customer</th><th>Phone</th><th>Product</th><th class="r">Qty</th><th class="r">Amount</th>
+          <th>Order ID</th><th>Customer</th><th>Phone</th><th>Product</th><th class="r">Qty</th><th class="r">Amount</th><th class="r">Delivery Fee</th><th class="r">COD Fee</th>
         </tr>
       </thead>
       <tbody>${orderRows}</tbody>
@@ -146,6 +153,8 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
         <tr>
           <td colspan="5" style="text-align:right;padding-right:10px;color:#555">Total Delivered Revenue</td>
           <td class="r g">${usd(tot?.delivered_revenue_usd??0)}</td>
+          <td class="r r-val">${usd(tot?.shipping_fees??0)}</td>
+          <td class="r r-val">${usd(tot?.cod_fees??0)}</td>
         </tr>
       </tfoot>
     </table>
