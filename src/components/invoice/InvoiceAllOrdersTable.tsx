@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
-import { formatPKR } from "@/lib/currency";
+import { formatUSD } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Copy, Check, AlertTriangle, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -147,7 +147,7 @@ export function InvoiceAllOrdersTable({ orders, invoiceStatus }: Props) {
             ) : (
               filtered.map((o, i) => {
                 const displayStatus = getDisplayStatus(o);
-                const amountPkr = o.price * o.quantity;
+                const amountUsd = o.total_amount ?? o.price * o.quantity;
                 const isReturnedAfterDelivery = o.was_delivered && o.delivery_status !== "delivered";
                 return (
                   <tr
@@ -207,7 +207,7 @@ export function InvoiceAllOrdersTable({ orders, invoiceStatus }: Props) {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{formatPKR(amountPkr)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{formatUSD(amountUsd)}</td>
                   </tr>
                 );
               })

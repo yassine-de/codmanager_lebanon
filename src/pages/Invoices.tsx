@@ -7,7 +7,7 @@ import {
   Loader2, ChevronLeft, ChevronRight, Package, Download, Printer
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { formatUSD, formatPKR } from "@/lib/currency";
+import { formatUSD } from "@/lib/currency";
 import { fetchInvoiceSummary, type InvoiceSummaryResponse } from "@/lib/invoice-summary";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -129,7 +129,7 @@ export default function Invoices() {
         ...inv,
         ordersCount: summary?.counts.total_orders_count ?? 0,
         deliveredCount: summary?.counts.delivered_count ?? 0,
-        totalAmountPKR: summary?.totals.delivered_revenue_usd ?? 0,
+        totalAmountUsd: summary?.totals.delivered_revenue_usd ?? 0,
         shippingFees: summary?.totals.shipping_fees ?? 0,
         callCenterFees: summary?.totals.call_center_fees ?? 0,
         codFees: summary?.totals.cod_fees ?? 0,
@@ -174,7 +174,6 @@ export default function Invoices() {
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // Stats
-  const totalAmountPKR = filtered.reduce((s, r) => s + r.data.netPayable, 0);
   const paidAmount = filtered.filter(r => r.data.status === "paid").reduce((s, r) => s + r.data.netPayable, 0);
   const needToPay = filtered.filter(r => r.data.status === "ready").reduce((s, r) => s + r.data.netPayable, 0);
 
@@ -544,7 +543,7 @@ export default function Invoices() {
                       <TableCell className="text-center">
                         <span className="inline-flex items-center justify-center h-6 min-w-[28px] px-1.5 rounded-md bg-accent text-[11px] font-semibold">{inv.deliveredCount}</span>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{formatUSD(inv.totalAmountPKR)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatUSD(inv.totalAmountUsd)}</TableCell>
                       <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.shippingFees)}</TableCell>
                       <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.callCenterFees)}</TableCell>
                       <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.codFees)}</TableCell>

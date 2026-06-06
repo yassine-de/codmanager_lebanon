@@ -102,10 +102,10 @@ export function InvoiceDetailModal({
               )}
 
               {/* SECTION 2: SHIPPING FEES (summary only — count × rate by weight bracket) */}
-              <SectionHeader icon={Truck} title={`Shipping Fees${isAdmin && (counts?.cross_shipped_count ?? 0) > 0 ? ` (incl. ${counts.cross_shipped_count} cross-invoice)` : ''}`} color="text-info" count={counts?.shipped_count ?? 0} />
+              <SectionHeader icon={Truck} title={`Delivery Fees${isAdmin && (counts?.cross_delivered_count ?? 0) > 0 ? ` (incl. ${counts.cross_delivered_count} cross-invoice)` : ''}`} color="text-info" count={counts?.delivered_count ?? 0} />
               <div className="px-4 py-2 space-y-1.5">
                 {shippingBreakdown.length === 0 ? (
-                  <div className="text-center py-2 text-muted-foreground text-xs">No shipping fees</div>
+                  <div className="text-center py-2 text-muted-foreground text-xs">No delivery fees</div>
                 ) : (
                   shippingBreakdown.map((item) => (
                       <div key={item.bracket} className="flex justify-between items-center text-xs">
@@ -118,7 +118,7 @@ export function InvoiceDetailModal({
                     ))
                 )}
                 <div className="border-t border-border/60 pt-2 mt-1 flex justify-between text-xs font-bold">
-                  <span>Total Shipping</span>
+                  <span>Total Delivery Fees</span>
                   <span className="tabular-nums text-destructive">-{formatUSD(totals?.shipping_fees ?? 0)}</span>
                 </div>
               </div>
@@ -230,7 +230,7 @@ export function InvoiceDetailModal({
                 </div>
                 <div className="border-t my-1" />
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Shipping Fees</span>
+                  <span className="text-muted-foreground">Delivery Fees</span>
                   <span className="tabular-nums font-semibold text-destructive">-{formatUSD(totals?.shipping_fees ?? 0)}</span>
                 </div>
                 <div className="flex justify-between text-xs">

@@ -105,8 +105,8 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
 <!-- HEADER -->
 <div class="hdr">
   <div>
-    <div class="brand">SCALERS</div>
-    <div class="brand-sub">COD Fulfillment &amp; Logistics</div>
+    <div class="brand">COD Manager Lebanon</div>
+    <div class="brand-sub">COD operations &amp; seller payouts</div>
   </div>
   <div>
     <div class="inv-num">${inv.invoice_number}</div>
@@ -159,7 +159,7 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
       <span class="g bold">${usd(tot?.delivered_revenue_usd??0)}</span>
     </div>
     <div class="fee-row fee-minus">
-      <span class="fee-lbl">Shipping Fees<small>${cnt?.shipped_count??0} orders shipped</small></span>
+      <span class="fee-lbl">Delivery Fees<small>${cnt?.delivered_count??0} delivered orders x $9.50</small></span>
       <span class="r-val">−${usd(tot?.shipping_fees??0)}</span>
     </div>
     <div class="fee-row fee-minus">
@@ -167,7 +167,7 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
       <span class="r-val">−${usd(tot?.cod_fees??0)}</span>
     </div>
     <div class="fee-row fee-minus">
-      <span class="fee-lbl">Call Center Fees<small>${cc?.confirmed_count??0} confirmed + ${cc?.dropped_count??0} dropped</small></span>
+      <span class="fee-lbl">Call Center Fees<small>Not charged for Lebanon invoices</small></span>
       <span class="r-val">−${usd(tot?.call_center_fees??0)}</span>
     </div>
     ${(tot?.addon_net??0)!==0?`
@@ -193,7 +193,7 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
 
 <!-- FOOTER -->
 <div class="footer">
-  <span>SCALERS · ${inv.invoice_number} · ${sellerName}</span>
+  <span>COD Manager Lebanon · ${inv.invoice_number} · ${sellerName}</span>
   <span>Generated ${new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"long",year:"numeric"})}</span>
 </div>
 
