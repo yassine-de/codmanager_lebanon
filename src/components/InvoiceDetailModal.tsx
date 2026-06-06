@@ -138,6 +138,10 @@ export function InvoiceDetailModal({
                   <span>Total Call Center</span>
                   <span className="tabular-nums text-destructive">-{formatUSD(totals?.call_center_fees ?? 0)}</span>
                 </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Warehouse Fees <span className="text-[10px]">(Not Charged)</span></span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(0)}</span>
+                </div>
               </div>
 
               {/* SECTION 4: COD FEES */}
@@ -240,6 +244,10 @@ export function InvoiceDetailModal({
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Call Center Fees</span>
                   <span className="tabular-nums font-semibold text-destructive">-{formatUSD(totals?.call_center_fees ?? 0)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Warehouse Fees <span className="text-[10px]">(Not Charged)</span></span>
+                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(0)}</span>
                 </div>
                 {(totals?.addon_net ?? 0) !== 0 && (
                   <div className="flex justify-between text-xs">

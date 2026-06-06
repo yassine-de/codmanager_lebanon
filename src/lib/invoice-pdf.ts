@@ -179,6 +179,10 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
       <span class="fee-lbl">Call Center Fees<small>Not charged for Lebanon invoices</small></span>
       <span class="r-val">−${usd(tot?.call_center_fees??0)}</span>
     </div>
+    <div class="fee-row fee-minus">
+      <span class="fee-lbl">Warehouse Fees<small>Not Charged</small></span>
+      <span class="r-val">-${usd(0)}</span>
+    </div>
     ${(tot?.addon_net??0)!==0?`
     <div class="fee-row">
       <span class="fee-lbl">Addons Net<small>${summary.addons.length} addon(s)</small></span>
