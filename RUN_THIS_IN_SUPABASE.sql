@@ -1,5 +1,5 @@
 -- ⚠️ RUN THIS IN SUPABASE DASHBOARD → SQL EDITOR ⚠️
--- URL: https://supabase.com/dashboard/project/gxyxmxzphyepsmecwbfi/sql/new
+-- URL: https://supabase.com/dashboard/project/hpinbuajpewnkieiokmq/sql/new
 -- Combines both pending migrations + reloads schema cache
 
 -- ============ Migration 1: RLS fix for agents (no_answer / postponed / unreachable) ============

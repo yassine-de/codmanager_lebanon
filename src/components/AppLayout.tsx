@@ -199,9 +199,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuItem className="text-sm gap-2.5 cursor-pointer rounded-lg" onClick={() => navigate('/settings')}>
                     <Settings className="h-4 w-4" /> {t("settings")}
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-sm gap-2.5 cursor-pointer rounded-lg" onClick={downloadAgentDebugLog}>
-                    <Info className="h-4 w-4" /> Download Debug Log
-                  </DropdownMenuItem>
+                  {authUser?.role !== "seller" && (
+                    <DropdownMenuItem className="text-sm gap-2.5 cursor-pointer rounded-lg" onClick={downloadAgentDebugLog}>
+                      <Info className="h-4 w-4" /> Download Debug Log
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-sm gap-2.5 cursor-pointer rounded-lg text-destructive focus:text-destructive" onClick={handleLogout}>
                     <LogOut className="h-4 w-4" /> {t("logout")}

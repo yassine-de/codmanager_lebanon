@@ -15,13 +15,14 @@ BEGIN
 
   PERFORM cron.schedule(
     'wakilni-status-sync',
-    '*/5 * * * *',
+    '*/30 * * * *',
     $cron$
     SELECT net.http_post(
       url := 'https://hpinbuajpewnkieiokmq.supabase.co/functions/v1/wakilni-sync',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInJlZiI6ImhwaW5idWFqcGV3bmtpZWlva21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzOTk1NTIsImV4cCI6MjA5NTk3NTU1Mn0.8PNB2CxjaQat7eurbVIzSrkngwzkeJ_G8dteOBoevck'
+        'apikey', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwaW5idWFqcGV3bmtpZWlva21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzOTk1NTIsImV4cCI6MjA5NTk3NTU1Mn0.8PNB2CxjaQat7eurbVIzSrkngwzkeJ_G8dteOBoevck',
+        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwaW5idWFqcGV3bmtpZWlva21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzOTk1NTIsImV4cCI6MjA5NTk3NTU1Mn0.8PNB2CxjaQat7eurbVIzSrkngwzkeJ_G8dteOBoevck'
       ),
       body := jsonb_build_object('action', 'sync-statuses', 'source', 'cron')
     );

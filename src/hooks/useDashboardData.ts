@@ -88,6 +88,10 @@ function reachedConfirmedStage(o: DashboardOrder): boolean {
   return o.confirmation_status === 'confirmed';
 }
 
+function isNoAnswerStatus(status: string | null | undefined): boolean {
+  return String(status || "").startsWith("no_answer");
+}
+
 function getConfirmationEventDate(o: DashboardOrder): Date | null {
   return o.confirmed_at ? new Date(o.confirmed_at) : null;
 }
@@ -109,7 +113,7 @@ function computeKPIs(orders: DashboardOrder[], allOrders?: DashboardOrder[], dat
   const confirmed = dateRange
     ? source.filter(o => { const d = getConfirmationEventDate(o); return reachedConfirmedStage(o) && d != null && inRange(d); }).length
     : orders.filter(reachedConfirmedStage).length;
-  const noAnswer = orders.filter(o => o.confirmation_status === 'no_answer').length;
+  const noAnswer = orders.filter(o => isNoAnswerStatus(o.confirmation_status)).length;
   const postponed = orders.filter(o => o.confirmation_status === 'postponed').length;
   const cancelled = orders.filter(o => o.confirmation_status === 'cancelled').length;
   const doubleOrders = orders.filter(o => o.confirmation_status === 'double').length;

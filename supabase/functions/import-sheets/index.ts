@@ -43,8 +43,14 @@ function normalizePhone(raw: string): { valid: true; phone: string } | { valid: 
   let phone = cleanPhone(raw);
 
   // Convert 00961... → +961...
-  if (phone.startsWith("00961")) {
+  if (phone.startsWith("+00961")) {
+    phone = "+961" + phone.slice(6);
+  } else if (phone.startsWith("00961")) {
     phone = "+961" + phone.slice(5);
+  } else if (phone.startsWith("+00") && phone.length > 3) {
+    phone = "+" + phone.slice(3);
+  } else if (phone.startsWith("00") && phone.length > 2) {
+    phone = "+" + phone.slice(2);
   }
   // Convert 961... (without +) → +961...
   else if (phone.startsWith("961") && !phone.startsWith("+")) {
@@ -63,9 +69,10 @@ function normalizePhone(raw: string): { valid: true; phone: string } | { valid: 
     phone = "+961" + phone;
   }
 
-  // Validate length: Lebanon mobile/landline numbers are commonly 7-8 digits after 961.
+  // Validate length: accept E.164-style international numbers.
+  // Local Lebanese numbers are normalized to +961 above; foreign numbers are kept.
   const digitsOnly = phone.replace(/\D/g, "");
-  if (digitsOnly.length < 10 || digitsOnly.length > 11) {
+  if (!phone.startsWith("+") || digitsOnly.length < 8 || digitsOnly.length > 15) {
     return { valid: false, reason: `Phone "${raw}" has invalid length (${digitsOnly.length} digits after formatting to "${phone}")` };
   }
 

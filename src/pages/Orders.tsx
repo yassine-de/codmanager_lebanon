@@ -593,7 +593,8 @@ export default function Orders() {
         if (f.confirmation !== 'all') {
           // For sellers, "new" filter also matches new_wts (WhatsApp pipeline is hidden as plain New)
           const effective = (!isAdmin && o.confirmationStatus === 'new_wts') ? 'new' : o.confirmationStatus;
-          if (effective !== f.confirmation) return false;
+          const matchesNoAnswerGroup = f.confirmation === 'no_answer' && effective.startsWith('no_answer');
+          if (!matchesNoAnswerGroup && effective !== f.confirmation) return false;
         }
         if (f.delivery !== 'all' && o.deliveryStatus !== f.delivery) return false;
         if (f.subStatus !== 'all' && (o.orioShippingStatus || '') !== f.subStatus) return false;
