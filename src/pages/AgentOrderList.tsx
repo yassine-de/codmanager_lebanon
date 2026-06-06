@@ -28,6 +28,8 @@ type OrderRow = {
   product_name: string;
   product_url: string | null;
   video_url: string | null;
+  variant_name: string | null;
+  variant_sku: string | null;
   quantity: number;
   price: number;
   total_amount: number;
@@ -46,6 +48,7 @@ type ProductRow = {
   last_price: number | null;
   product_url: string | null;
   video_url: string | null;
+  variants: any[] | null;
 };
 
 type EditForm = {
@@ -54,6 +57,8 @@ type EditForm = {
   product_name: string;
   product_url: string;
   video_url: string;
+  variant_name: string;
+  variant_sku: string;
   customer_name: string;
   customer_phone: string;
   quantity: string;
@@ -121,6 +126,8 @@ const createEmptyForm = (): EditForm => ({
   product_name: "",
   product_url: "",
   video_url: "",
+  variant_name: "",
+  variant_sku: "",
   customer_name: "",
   customer_phone: "",
   quantity: "1",
@@ -143,7 +150,7 @@ export default function AgentOrderList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id,system_id,order_id,created_at,updated_at,confirmation_status,customer_name,customer_phone,customer_city,customer_address,product_name,product_url,video_url,quantity,price,total_amount,note,seller_id,agent_id,original_agent_id")
+        .select("id,system_id,order_id,created_at,updated_at,confirmation_status,customer_name,customer_phone,customer_city,customer_address,product_name,product_url,video_url,variant_name,variant_sku,quantity,price,total_amount,note,seller_id,agent_id,original_agent_id")
         .eq("confirmation_status", "new")
         .order("created_at", { ascending: true });
 
@@ -158,7 +165,7 @@ export default function AgentOrderList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id,seller_id,name,sku,price,last_price,product_url,video_url")
+        .select("id,seller_id,name,sku,price,last_price,product_url,video_url,variants")
         .eq("active", true)
         .order("name", { ascending: true });
 
@@ -171,6 +178,16 @@ export default function AgentOrderList() {
     if (!selectedOrder) return productsQuery.data || [];
     return (productsQuery.data || []).filter((product) => product.seller_id === selectedOrder.seller_id);
   }, [productsQuery.data, selectedOrder]);
+
+  const selectedProduct = useMemo(
+    () => productsForOrder.find((product) => product.id === form.product_id) || null,
+    [form.product_id, productsForOrder]
+  );
+
+  const selectedProductVariants = useMemo(() => {
+    const variants = Array.isArray(selectedProduct?.variants) ? selectedProduct.variants : [];
+    return variants.filter((variant) => variant?.name);
+  }, [selectedProduct]);
 
   useEffect(() => {
     if (!selectedOrder) return;
@@ -186,6 +203,8 @@ export default function AgentOrderList() {
       product_name: selectedOrder.product_name || "",
       product_url: selectedOrder.product_url || matchingProduct?.product_url || "",
       video_url: selectedOrder.video_url || matchingProduct?.video_url || "",
+      variant_name: selectedOrder.variant_name || "",
+      variant_sku: selectedOrder.variant_sku || "",
       customer_name: selectedOrder.customer_name || "",
       customer_phone: selectedOrder.customer_phone || "",
       quantity: String(selectedOrder.quantity || 1),
@@ -201,6 +220,11 @@ export default function AgentOrderList() {
   };
 
   const handleProductChange = (productId: string) => {
+    if (productId === "custom") {
+      setForm((current) => ({ ...current, product_id: "", variant_name: "", variant_sku: "" }));
+      return;
+    }
+
     const product = productsForOrder.find((p) => p.id === productId);
     updateField("product_id", productId);
     if (!product) return;
@@ -211,6 +235,17 @@ export default function AgentOrderList() {
       product_name: product.name,
       product_url: product.product_url || current.product_url,
       video_url: product.video_url || current.video_url,
+      variant_name: "",
+      variant_sku: "",
+    }));
+  };
+
+  const handleVariantChange = (variantName: string) => {
+    const variant = selectedProductVariants.find((item) => String(item.name) === variantName);
+    setForm((current) => ({
+      ...current,
+      variant_name: variantName,
+      variant_sku: String(variant?.sku || ""),
     }));
   };
 
@@ -234,6 +269,8 @@ export default function AgentOrderList() {
         product_name: form.product_name.trim(),
         product_url: form.product_url.trim() || null,
         video_url: form.video_url.trim() || null,
+        variant_name: form.variant_name.trim() || null,
+        variant_sku: form.variant_sku.trim() || null,
         quantity,
         total_amount: totalAmount,
         price: unitPrice,
@@ -414,6 +451,23 @@ export default function AgentOrderList() {
                   </a>
                 )}
               </div>
+              {selectedProductVariants.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <Label>Variant</Label>
+                  <Select value={form.variant_name} onValueChange={handleVariantChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select variant" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedProductVariants.map((variant) => (
+                        <SelectItem key={variant.id || variant.sku || variant.name} value={String(variant.name)}>
+                          {variant.name}{variant.sku ? ` - ${variant.sku}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
