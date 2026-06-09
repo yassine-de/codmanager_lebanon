@@ -342,6 +342,8 @@ function mapWakilniDeliveryStatus(status?: string | null, statusCode?: string | 
   if (["6"].includes(code) || ["declined", "rejected", "refused", "cancelled", "canceled"].some((s) => normalized.includes(s))) {
     return "rejected";
   }
+  if (["4"].includes(code) || normalized.includes("success")) return "delivered";
+  if (["3"].includes(code) || normalized.includes("processing")) return "shipped";
   if (normalized.includes("delivered")) return "delivered";
   if (normalized.includes("return")) return "returned";
   if (normalized.includes("failed")) return "failed_attempt";
