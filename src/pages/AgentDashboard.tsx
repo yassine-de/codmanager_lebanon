@@ -144,74 +144,40 @@ const AgentDashboard = () => {
     refetchOnWindowFocus: true,
   });
 
-  const statusActionsInPeriod = useMemo(() => {
-    const map = new Map<string, { lastStatus: string; lastAt: string }>();
-    const from = dateRange?.from ? startOfDay(dateRange.from) : null;
-    const to = dateRange?.to
-      ? endOfDay(dateRange.to)
-      : dateRange?.from
-        ? endOfDay(dateRange.from)
-        : null;
+  const getAgentStatusDate = (order: any) => {
+    if (order.confirmation_status === "confirmed") {
+      return order.confirmed_at || order.updated_at || order.last_activity_at || order.last_attempt_at || order.created_at;
+    }
+    return order.updated_at || order.last_activity_at || order.last_attempt_at || order.confirmed_at || order.created_at;
+  };
 
-    orderHistory.forEach((entry) => {
-      const changedAt = new Date(entry.created_at);
-      if (from && changedAt < from) return;
-      if (to && changedAt > to) return;
-
-      const previous = map.get(entry.order_id);
-      if (!previous || changedAt > new Date(previous.lastAt)) {
-        map.set(entry.order_id, {
-          lastStatus: entry.new_value || "",
-          lastAt: entry.created_at,
-        });
-      }
-    });
-
-    return map;
-  }, [orderHistory, dateRange]);
-
-  const statusActionRowsInPeriod = useMemo(() => {
-    const from = dateRange?.from ? startOfDay(dateRange.from) : null;
-    const to = dateRange?.to
-      ? endOfDay(dateRange.to)
-      : dateRange?.from
-        ? endOfDay(dateRange.from)
-        : null;
-
-    return orderHistory.filter((entry) => {
-      const changedAt = new Date(entry.created_at);
-      if (from && changedAt < from) return false;
-      if (to && changedAt > to) return false;
-      return true;
-    });
-  }, [orderHistory, dateRange]);
-
-  // Filter by status update date from order_history so Today/Cancelled matches the system logs
+  // The lightweight agent order flow updates the order row directly and does not
+  // always create order_history rows. Use orders as the source of truth here.
   const filteredOrders = useMemo(() => {
     if (!dateRange?.from) return agentOrders;
 
     return agentOrders
-      .filter((o: any) => statusActionsInPeriod.has(o.order_id))
-      .map((o: any) => {
-        const action = statusActionsInPeriod.get(o.order_id)!;
-        return {
-          ...o,
-          confirmation_status: action.lastStatus || o.confirmation_status,
-          treated_at: action.lastAt,
-        };
+      .filter((o: any) => {
+        const statusDateValue = getAgentStatusDate(o);
+        if (!statusDateValue) return false;
+
+        const statusDate = new Date(statusDateValue);
+        const from = startOfDay(dateRange.from!);
+        const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from!);
+
+        return isWithinInterval(statusDate, { start: from, end: to });
       });
-  }, [agentOrders, dateRange, statusActionsInPeriod]);
+  }, [agentOrders, dateRange]);
 
   const stats = useMemo(() => {
-    const total = statusActionRowsInPeriod.length;
-    const confirmed = statusActionRowsInPeriod.filter((o) => o.new_value === "confirmed").length;
-    const postponed = statusActionRowsInPeriod.filter((o) => o.new_value === "postponed").length;
-    const noAnswer = statusActionRowsInPeriod.filter((o) => (o.new_value || "").startsWith("no_answer")).length;
-    const cancelled = statusActionRowsInPeriod.filter((o) => o.new_value === "cancelled").length;
-    const doubleOrders = statusActionRowsInPeriod.filter((o) => o.new_value === "double").length;
-    const wrongNumber = statusActionRowsInPeriod.filter((o) => o.new_value === "wrong_number").length;
-    const other = doubleOrders + wrongNumber;
-    // Claimed Orders counts every status action, including retry/no-answer attempts on the same order.
+    const total = filteredOrders.length;
+    const confirmed = filteredOrders.filter((o: any) => o.confirmation_status === "confirmed").length;
+    const postponed = filteredOrders.filter((o: any) => o.confirmation_status === "postponed").length;
+    const noAnswer = filteredOrders.filter((o: any) => (o.confirmation_status || "").startsWith("no_answer")).length;
+    const cancelled = filteredOrders.filter((o: any) => o.confirmation_status === "cancelled").length;
+    const doubleOrders = filteredOrders.filter((o: any) => o.confirmation_status === "double").length;
+    const wrongNumber = filteredOrders.filter((o: any) => o.confirmation_status === "wrong_number").length;
+
     return {
       total,
       confirmed,
@@ -228,7 +194,7 @@ const AgentDashboard = () => {
       wrongNumberPct: total ? Math.round((wrongNumber / total) * 100) : 0,
       other: 0,
     };
-  }, [statusActionRowsInPeriod]);
+  }, [filteredOrders]);
 
   // Pie chart data
   const pieData = [
