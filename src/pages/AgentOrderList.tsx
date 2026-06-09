@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CitySelect } from "@/components/CitySelect";
 import { useToast } from "@/hooks/use-toast";
 import CreateOrderModal from "@/components/CreateOrderModal";
+import WakilniTrackingModal from "@/components/WakilniTrackingModal";
 
 type OrderRow = {
   id: string;
@@ -38,6 +39,8 @@ type OrderRow = {
   seller_id: string;
   agent_id: string | null;
   original_agent_id: string | null;
+  wakilni_order_id: string | null;
+  wakilni_tracking_id: string | null;
 };
 
 type ProductRow = {
@@ -162,13 +165,14 @@ export default function AgentOrderList() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
+  const [trackingTarget, setTrackingTarget] = useState<{ trackingId?: string | null; wakilniOrderId?: string | null; systemId?: number | null; sellerId?: string | null } | null>(null);
 
   const ordersQuery = useQuery({
     queryKey: ["agent-direct-orders"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id,system_id,order_id,created_at,updated_at,confirmation_status,customer_name,customer_phone,customer_city,customer_address,product_name,product_url,video_url,variant_name,variant_sku,quantity,price,total_amount,note,seller_id,agent_id,original_agent_id")
+        .select("id,system_id,order_id,created_at,updated_at,confirmation_status,customer_name,customer_phone,customer_city,customer_address,product_name,product_url,video_url,variant_name,variant_sku,quantity,price,total_amount,note,seller_id,agent_id,original_agent_id,wakilni_order_id,wakilni_tracking_id")
         .order("created_at", { ascending: true });
 
       if (error) throw error;
@@ -483,10 +487,11 @@ export default function AgentOrderList() {
         </div>
 
         <div className="overflow-x-auto">
-          <Table className="min-w-[1180px]">
+          <Table className="min-w-[1280px]">
             <TableHeader>
               <TableRow className="bg-muted/40">
                 <TableHead className="w-[120px] px-6 uppercase tracking-wider">Order ID</TableHead>
+                <TableHead className="w-[120px] uppercase tracking-wider">Wakilni ID</TableHead>
                 <TableHead className="w-[170px] uppercase tracking-wider">Order Date</TableHead>
                 <TableHead className="w-[120px] uppercase tracking-wider">Status</TableHead>
                 <TableHead className="w-[220px] uppercase tracking-wider">Product Name</TableHead>
@@ -500,14 +505,14 @@ export default function AgentOrderList() {
             <TableBody>
               {ordersQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                     Loading orders...
                   </TableCell>
                 </TableRow>
               ) : visibleOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
                     No orders found.
                   </TableCell>
                 </TableRow>
@@ -515,6 +520,30 @@ export default function AgentOrderList() {
                 visibleOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="px-6 font-medium">#{order.system_id || order.order_id}</TableCell>
+                    <TableCell>
+                      {order.wakilni_tracking_id || order.wakilni_order_id ? (
+                        (() => {
+                          const fullId = String(order.wakilni_tracking_id || order.wakilni_order_id);
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setTrackingTarget({
+                                trackingId: order.wakilni_tracking_id ?? null,
+                                wakilniOrderId: order.wakilni_order_id ?? null,
+                                systemId: order.system_id ?? null,
+                                sellerId: order.order_id,
+                              })}
+                              className="font-mono text-[11px] font-semibold text-primary hover:underline tabular-nums"
+                              title={fullId}
+                            >
+                              {fullId.slice(-5)}
+                            </button>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{formatDate(order.created_at)}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={getStatusClass(order.confirmation_status)}>
@@ -672,6 +701,21 @@ export default function AgentOrderList() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {trackingTarget && (
+        <WakilniTrackingModal
+          trackingId={trackingTarget.trackingId}
+          wakilniOrderId={trackingTarget.wakilniOrderId}
+          systemId={trackingTarget.systemId}
+          sellerId={trackingTarget.sellerId}
+          open={!!trackingTarget}
+          onClose={() => {
+            setTrackingTarget(null);
+            queryClient.invalidateQueries({ queryKey: ["agent-direct-orders"] });
+          }}
+          onStatusSync={() => queryClient.invalidateQueries({ queryKey: ["agent-direct-orders"] })}
+        />
+      )}
 
       <CreateOrderModal
         open={createOpen}
