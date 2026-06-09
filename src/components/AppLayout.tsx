@@ -63,7 +63,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           {/* Premium top navbar */}
-          <header className="h-14 flex items-center border-b bg-card/80 glass px-4 shrink-0 sticky top-0 z-40">
+          <header className="lebanon-shell h-14 flex items-center border-b bg-card/80 glass px-4 shrink-0 sticky top-0 z-40">
             <SidebarTrigger className="mr-3 h-8 w-8 text-muted-foreground hover:text-foreground transition-colors" />
             
             {/* Search bar */}

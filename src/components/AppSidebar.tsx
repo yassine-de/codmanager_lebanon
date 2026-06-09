@@ -279,19 +279,19 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarContent className="pt-5 gap-1">
+      <SidebarContent className="pt-5 gap-1 border-r border-sidebar-border/60">
         {/* Logo */}
-        <div className={`px-4 pb-6 ${collapsed ? 'px-2' : ''}`}>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-sidebar-primary flex items-center justify-center shrink-0 shadow-soft">
+        <div className={`px-4 pb-5 ${collapsed ? 'px-2' : ''}`}>
+          <div className="flex items-center gap-2.5 rounded-xl border border-sidebar-border/70 bg-sidebar-accent/45 p-2">
+            <div className="lebanon-sidebar-mark w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-soft">
               <Package className="w-4 h-4 text-sidebar-primary-foreground" />
             </div>
             {!collapsed && (
-              <div className="flex flex-col">
+              <div className="flex min-w-0 flex-col">
                 <span className="text-sm font-bold text-sidebar-accent-foreground tracking-tight leading-none">
-                  COD Manager
+                  COD Lebanon
                 </span>
-                <span className="text-[10px] text-sidebar-foreground/50 mt-0.5">Business Suite</span>
+                <span className="text-[10px] text-sidebar-foreground/60 mt-0.5">Delivery Ops</span>
               </div>
             )}
           </div>
@@ -332,7 +332,7 @@ export function AppSidebar() {
                           to={item.url}
                           end={item.url === '/'}
                           className="hover:bg-sidebar-accent/70"
-                          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          activeClassName="lebanon-active-nav bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                         >
                           <item.icon className="mr-2 h-4 w-4 opacity-70" />
                           {!collapsed && <span className="flex-1">{t(item.title)}</span>}
@@ -396,7 +396,7 @@ export function AppSidebar() {
                                         to={sub.url}
                                         end={sub.end}
                                         className="hover:bg-sidebar-accent/70"
-                                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                        activeClassName="lebanon-active-nav bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                                       >
                                         <sub.icon className="mr-2 h-3.5 w-3.5 opacity-60" />
                                         <span className="flex-1">{sub.title}</span>
@@ -447,7 +447,7 @@ export function AppSidebar() {
                                 <NavLink
                                   to={sub.url}
                                   className="hover:bg-sidebar-accent/70"
-                                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                  activeClassName="lebanon-active-nav bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                                 >
                                   <sub.icon className="mr-2 h-3.5 w-3.5 opacity-60" />
                                   <span>{t(sub.title)}</span>
@@ -490,7 +490,7 @@ export function AppSidebar() {
                                 <NavLink
                                   to={sub.url}
                                   className="hover:bg-sidebar-accent/70"
-                                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                  activeClassName="lebanon-active-nav bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                                 >
                                   <sub.icon className="mr-2 h-3.5 w-3.5 opacity-60" />
                                   <span>{t(sub.title)}</span>
