@@ -28,6 +28,8 @@ const COLORS = {
   double: "hsl(30, 70%, 50%)",
 };
 
+const CHART_AXIS_COLOR = "hsl(var(--muted-foreground))";
+
 const AgentDashboard = () => {
   const { authUser } = useAuth();
   const agentName = authUser?.name || "Agent";
@@ -204,7 +206,7 @@ const AgentDashboard = () => {
     const total = statusActionRowsInPeriod.length;
     const confirmed = statusActionRowsInPeriod.filter((o) => o.new_value === "confirmed").length;
     const postponed = statusActionRowsInPeriod.filter((o) => o.new_value === "postponed").length;
-    const noAnswer = statusActionRowsInPeriod.filter((o) => o.new_value === "no_answer").length;
+    const noAnswer = statusActionRowsInPeriod.filter((o) => (o.new_value || "").startsWith("no_answer")).length;
     const cancelled = statusActionRowsInPeriod.filter((o) => o.new_value === "cancelled").length;
     const doubleOrders = statusActionRowsInPeriod.filter((o) => o.new_value === "double").length;
     const wrongNumber = statusActionRowsInPeriod.filter((o) => o.new_value === "wrong_number").length;
@@ -264,7 +266,7 @@ const AgentDashboard = () => {
     });
     return Array.from(productMap.entries())
       .map(([name, d]) => ({ name, rate: d.total ? Math.round((d.confirmed / d.total) * 100) : 0, total: d.total }))
-      .filter((p) => p.total >= 2)
+      .filter((p) => p.total >= 1)
       .sort((a, b) => b.rate - a.rate)
       .slice(0, 8);
   }, [filteredOrders]);
@@ -280,7 +282,7 @@ const AgentDashboard = () => {
     });
     return Array.from(productMap.entries())
       .map(([name, d]) => ({ name, rate: d.shipped ? Math.round((d.delivered / d.shipped) * 100) : 0, shipped: d.shipped }))
-      .filter((p) => p.shipped >= 2)
+      .filter((p) => p.shipped >= 1)
       .sort((a, b) => b.rate - a.rate)
       .slice(0, 8);
   }, [filteredOrders]);
@@ -463,15 +465,21 @@ const AgentDashboard = () => {
             <CardTitle className="text-sm font-semibold">✅ Top Products — Confirmation Rate</CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topByConfirmation} layout="vertical" margin={{ left: 10, right: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
-                <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => `${v}%`} />
-                <Bar dataKey="rate" fill={COLORS.confirmed} radius={[0, 4, 4, 0]} barSize={18} />
-              </BarChart>
-            </ResponsiveContainer>
+            {topByConfirmation.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topByConfirmation} layout="vertical" margin={{ left: 10, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: CHART_AXIS_COLOR }} unit="%" />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11, fill: CHART_AXIS_COLOR }} />
+                  <Tooltip formatter={(v: number) => `${v}%`} />
+                  <Bar dataKey="rate" fill={COLORS.confirmed} radius={[0, 4, 4, 0]} barSize={18} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-lg border border-dashed bg-muted/20 text-sm text-muted-foreground">
+                No product data in this date range
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -481,15 +489,21 @@ const AgentDashboard = () => {
             <CardTitle className="text-sm font-semibold">📦 Top Products — Delivery Rate</CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topByDelivery} layout="vertical" margin={{ left: 10, right: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
-                <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => `${v}%`} />
-                <Bar dataKey="rate" fill="hsl(220, 60%, 55%)" radius={[0, 4, 4, 0]} barSize={18} />
-              </BarChart>
-            </ResponsiveContainer>
+            {topByDelivery.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topByDelivery} layout="vertical" margin={{ left: 10, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: CHART_AXIS_COLOR }} unit="%" />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11, fill: CHART_AXIS_COLOR }} />
+                  <Tooltip formatter={(v: number) => `${v}%`} />
+                  <Bar dataKey="rate" fill="hsl(var(--info))" radius={[0, 4, 4, 0]} barSize={18} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-lg border border-dashed bg-muted/20 text-sm text-muted-foreground">
+                No delivery data in this date range
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
