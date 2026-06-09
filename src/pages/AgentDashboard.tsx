@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { isWithinInterval } from "date-fns";
 import { formatPKT as format, startOfDayPKT as startOfDay, endOfDayPKT as endOfDay } from "@/lib/timezone";
-import { CheckCircle2, Clock, Copy, PhoneOff, XCircle, TrendingUp, Trophy, Sparkles, Star } from "lucide-react";
+import { CheckCircle2, Copy, PhoneOff, XCircle, TrendingUp, Trophy, Sparkles, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { DatePresetFilter, getDateRangeFromPreset, type DatePresetValue } from "@/components/DatePresetFilter";
@@ -281,7 +281,7 @@ const AgentDashboard = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <Card className="border-l-4 border-l-primary/60">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
@@ -297,15 +297,6 @@ const AgentDashboard = () => {
             </div>
             <p className="text-3xl font-bold text-foreground mt-1">{stats.confirmed}</p>
             <p className="text-xs text-muted-foreground">{stats.confirmedPct}%</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4" style={{ borderLeftColor: COLORS.postponed }}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide" style={{ color: COLORS.postponed }}>
-              <Clock className="h-3.5 w-3.5" /> Postponed
-            </div>
-            <p className="text-3xl font-bold text-foreground mt-1">{stats.postponed}</p>
-            <p className="text-xs text-muted-foreground">{stats.postponedPct}%</p>
           </CardContent>
         </Card>
         <Card className="border-l-4" style={{ borderLeftColor: COLORS.noAnswer }}>
