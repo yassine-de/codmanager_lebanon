@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { isWithinInterval } from "date-fns";
 import { formatPKT as format, startOfDayPKT as startOfDay, endOfDayPKT as endOfDay } from "@/lib/timezone";
-import { CheckCircle2, Clock, PhoneOff, XCircle, TrendingUp, Trophy, Sparkles, Star } from "lucide-react";
+import { CheckCircle2, Clock, Copy, PhoneOff, XCircle, TrendingUp, Trophy, Sparkles, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { DatePresetFilter, getDateRangeFromPreset, type DatePresetValue } from "@/components/DatePresetFilter";
@@ -222,7 +222,11 @@ const AgentDashboard = () => {
       noAnswerPct: total ? Math.round((noAnswer / total) * 100) : 0,
       cancelled,
       cancelledPct: total ? Math.round((cancelled / total) * 100) : 0,
-      other,
+      doubleOrders,
+      doublePct: total ? Math.round((doubleOrders / total) * 100) : 0,
+      wrongNumber,
+      wrongNumberPct: total ? Math.round((wrongNumber / total) * 100) : 0,
+      other: 0,
     };
   }, [statusActionRowsInPeriod]);
 
@@ -232,6 +236,8 @@ const AgentDashboard = () => {
     { name: "Postponed", value: stats.postponed, color: COLORS.postponed },
     { name: "No Answer", value: stats.noAnswer, color: COLORS.noAnswer },
     { name: "Cancelled", value: stats.cancelled, color: COLORS.cancelled },
+    { name: "Double", value: stats.doubleOrders, color: COLORS.double },
+    { name: "Wrong Number", value: stats.wrongNumber, color: COLORS.wrongNumber },
     ...(stats.other > 0 ? [{ name: "Wrong №/Double", value: stats.other, color: COLORS.wrongNumber }] : []),
   ].filter(d => d.value > 0);
 
@@ -309,7 +315,7 @@ const AgentDashboard = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
         <Card className="border-l-4 border-l-primary/60">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
@@ -352,6 +358,24 @@ const AgentDashboard = () => {
             </div>
             <p className="text-3xl font-bold text-foreground mt-1">{stats.cancelled}</p>
             <p className="text-xs text-muted-foreground">{stats.cancelledPct}%</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4" style={{ borderLeftColor: COLORS.double }}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide" style={{ color: COLORS.double }}>
+              <Copy className="h-3.5 w-3.5" /> Double
+            </div>
+            <p className="text-3xl font-bold text-foreground mt-1">{stats.doubleOrders}</p>
+            <p className="text-xs text-muted-foreground">{stats.doublePct}%</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4" style={{ borderLeftColor: COLORS.wrongNumber }}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide" style={{ color: COLORS.wrongNumber }}>
+              <PhoneOff className="h-3.5 w-3.5" /> Wrong Number
+            </div>
+            <p className="text-3xl font-bold text-foreground mt-1">{stats.wrongNumber}</p>
+            <p className="text-xs text-muted-foreground">{stats.wrongNumberPct}%</p>
           </CardContent>
         </Card>
       </div>
