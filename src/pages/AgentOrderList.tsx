@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Loader2, MessageCircle, Pencil, Plus, RefreshCcw, Video } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Loader2, MessageCircle, Pencil, Plus, RefreshCcw, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -160,6 +160,7 @@ export default function AgentOrderList() {
   const [saving, setSaving] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [pageSize, setPageSize] = useState("10");
+  const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [productFilter, setProductFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -173,7 +174,7 @@ export default function AgentOrderList() {
       const { data, error } = await supabase
         .from("orders")
         .select("id,system_id,order_id,created_at,updated_at,confirmation_status,customer_name,customer_phone,customer_city,customer_address,product_name,product_url,video_url,variant_name,variant_sku,quantity,price,total_amount,note,seller_id,agent_id,original_agent_id,wakilni_order_id,wakilni_tracking_id")
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       return (data || []) as OrderRow[];
@@ -285,30 +286,46 @@ export default function AgentOrderList() {
     const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
     const toTime = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
 
-    return (ordersQuery.data || []).filter((order) => {
-      if (statusFilter !== "all" && order.confirmation_status !== statusFilter) return false;
-      if (productFilter !== "all" && order.product_name !== productFilter) return false;
+    return (ordersQuery.data || [])
+      .filter((order) => {
+        if (statusFilter !== "all" && order.confirmation_status !== statusFilter) return false;
+        if (productFilter !== "all" && order.product_name !== productFilter) return false;
 
-      const createdTime = new Date(order.created_at).getTime();
-      if (fromTime && createdTime < fromTime) return false;
-      if (toTime && createdTime > toTime) return false;
+        const createdTime = new Date(order.created_at).getTime();
+        if (fromTime && createdTime < fromTime) return false;
+        if (toTime && createdTime > toTime) return false;
 
-      if (!normalizedSearch) return true;
-      return [
-        order.order_id,
-        String(order.system_id || ""),
-        order.product_name,
-        order.customer_name,
-        order.customer_phone,
-        order.customer_city,
-      ].some((value) => value.toLowerCase().includes(normalizedSearch));
-    });
+        if (!normalizedSearch) return true;
+        return [
+          order.order_id,
+          String(order.system_id || ""),
+          order.product_name,
+          order.customer_name,
+          order.customer_phone,
+          order.customer_city,
+        ].some((value) => value.toLowerCase().includes(normalizedSearch));
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [dateFrom, dateTo, ordersQuery.data, productFilter, search, statusFilter]);
 
+  const pageSizeNumber = Number(pageSize) || 10;
+  const pageCount = Math.max(1, Math.ceil(filteredOrders.length / pageSizeNumber));
+  const safeCurrentPage = Math.min(currentPage, pageCount);
+  const startIndex = (safeCurrentPage - 1) * pageSizeNumber;
+  const endIndex = Math.min(startIndex + pageSizeNumber, filteredOrders.length);
+
   const visibleOrders = useMemo(
-    () => filteredOrders.slice(0, Number(pageSize) || 10),
-    [filteredOrders, pageSize]
+    () => filteredOrders.slice(startIndex, endIndex),
+    [endIndex, filteredOrders, startIndex]
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateFrom, dateTo, pageSize, productFilter, search, statusFilter]);
+
+  useEffect(() => {
+    if (currentPage > pageCount) setCurrentPage(pageCount);
+  }, [currentPage, pageCount]);
 
   const saveOrder = async () => {
     if (!selectedOrder || !authUser) return;
@@ -570,6 +587,35 @@ export default function AgentOrderList() {
               )}
             </TableBody>
           </Table>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-sm text-muted-foreground">
+            {filteredOrders.length === 0 ? "0 orders" : `${startIndex + 1}-${endIndex} of ${filteredOrders.length}`}
+          </span>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={safeCurrentPage <= 1}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="min-w-[72px] text-center text-sm text-muted-foreground">
+              {safeCurrentPage} / {pageCount}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}
+              disabled={safeCurrentPage >= pageCount}
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
