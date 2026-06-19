@@ -343,7 +343,7 @@ function mapWakilniDeliveryStatus(status?: string | null, statusCode?: string | 
     return "rejected";
   }
   if (["4"].includes(code) || normalized.includes("success")) return "delivered";
-  if (["3"].includes(code) || normalized.includes("processing")) return "shipped";
+  if (["2", "3"].includes(code) || normalized.includes("confirmed") || normalized.includes("processing")) return "shipped";
   if (normalized.includes("delivered")) return "delivered";
   if (normalized.includes("return")) return "returned";
   if (normalized.includes("failed")) return "failed_attempt";
