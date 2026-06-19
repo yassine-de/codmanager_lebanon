@@ -10,6 +10,7 @@ export interface ProductVariant {
   sku: string;
   price: number;
   quantity: number;
+  currentStock?: number;
 }
 
 export interface Product {
@@ -25,6 +26,7 @@ export interface Product {
   shipped: number;
   cancelled: number;
   available: number;
+  currentStock?: number;
   createdAt: string;
   variants: ProductVariant[];
   storeLink: string;

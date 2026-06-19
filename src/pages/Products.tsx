@@ -26,6 +26,18 @@ export default function Products() {
   const isAgent = authUser?.role === "agent";
   const [localProducts, setLocalProducts] = useState<Product[]>([]);
 
+  const { data: stockSheetMap = {} } = useQuery({
+    queryKey: ["stock-sheet-map"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("stock-sheet");
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return (data?.stocks || {}) as Record<string, number>;
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+
   // Fetch DB products (RLS ensures sellers only see their own)
   const { data: dbProducts = [] } = useQuery({
     queryKey: ["db-products"],
@@ -130,6 +142,9 @@ export default function Products() {
 
   // Merge: admin sees mock + DB, seller sees only their DB products
   const products = useMemo(() => {
+    const normalizeSku = (value: string | null | undefined) =>
+      String(value || "").replace(/\s+/g, "").toUpperCase();
+
     const dbMapped: Product[] = dbProducts.map(p => {
       const orderStats = productOrderStatsMap[`${p.seller_id}::${p.name}`] || { delivered: 0, shipped: 0, returned: 0, cancelled: 0 };
       const availableQty = Math.max(0, (p.quantity || 0) - orderStats.delivered - orderStats.shipped + orderStats.returned);
@@ -143,8 +158,12 @@ export default function Products() {
             sku: v.sku || "",
             price: v.price || Number((p as any).landed_price) || 0,
             quantity: v.quantity || (v.subVariants ? v.subVariants.reduce((s: number, sv: any) => s + (sv.quantity || 0), 0) : 0),
+            currentStock: stockSheetMap[normalizeSku(v.sku)],
           }))
         : [];
+      const currentStock = mappedVariants.length === 0
+        ? stockSheetMap[normalizeSku(p.sku)]
+        : undefined;
       return {
         id: p.id,
         displayId: (p as any).display_id || undefined,
@@ -158,6 +177,7 @@ export default function Products() {
         shipped: orderStats.shipped,
         cancelled: orderStats.returned,
         available: availableQty,
+        currentStock,
         createdAt: p.created_at,
         variants: mappedVariants,
         storeLink: p.product_url || "",
@@ -172,7 +192,7 @@ export default function Products() {
       } as Product & { whatsappEnabled: boolean };
     });
     return dbMapped;
-  }, [dbProducts, dbSellerNameMap, localProducts, isAdmin, authUser, productOrderStatsMap]);
+  }, [dbProducts, dbSellerNameMap, localProducts, isAdmin, authUser, productOrderStatsMap, stockSheetMap]);
 
   // Mark unseen products as seen for sellers
   useEffect(() => {
@@ -545,6 +565,7 @@ export default function Products() {
                       <th className="text-right py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Buying Price</th>
                       <th className="text-right py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Selling Price</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Total Qty</th>
+                      <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Current Stock</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Delivered</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Shipped</th>
                       <th className="text-center py-2.5 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">Returned</th>
@@ -619,6 +640,26 @@ export default function Products() {
                         </td>
                         <td className="py-2 px-3 text-center tabular-nums text-xs">{product.totalQty}</td>
                         <td className="py-2 px-3 text-center">
+                          {product.variants.length > 0 ? (
+                            <span className="text-[10px] text-muted-foreground">Per variant</span>
+                          ) : product.currentStock !== undefined ? (
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                              product.currentStock > 0
+                                ? "bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)] border-[hsl(155,50%,42%)]/20"
+                                : "bg-[hsl(0,65%,52%)]/12 text-[hsl(0,65%,52%)] border-[hsl(0,65%,52%)]/20"
+                            }`}>
+                              {product.currentStock}
+                            </span>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-[10px] text-muted-foreground cursor-help">-</span>
+                              </TooltipTrigger>
+                              <TooltipContent>SKU not found in stock sheet</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-center">
                           <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium bg-[hsl(155,50%,42%)]/12 text-[hsl(155,50%,42%)] border-[hsl(155,50%,42%)]/20">
                             {product.delivered}
                           </span>
@@ -661,7 +702,16 @@ export default function Products() {
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="text-xs">
-                                {product.variants.map(v => v.name).join(', ')}
+                                <div className="space-y-1">
+                                  {product.variants.map((variant) => (
+                                    <div key={variant.id} className="flex min-w-[190px] items-center justify-between gap-4">
+                                      <span>{variant.name} · {variant.sku || "No SKU"}</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {variant.currentStock !== undefined ? variant.currentStock : "-"}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
                               </TooltipContent>
                             </Tooltip>
                           ) : (
@@ -765,6 +815,9 @@ export default function Products() {
                           <span className="font-medium">{product.price}</span>
                           <span className="text-muted-foreground">Selling: {product.lastSellingPrice}</span>
                           <span className="text-muted-foreground">Qty: {product.totalQty}</span>
+                          <span className="text-muted-foreground">
+                            Stock: {product.variants.length > 0 ? "Per variant" : (product.currentStock ?? "-")}
+                          </span>
                           <span className="text-destructive">Returned: {product.cancelled}</span>
                           <span className="text-muted-foreground">Avail: {product.available}</span>
                         </div>
