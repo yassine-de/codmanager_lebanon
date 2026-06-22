@@ -226,6 +226,68 @@ function deliveryPayload(order: any, product: any) {
   };
 }
 
+function isSafePreCreationRetry(error: string | null | undefined) {
+  const message = String(error || "").toLowerCase();
+  return message.includes("wakilni auth failed")
+    || message.includes("start_bulk failed")
+    || message.includes("start bulk");
+}
+
+async function finishExistingBulk(
+  supabase: ReturnType<typeof createClient>,
+  order: any,
+  resumed = true,
+) {
+  if (!order.wakilni_bulk_id || (!order.wakilni_order_id && !order.wakilni_tracking_id)) {
+    throw new Error("Cannot resume Wakilni sync without bulk and delivery identifiers");
+  }
+
+  await supabase
+    .from("orders")
+    .update({ wakilni_sync_status: "pending", wakilni_sync_error: null })
+    .eq("id", order.id);
+
+  try {
+    const token = await getWakilniToken();
+    const endResponse = await wakilniRequestWithFallback(
+      [`/clients/end_bulk/${order.wakilni_bulk_id}`, `/end_bulk/${order.wakilni_bulk_id}`],
+      token,
+    );
+
+    await supabase
+      .from("orders")
+      .update({
+        wakilni_sync_status: "synced",
+        wakilni_sync_error: null,
+        wakilni_synced_at: new Date().toISOString(),
+        wakilni_response: {
+          ...(order.wakilni_response || {}),
+          end: endResponse,
+        },
+      })
+      .eq("id", order.id);
+
+    return {
+      success: true,
+      resumed,
+      order_id: order.order_id,
+      wakilni_order_id: order.wakilni_order_id,
+      wakilni_tracking_id: order.wakilni_tracking_id,
+      wakilni_bulk_id: order.wakilni_bulk_id,
+    };
+  } catch (error) {
+    const message = String((error as Error)?.message || error);
+    await supabase
+      .from("orders")
+      .update({
+        wakilni_sync_status: "failed",
+        wakilni_sync_error: message.slice(0, 1000),
+      })
+      .eq("id", order.id);
+    throw error;
+  }
+}
+
 async function syncOrder(supabase: ReturnType<typeof createClient>, orderId: string) {
   const { data: enabledSetting } = await supabase
     .from("app_settings")
@@ -255,7 +317,14 @@ async function syncOrder(supabase: ReturnType<typeof createClient>, orderId: str
   if (!order) throw new Error(`Order not found: ${orderId}`);
   if (order.confirmation_status !== "confirmed") return { skipped: true, reason: "Order is not confirmed" };
   if (order.delivery_status !== "booked") return { skipped: true, reason: "Order is not booked" };
-  if (order.wakilni_order_id || order.wakilni_sync_status === "synced") {
+  if (
+    order.wakilni_sync_status === "failed"
+    && order.wakilni_bulk_id
+    && (order.wakilni_order_id || order.wakilni_tracking_id)
+  ) {
+    return await finishExistingBulk(supabase, order);
+  }
+  if (order.wakilni_order_id || order.wakilni_tracking_id || order.wakilni_sync_status === "synced") {
     return {
       skipped: true,
       reason: "Already synced",
@@ -282,14 +351,25 @@ async function syncOrder(supabase: ReturnType<typeof createClient>, orderId: str
     const bulkId = pickBulkId(startResponse);
     if (!bulkId) throw new Error(`Wakilni start_bulk response did not include bulk id: ${JSON.stringify(startResponse).slice(0, 500)}`);
 
+    await supabase
+      .from("orders")
+      .update({
+        wakilni_bulk_id: String(bulkId),
+        wakilni_response: { start: startResponse },
+      })
+      .eq("id", order.id);
+
     const addResponse = await wakilniRequestWithFallback(
       [`/clients/add_delivery/${bulkId}`, `/add_delivery/${bulkId}`],
       token,
       deliveryPayload(order, product)
     );
-    const endResponse = await wakilniRequestWithFallback([`/clients/end_bulk/${bulkId}`, `/end_bulk/${bulkId}`], token);
     const wakilniOrderId = pickId(addResponse);
-    const trackingId = pickTrackingId(addResponse) || pickTrackingId(endResponse);
+    const trackingId = pickTrackingId(addResponse);
+
+    if (!wakilniOrderId && !trackingId) {
+      throw new Error(`Wakilni add_delivery response did not include delivery identifiers: ${JSON.stringify(addResponse).slice(0, 500)}`);
+    }
 
     await supabase
       .from("orders")
@@ -297,20 +377,23 @@ async function syncOrder(supabase: ReturnType<typeof createClient>, orderId: str
         wakilni_order_id: wakilniOrderId ? String(wakilniOrderId) : null,
         wakilni_tracking_id: trackingId ? String(trackingId) : null,
         wakilni_bulk_id: String(bulkId),
-        wakilni_sync_status: "synced",
+        wakilni_sync_status: "pending",
         wakilni_sync_error: null,
-        wakilni_synced_at: new Date().toISOString(),
-        wakilni_response: { start: startResponse, add: addResponse, end: endResponse },
+        wakilni_response: { start: startResponse, add: addResponse },
       })
       .eq("id", order.id);
 
-    return {
-      success: true,
-      order_id: order.order_id,
-      wakilni_order_id: wakilniOrderId,
-      wakilni_tracking_id: trackingId,
-      wakilni_bulk_id: bulkId,
-    };
+    return await finishExistingBulk(
+      supabase,
+      {
+        ...order,
+        wakilni_order_id: wakilniOrderId ? String(wakilniOrderId) : null,
+        wakilni_tracking_id: trackingId ? String(trackingId) : null,
+        wakilni_bulk_id: String(bulkId),
+        wakilni_response: { start: startResponse, add: addResponse },
+      },
+      false,
+    );
   } catch (error) {
     const message = String((error as Error)?.message || error);
     await supabase
@@ -322,6 +405,69 @@ async function syncOrder(supabase: ReturnType<typeof createClient>, orderId: str
       .eq("id", order.id);
     throw error;
   }
+}
+
+async function retryFailedOrderCreations(supabase: ReturnType<typeof createClient>, manual = false) {
+  const retryBefore = new Date(Date.now() - (manual ? 0 : 10 * 60_000)).toISOString();
+  let query = supabase
+    .from("orders")
+    .select("id, order_id, system_id, confirmation_status, delivery_status, wakilni_order_id, wakilni_tracking_id, wakilni_bulk_id, wakilni_sync_status, wakilni_sync_error, wakilni_response, updated_at")
+    .eq("confirmation_status", "confirmed")
+    .eq("delivery_status", "booked")
+    .eq("wakilni_sync_status", "failed")
+    .order("updated_at", { ascending: true })
+    .limit(10);
+
+  if (!manual) query = query.lte("updated_at", retryBefore);
+
+  const { data: orders, error } = await query;
+  if (error) throw error;
+
+  const results = [];
+  for (const order of orders || []) {
+    const canResumeBulk = !!order.wakilni_bulk_id
+      && !!(order.wakilni_order_id || order.wakilni_tracking_id);
+    const safeBeforeCreation = !order.wakilni_bulk_id
+      && !order.wakilni_order_id
+      && !order.wakilni_tracking_id
+      && isSafePreCreationRetry(order.wakilni_sync_error);
+
+    if (!canResumeBulk && !safeBeforeCreation) {
+      results.push({
+        order_id: order.order_id,
+        system_id: order.system_id,
+        skipped: true,
+        reason: "Ambiguous Wakilni failure requires manual verification",
+      });
+      continue;
+    }
+
+    try {
+      const result = await syncOrder(supabase, order.id);
+      results.push({
+        order_id: order.order_id,
+        system_id: order.system_id,
+        success: !!result?.success,
+        resumed: !!result?.resumed,
+        skipped: !!result?.skipped,
+        reason: result?.reason || null,
+      });
+    } catch (error) {
+      results.push({
+        order_id: order.order_id,
+        system_id: order.system_id,
+        error: String((error as Error)?.message || error).slice(0, 500),
+      });
+    }
+  }
+
+  return {
+    checked: (orders || []).length,
+    retried: results.filter((result: any) => !result.skipped).length,
+    succeeded: results.filter((result: any) => result.success).length,
+    skipped_ambiguous: results.filter((result: any) => result.skipped).length,
+    results,
+  };
 }
 
 async function getSettingMap(supabase: ReturnType<typeof createClient>, keys: string[]) {
@@ -486,6 +632,7 @@ async function syncActiveStatuses(supabase: ReturnType<typeof createClient>, man
     return { skipped: true, reason: "Wakilni API is disabled" };
   }
 
+  const failedRetries = await retryFailedOrderCreations(supabase, manual);
   const intervalMinutes = Math.max(
     1,
     Math.min(1440, Number(settings.get("wakilni_status_sync_interval_minutes") || 30) || 30),
@@ -500,6 +647,7 @@ async function syncActiveStatuses(supabase: ReturnType<typeof createClient>, man
       return {
         skipped: true,
         reason: "Status sync interval not reached",
+        failed_order_retries: failedRetries,
         interval_minutes: intervalMinutes,
         last_run_at: lastRunRaw,
         next_run_at: nextRunAt.toISOString(),
@@ -549,6 +697,7 @@ async function syncActiveStatuses(supabase: ReturnType<typeof createClient>, man
 
   return {
     success: true,
+    failed_order_retries: failedRetries,
     interval_minutes: intervalMinutes,
     checked: results.length,
     updated: results.filter((result: any) => result.updated).length,
@@ -573,6 +722,8 @@ Deno.serve(async (req) => {
       result = await trackOrder(supabase, body);
     } else if (action === "sync-statuses") {
       result = await syncActiveStatuses(supabase, body.manual === true);
+    } else if (action === "retry-failed") {
+      result = await retryFailedOrderCreations(supabase, body.manual === true);
     } else {
       throw new Error(`Unknown action: ${action}`);
     }
