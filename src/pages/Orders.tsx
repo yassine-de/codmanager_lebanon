@@ -29,6 +29,7 @@ import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetF
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import WakilniTrackingModal from "@/components/WakilniTrackingModal";
+import SellerTrackingModal from "@/components/SellerTrackingModal";
 import { FinancialIndicators } from "@/components/FinancialIndicators";
 
 /* ── Status badge configs ── */
@@ -223,6 +224,7 @@ export default function Orders() {
   const [historyOrder, setHistoryOrder] = useState<Order | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState<{ trackingId?: string | null; wakilniOrderId?: string | null; systemId?: number | null; sellerId?: string | null } | null>(null);
+  const [sellerTrackingOrderId, setSellerTrackingOrderId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sellerNames, setSellerNames] = useState<string[]>([]);
@@ -648,6 +650,14 @@ export default function Orders() {
 
   const isCol = (key: ColumnKey) => visibleColumns.has(key);
 
+  const handleSellerOrderIdClick = (order: Order) => {
+    if (!order.wakilniTrackingId && !order.wakilniOrderId) {
+      toast.info("Tracking is not available yet");
+      return;
+    }
+    setSellerTrackingOrderId(order.id);
+  };
+
   return (
     <TooltipProvider delayDuration={200}>
     <div className="space-y-3 w-full">
@@ -978,19 +988,25 @@ export default function Orders() {
                       <button
                         type="button"
                         onClick={() => {
+                          if (!isAdmin) {
+                            handleSellerOrderIdClick(order);
+                            return;
+                          }
                           navigator.clipboard.writeText(order.id);
                           setCopiedId(order.id);
                           toast.success("Order ID copied");
                           setTimeout(() => setCopiedId(prev => prev === order.id ? null : prev), 1500);
                         }}
                         className="inline-flex items-center gap-1 hover:text-primary transition-colors group"
-                        title="Click to copy"
+                        title={isAdmin ? "Click to copy" : "View tracking"}
                       >
                         <span>{order.id}</span>
-                        {copiedId === order.id ? (
-                          <Check className="w-3 h-3 text-success" />
-                        ) : (
-                          <Copy className="w-3 h-3 opacity-0 group-hover:opacity-60" />
+                        {isAdmin && (
+                          copiedId === order.id ? (
+                            <Check className="w-3 h-3 text-success" />
+                          ) : (
+                            <Copy className="w-3 h-3 opacity-0 group-hover:opacity-60" />
+                          )
                         )}
                       </button>
                     </td>
@@ -1138,7 +1154,20 @@ export default function Orders() {
               onClick={() => navigate(`/orders/${order.id}`)}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-sm">{order.id}</span>
+                <button
+                  type="button"
+                  className="font-medium text-sm hover:text-primary transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isAdmin) {
+                      navigate(`/orders/${order.id}`);
+                    } else {
+                      handleSellerOrderIdClick(order);
+                    }
+                  }}
+                >
+                  {order.id}
+                </button>
                 <span className="text-xs text-muted-foreground tabular-nums">{format(new Date(order.createdAt), 'dd MMM yyyy HH:mm')}</span>
               </div>
               <div className="flex items-center justify-between mb-2">
@@ -1211,6 +1240,17 @@ export default function Orders() {
             setRefreshKey(k => k + 1);
           }}
           onStatusSync={() => setRefreshKey(k => k + 1)}
+        />
+      )}
+
+      {sellerTrackingOrderId && (
+        <SellerTrackingModal
+          orderId={sellerTrackingOrderId}
+          open={!!sellerTrackingOrderId}
+          onClose={() => {
+            setSellerTrackingOrderId(null);
+            setRefreshKey(k => k + 1);
+          }}
         />
       )}
 

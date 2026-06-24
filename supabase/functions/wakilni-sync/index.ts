@@ -482,23 +482,62 @@ async function getSettingMap(supabase: ReturnType<typeof createClient>, keys: st
 }
 
 function mapWakilniDeliveryStatus(status?: string | null, statusCode?: string | number | null) {
-  const normalized = String(status || "").toLowerCase().trim();
-  const code = String(statusCode ?? "").trim();
+  const normalizedStatus = String(status || "").toLowerCase().trim();
+  const normalizedCode = String(statusCode ?? "").toLowerCase().trim();
+  const combined = `${normalizedStatus} ${normalizedCode}`.trim();
+  const numericCode = /^\d+$/.test(normalizedCode)
+    ? normalizedCode
+    : /^\d+$/.test(normalizedStatus)
+      ? normalizedStatus
+      : "";
 
-  if (["6"].includes(code) || ["declined", "rejected", "refused", "cancelled", "canceled"].some((s) => normalized.includes(s))) {
-    return "rejected";
-  }
-  if (["4"].includes(code) || normalized.includes("success")) return "delivered";
-  if (["2", "3"].includes(code) || normalized.includes("confirmed") || normalized.includes("processing")) return "shipped";
-  if (normalized.includes("delivered")) return "delivered";
-  if (normalized.includes("return")) return "returned";
-  if (normalized.includes("failed")) return "failed_attempt";
-  if (normalized.includes("out for delivery") || normalized.includes("with courier")) return "with_courier";
-  if (normalized.includes("transit")) return "in_transit";
-  if (normalized.includes("picked") || normalized.includes("pickup") || normalized.includes("shipped")) return "shipped";
-  if (normalized.includes("pending") || normalized.includes("created")) return "booked";
+  if (numericCode === "10" || combined.includes("pending cancellation")) return "cancelled";
+  if (numericCode === "7" || combined.includes("cancelled") || combined.includes("canceled")) return "cancelled";
+  if (numericCode === "6" || ["declined", "rejected", "refused"].some((s) => combined.includes(s))) return "rejected";
+  if (numericCode === "4" || combined.includes("success")) return "delivered";
+  if (numericCode === "2" || numericCode === "3" || combined.includes("confirmed") || combined.includes("processing")) return "shipped";
+  if (combined.includes("delivered")) return "delivered";
+  if (combined.includes("return")) return "returned";
+  if (combined.includes("failed")) return "failed_attempt";
+  if (combined.includes("out for delivery") || combined.includes("with courier")) return "with_courier";
+  if (combined.includes("transit")) return "in_transit";
+  if (combined.includes("picked") || combined.includes("pickup") || combined.includes("shipped")) return "shipped";
+  if (combined.includes("pending") || combined.includes("created")) return "booked";
 
   return null;
+}
+
+const ACTIVE_WAKILNI_STATUSES = ["pending", "booked", "shipped", "in_transit", "with_courier", "failed_attempt"];
+const STATUS_SYNC_INTERVAL_MINUTES: Record<string, number> = {
+  with_courier: 15,
+  failed_attempt: 30,
+  shipped: 60,
+  in_transit: 60,
+  booked: 180,
+  pending: 180,
+};
+const STATUS_SYNC_PRIORITY: Record<string, number> = {
+  with_courier: 1,
+  failed_attempt: 2,
+  shipped: 3,
+  in_transit: 4,
+  booked: 5,
+  pending: 6,
+};
+
+function getStatusSyncIntervalMinutes(status: string | null | undefined) {
+  return STATUS_SYNC_INTERVAL_MINUTES[String(status || "")] ?? 180;
+}
+
+function isOrderDueForStatusSync(order: any, now: Date, manual = false) {
+  if (manual) return true;
+  if (!order.wakilni_synced_at) return true;
+
+  const lastSyncedAt = new Date(order.wakilni_synced_at);
+  if (Number.isNaN(lastSyncedAt.getTime())) return true;
+
+  const intervalMs = getStatusSyncIntervalMinutes(order.delivery_status) * 60_000;
+  return now.getTime() - lastSyncedAt.getTime() >= intervalMs;
 }
 
 async function updateLocalOrderStatus(
@@ -507,9 +546,8 @@ async function updateLocalOrderStatus(
   identifiers: { trackingId?: string | null; wakilniOrderId?: string | null; localOrderId?: string | null; systemId?: string | number | null },
 ) {
   const mappedStatus = mapWakilniDeliveryStatus(result.status, result.status_code);
-  if (!mappedStatus) return result;
 
-  let query = supabase.from("orders").select("id, order_id, delivery_status").limit(1);
+  let query = supabase.from("orders").select("id, order_id, delivery_status, delivered_at").limit(1);
   if (identifiers.trackingId) {
     query = query.eq("wakilni_tracking_id", identifiers.trackingId);
   } else if (identifiers.wakilniOrderId) {
@@ -526,16 +564,27 @@ async function updateLocalOrderStatus(
   const order = rows?.[0];
   if (!order) return { ...result, delivery_status: mappedStatus };
 
-  if (order.delivery_status !== mappedStatus) {
-    await supabase
-      .from("orders")
-      .update({
-        delivery_status: mappedStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", order.id);
+  const nowIso = new Date().toISOString();
+  const statusChanged = !!mappedStatus && order.delivery_status !== mappedStatus;
+  const updatePayload: Record<string, unknown> = {
+    wakilni_synced_at: nowIso,
+  };
 
-    await supabase.from("order_history").insert({
+  if (statusChanged) {
+    updatePayload.delivery_status = mappedStatus;
+    updatePayload.updated_at = nowIso;
+    if (mappedStatus === "delivered" && !order.delivered_at) {
+      updatePayload.delivered_at = result.completed_on || nowIso;
+    }
+  }
+
+  await supabase
+    .from("orders")
+    .update(updatePayload)
+    .eq("id", order.id);
+
+  if (statusChanged) {
+    const { error: historyError } = await supabase.from("order_history").insert({
       order_id: order.order_id,
       changed_by: null,
       changed_by_role: "system",
@@ -544,13 +593,14 @@ async function updateLocalOrderStatus(
       new_value: mappedStatus,
       action_type: "wakilni_tracking_sync",
     });
+    if (historyError) console.error("order_history insert failed:", historyError);
   }
 
   return {
     ...result,
     delivery_status: mappedStatus,
     local_order_id: order.order_id,
-    local_status_updated: order.delivery_status !== mappedStatus,
+    local_status_updated: statusChanged,
   };
 }
 
@@ -657,16 +707,25 @@ async function syncActiveStatuses(supabase: ReturnType<typeof createClient>, man
 
   const { data: orders, error } = await supabase
     .from("orders")
-    .select("id, order_id, system_id, wakilni_order_id, wakilni_tracking_id, delivery_status")
+    .select("id, order_id, system_id, wakilni_order_id, wakilni_tracking_id, delivery_status, wakilni_synced_at")
     .not("wakilni_tracking_id", "is", null)
-    .in("delivery_status", ["booked", "shipped", "in_transit", "with_courier", "failed_attempt"])
+    .in("delivery_status", ACTIVE_WAKILNI_STATUSES)
     .order("wakilni_synced_at", { ascending: true, nullsFirst: true })
-    .limit(100);
+    .limit(manual ? 1000 : 500);
 
   if (error) throw error;
 
+  const dueOrders = (orders || [])
+    .filter((order: any) => isOrderDueForStatusSync(order, now, manual))
+    .sort((a: any, b: any) => {
+      const priorityDiff = (STATUS_SYNC_PRIORITY[a.delivery_status] ?? 99) - (STATUS_SYNC_PRIORITY[b.delivery_status] ?? 99);
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(a.wakilni_synced_at || 0).getTime() - new Date(b.wakilni_synced_at || 0).getTime();
+    })
+    .slice(0, manual ? 250 : 100);
+
   const results = [];
-  for (const order of orders || []) {
+  for (const order of dueOrders) {
     try {
       const result = await trackOrder(supabase, {
         tracking_id: order.wakilni_tracking_id,
@@ -699,6 +758,8 @@ async function syncActiveStatuses(supabase: ReturnType<typeof createClient>, man
     success: true,
     failed_order_retries: failedRetries,
     interval_minutes: intervalMinutes,
+    active_candidates: (orders || []).length,
+    due: dueOrders.length,
     checked: results.length,
     updated: results.filter((result: any) => result.updated).length,
     results,
