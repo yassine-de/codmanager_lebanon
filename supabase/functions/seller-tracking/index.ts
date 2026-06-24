@@ -50,20 +50,22 @@ function publicStatusLabel(status: string | null | undefined) {
 
 function buildPublicEvents(order: any, history: any[]) {
   const currentStatus = order.delivery_status || "pending";
+  const currentLabel = publicStatusLabel(currentStatus);
   const statusEvents = (history || [])
     .filter((entry) => entry.field_changed === "delivery_status" && entry.new_value)
     .map((entry) => ({
       label: publicStatusLabel(entry.new_value),
       created_at: entry.created_at || null,
     }));
+  const hasCurrentStatusEvent = statusEvents.some((event) => event.label === currentLabel);
 
   const events = [
-    {
-      label: publicStatusLabel(currentStatus),
+    ...(hasCurrentStatusEvent ? [] : [{
+      label: currentLabel,
       created_at: currentStatus === "delivered"
         ? order.delivered_at || order.wakilni_synced_at || order.updated_at || null
         : order.wakilni_synced_at || order.updated_at || null,
-    },
+    }]),
     ...statusEvents,
     {
       label: "Order created",
