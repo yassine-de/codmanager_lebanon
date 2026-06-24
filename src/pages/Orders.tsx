@@ -102,6 +102,16 @@ const subStatusClass = (raw?: string | null): string => {
 };
 
 const shippedDeliveryStatuses: DeliveryStatus[] = ["shipped", "in_transit", "with_courier"];
+const sellerTrackableDeliveryStatuses: DeliveryStatus[] = [
+  "shipped",
+  "in_transit",
+  "with_courier",
+  "delivered",
+  "failed_attempt",
+  "ready_for_return",
+  "returned",
+  "return",
+];
 
 function StatusBadge({ label, cls, attemptCount }: { label: string; cls: string; attemptCount?: number }) {
   return (
@@ -652,7 +662,7 @@ export default function Orders() {
 
   const canSellerTrackOrder = (order: Order) =>
     !isAdmin
-    && order.confirmationStatus === "confirmed"
+    && sellerTrackableDeliveryStatuses.includes(order.deliveryStatus)
     && !!(order.wakilniTrackingId || order.wakilniOrderId);
 
   const handleSellerOrderIdClick = (order: Order) => {
