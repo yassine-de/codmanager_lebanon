@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { eachDayOfInterval, isAfter } from "date-fns";
 import { startOfDayPKT as startOfDay, subDaysPKT as subDays, formatPKT as fmtDate } from "@/lib/timezone";
-import { Search, SlidersHorizontal, X, Columns3, CalendarIcon, Filter, Pencil, History, MessageCircle, Download, RefreshCw, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Copy, Check } from "lucide-react";
+import { Search, SlidersHorizontal, X, Columns3, CalendarIcon, Filter, Pencil, History, MessageCircle, Download, RefreshCw, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Copy, Check, Truck } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
@@ -997,10 +997,16 @@ export default function Orders() {
                           toast.success("Order ID copied");
                           setTimeout(() => setCopiedId(prev => prev === order.id ? null : prev), 1500);
                         }}
-                        className="inline-flex items-center gap-1 hover:text-primary transition-colors group"
+                        className={cn(
+                          "inline-flex items-center gap-1 transition-colors group",
+                          isAdmin
+                            ? "hover:text-primary"
+                            : "text-[hsl(210,60%,52%)] font-semibold underline underline-offset-4 decoration-[hsl(210,60%,52%)]/35 hover:decoration-[hsl(210,60%,52%)]"
+                        )}
                         title={isAdmin ? "Click to copy" : "View tracking"}
                       >
                         <span>{order.id}</span>
+                        {!isAdmin && <Truck className="w-3.5 h-3.5" />}
                         {isAdmin && (
                           copiedId === order.id ? (
                             <Check className="w-3 h-3 text-success" />
@@ -1156,7 +1162,12 @@ export default function Orders() {
               <div className="flex items-center justify-between mb-2">
                 <button
                   type="button"
-                  className="font-medium text-sm hover:text-primary transition-colors"
+                  className={cn(
+                    "inline-flex items-center gap-1 font-medium text-sm transition-colors",
+                    isAdmin
+                      ? "hover:text-primary"
+                      : "text-[hsl(210,60%,52%)] font-semibold underline underline-offset-4 decoration-[hsl(210,60%,52%)]/35 hover:decoration-[hsl(210,60%,52%)]"
+                  )}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (isAdmin) {
@@ -1167,6 +1178,7 @@ export default function Orders() {
                   }}
                 >
                   {order.id}
+                  {!isAdmin && <Truck className="w-3.5 h-3.5" />}
                 </button>
                 <span className="text-xs text-muted-foreground tabular-nums">{format(new Date(order.createdAt), 'dd MMM yyyy HH:mm')}</span>
               </div>
