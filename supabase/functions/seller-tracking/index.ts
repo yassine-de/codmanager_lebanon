@@ -55,7 +55,9 @@ function buildPublicEvents(order: any, history: any[]) {
     .filter((entry) => entry.field_changed === "delivery_status" && entry.new_value)
     .map((entry) => ({
       label: publicStatusLabel(entry.new_value),
-      created_at: entry.created_at || null,
+      created_at: entry.new_value === "delivered"
+        ? order.delivered_at || entry.created_at || null
+        : entry.created_at || null,
     }));
   const hasCurrentStatusEvent = statusEvents.some((event) => event.label === currentLabel);
 
