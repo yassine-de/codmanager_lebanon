@@ -111,6 +111,8 @@ const sellerTrackableDeliveryStatuses: DeliveryStatus[] = [
   "ready_for_return",
   "returned",
   "return",
+  "cancelled",
+  "rejected",
 ];
 
 function StatusBadge({ label, cls, attemptCount }: { label: string; cls: string; attemptCount?: number }) {
