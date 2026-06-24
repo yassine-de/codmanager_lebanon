@@ -650,8 +650,13 @@ export default function Orders() {
 
   const isCol = (key: ColumnKey) => visibleColumns.has(key);
 
+  const canSellerTrackOrder = (order: Order) =>
+    !isAdmin
+    && order.confirmationStatus === "confirmed"
+    && !!(order.wakilniTrackingId || order.wakilniOrderId);
+
   const handleSellerOrderIdClick = (order: Order) => {
-    if (!order.wakilniTrackingId && !order.wakilniOrderId) {
+    if (!canSellerTrackOrder(order)) {
       toast.info("Tracking is not available yet");
       return;
     }
@@ -985,36 +990,40 @@ export default function Orders() {
                   {isAdmin && isCol('systemId') && <td className="py-2.5 px-4 font-mono text-xs text-muted-foreground">{order.systemId ?? '—'}</td>}
                   {isCol('id') && (
                     <td className="py-2.5 px-4 font-medium text-xs" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!isAdmin) {
-                            handleSellerOrderIdClick(order);
-                            return;
-                          }
-                          navigator.clipboard.writeText(order.id);
-                          setCopiedId(order.id);
-                          toast.success("Order ID copied");
-                          setTimeout(() => setCopiedId(prev => prev === order.id ? null : prev), 1500);
-                        }}
-                        className={cn(
-                          "inline-flex items-center gap-1 transition-colors group",
-                          isAdmin
-                            ? "hover:text-primary"
-                            : "text-[hsl(210,60%,52%)] font-semibold underline underline-offset-4 decoration-[hsl(210,60%,52%)]/35 hover:decoration-[hsl(210,60%,52%)]"
-                        )}
-                        title={isAdmin ? "Click to copy" : "View tracking"}
-                      >
+                      {isAdmin || canSellerTrackOrder(order) ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!isAdmin) {
+                              handleSellerOrderIdClick(order);
+                              return;
+                            }
+                            navigator.clipboard.writeText(order.id);
+                            setCopiedId(order.id);
+                            toast.success("Order ID copied");
+                            setTimeout(() => setCopiedId(prev => prev === order.id ? null : prev), 1500);
+                          }}
+                          className={cn(
+                            "inline-flex items-center gap-1 transition-colors group",
+                            isAdmin
+                              ? "hover:text-primary"
+                              : "text-[hsl(210,60%,52%)] font-semibold underline underline-offset-4 decoration-[hsl(210,60%,52%)]/35 hover:decoration-[hsl(210,60%,52%)]"
+                          )}
+                          title={isAdmin ? "Click to copy" : "View tracking"}
+                        >
+                          <span>{order.id}</span>
+                          {!isAdmin && <Truck className="w-3.5 h-3.5" />}
+                          {isAdmin && (
+                            copiedId === order.id ? (
+                              <Check className="w-3 h-3 text-success" />
+                            ) : (
+                              <Copy className="w-3 h-3 opacity-0 group-hover:opacity-60" />
+                            )
+                          )}
+                        </button>
+                      ) : (
                         <span>{order.id}</span>
-                        {!isAdmin && <Truck className="w-3.5 h-3.5" />}
-                        {isAdmin && (
-                          copiedId === order.id ? (
-                            <Check className="w-3 h-3 text-success" />
-                          ) : (
-                            <Copy className="w-3 h-3 opacity-0 group-hover:opacity-60" />
-                          )
-                        )}
-                      </button>
+                      )}
                     </td>
                   )}
                   {isAdmin && isCol('wakilniId') && (
@@ -1164,7 +1173,7 @@ export default function Orders() {
                   type="button"
                   className={cn(
                     "inline-flex items-center gap-1 font-medium text-sm transition-colors",
-                    isAdmin
+                    isAdmin || !canSellerTrackOrder(order)
                       ? "hover:text-primary"
                       : "text-[hsl(210,60%,52%)] font-semibold underline underline-offset-4 decoration-[hsl(210,60%,52%)]/35 hover:decoration-[hsl(210,60%,52%)]"
                   )}
@@ -1172,13 +1181,13 @@ export default function Orders() {
                     e.stopPropagation();
                     if (isAdmin) {
                       navigate(`/orders/${order.id}`);
-                    } else {
+                    } else if (canSellerTrackOrder(order)) {
                       handleSellerOrderIdClick(order);
                     }
                   }}
                 >
                   {order.id}
-                  {!isAdmin && <Truck className="w-3.5 h-3.5" />}
+                  {canSellerTrackOrder(order) && <Truck className="w-3.5 h-3.5" />}
                 </button>
                 <span className="text-xs text-muted-foreground tabular-nums">{format(new Date(order.createdAt), 'dd MMM yyyy HH:mm')}</span>
               </div>
