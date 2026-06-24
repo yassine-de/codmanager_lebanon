@@ -155,6 +155,29 @@ function publicEventLabel(status?: string | null, statusCode?: string | number |
   return publicStatusLabel(mapped || "pending");
 }
 
+function buildPublicEvents(order: any, tracking: any, mappedStatus: string) {
+  const currentLabel = publicStatusLabel(mappedStatus);
+  const currentCreatedAt = mappedStatus === "delivered"
+    ? tracking.completed_on || order.delivered_at || order.wakilni_synced_at || order.updated_at || null
+    : order.wakilni_synced_at || order.updated_at || null;
+
+  const events = [
+    { label: currentLabel, created_at: currentCreatedAt },
+    ...(tracking.logs || []).map((event: any) => ({
+      label: event.label || "Status update",
+      created_at: event.created_at || null,
+    })),
+  ];
+
+  const seen = new Set<string>();
+  return events.filter((event) => {
+    const key = `${event.label}|${event.created_at || ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 async function fetchTracking(order: any) {
   const token = await getWakilniToken();
   const result: any = {
@@ -210,7 +233,7 @@ Deno.serve(async (req) => {
 
     const { data: order, error } = await supabase
       .from("orders")
-      .select("id, order_id, seller_id, delivery_status, delivered_at, wakilni_order_id, wakilni_tracking_id")
+      .select("id, order_id, seller_id, delivery_status, delivered_at, updated_at, wakilni_order_id, wakilni_tracking_id, wakilni_synced_at")
       .eq("order_id", orderId)
       .eq("seller_id", user.id)
       .maybeSingle();
@@ -229,16 +252,14 @@ Deno.serve(async (req) => {
 
     const tracking = await fetchTracking(order);
     const mappedStatus = mapDeliveryStatus(tracking.status, tracking.status_code) || order.delivery_status || "pending";
+    const events = buildPublicEvents(order, tracking, mappedStatus);
 
     return jsonResponse({
       order_id: order.order_id,
       status: publicStatusLabel(mappedStatus),
       delivery_status: mappedStatus,
       completed_on: mappedStatus === "delivered" ? (tracking.completed_on || order.delivered_at || null) : null,
-      events: (tracking.logs || []).map((event: any) => ({
-        label: event.label || "Status update",
-        created_at: event.created_at || null,
-      })),
+      events,
     });
   } catch (error) {
     const message = String(error?.message || error);
