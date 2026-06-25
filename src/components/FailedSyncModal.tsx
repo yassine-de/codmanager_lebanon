@@ -25,8 +25,10 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_id, customer_name, customer_city, orio_sync_error, updated_at, confirmation_status")
-        .eq("orio_sync_status", "failed")
+        .select("id, order_id, customer_name, customer_city, wakilni_sync_error, updated_at, confirmation_status")
+        .eq("wakilni_sync_status", "failed")
+        .eq("confirmation_status", "confirmed")
+        .eq("delivery_status", "booked")
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return data || [];
@@ -37,16 +39,10 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
 
   const [updatingCityId, setUpdatingCityId] = useState<string | null>(null);
 
-  const handleRetry = async (orderId: string, orderDbId: string) => {
+  const handleRetry = async (orderId: string) => {
     setRetryingId(orderId);
     try {
-      // Reset sync status first so the edge function doesn't skip it
-      await supabase
-        .from("orders")
-        .update({ orio_sync_status: "pending", orio_sync_error: null })
-        .eq("order_id", orderId);
-
-      const { data, error } = await supabase.functions.invoke("orio-sync", {
+      const { data, error } = await supabase.functions.invoke("wakilni-sync", {
         body: { action: "sync-order", order_id: orderId },
       });
       if (error) throw error;
@@ -58,6 +54,8 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
       }
       queryClient.invalidateQueries({ queryKey: ["failed-sync-orders"] });
       queryClient.invalidateQueries({ queryKey: ["system-failed-syncs"] });
+      queryClient.invalidateQueries({ queryKey: ["system-stuck-pending-syncs"] });
+      queryClient.invalidateQueries({ queryKey: ["system-stale-wakilni-sync"] });
     } catch (e: any) {
       toast.error(`Retry failed: ${e.message}`);
       queryClient.invalidateQueries({ queryKey: ["failed-sync-orders"] });
@@ -77,7 +75,7 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
       toast.success(`City updated to ${newCity}`);
       queryClient.invalidateQueries({ queryKey: ["failed-sync-orders"] });
       // Auto-retry sync since the most common failure is invalid city
-      await handleRetry(orderId, orderId);
+      await handleRetry(orderId);
     } catch (e: any) {
       toast.error(`Update failed: ${e.message}`);
     } finally {
@@ -91,7 +89,7 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <AlertTriangle className="w-4 h-4 text-destructive" />
-            OR Sync Errors ({failedOrders.length})
+            Wakilni Sync Errors ({failedOrders.length})
           </DialogTitle>
         </DialogHeader>
 
@@ -143,8 +141,8 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
                         {order.confirmation_status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs text-destructive max-w-[200px] truncate" title={order.orio_sync_error || ""}>
-                      {order.orio_sync_error || "Unknown error"}
+                    <TableCell className="text-xs text-destructive max-w-[200px] truncate" title={order.wakilni_sync_error || ""}>
+                      {order.wakilni_sync_error || "Unknown error"}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {format(new Date(order.updated_at), "dd.MM.yy HH:mm")}
@@ -157,7 +155,7 @@ export default function FailedSyncModal({ open, onOpenChange }: FailedSyncModalP
                         title="Retry sync"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleRetry(order.order_id, order.order_id);
+                          handleRetry(order.order_id);
                         }}
                         disabled={retryingId === order.order_id}
                       >

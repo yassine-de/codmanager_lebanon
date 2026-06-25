@@ -57,12 +57,17 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
     return q;
   };
 
-  // Failed ORIO syncs
+  // Failed Wakilni syncs for orders that should still be actively synced.
   const { data: failedSyncCount = 0 } = useQuery({
     queryKey: ["system-failed-syncs", rangeKey],
     queryFn: async () => {
       const { count, error } = await applyRange(
-        supabase.from("orders").select("id", { count: "exact", head: true }).eq("orio_sync_status", "failed")
+        supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("wakilni_sync_status", "failed")
+          .eq("confirmation_status", "confirmed")
+          .eq("delivery_status", "booked")
       );
       if (error) throw error;
       return count || 0;
@@ -70,7 +75,7 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
     refetchInterval: 30_000,
   });
 
-  // Stuck pending syncs (confirmed+booked, no orio_order_id, pending > 1h)
+  // Stuck pending Wakilni syncs (confirmed+booked, no Wakilni tracking, pending > 1h)
   const { data: stuckPendingCount = 0 } = useQuery({
     queryKey: ["system-stuck-pending-syncs", rangeKey],
     queryFn: async () => {
@@ -81,8 +86,8 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
           .select("id", { count: "exact", head: true })
           .eq("confirmation_status", "confirmed")
           .eq("delivery_status", "booked")
-          .is("orio_order_id", null)
-          .or("orio_sync_status.is.null,orio_sync_status.eq.pending")
+          .is("wakilni_tracking_id", null)
+          .or("wakilni_sync_status.is.null,wakilni_sync_status.eq.pending,wakilni_sync_status.eq.failed")
           .lt("updated_at", oneHourAgo)
       );
       if (error) throw error;
@@ -91,19 +96,19 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
     refetchInterval: 30_000,
   });
 
-  // Stale ORIO sync — orders not synced in >30 min (excluding terminal statuses)
+  // Stale Wakilni sync — active Wakilni shipments not checked in >30 min.
   const { data: staleSyncCount = 0 } = useQuery({
-    queryKey: ["system-stale-orio-sync"],
+    queryKey: ["system-stale-wakilni-sync"],
     queryFn: async () => {
       const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const { count, error } = await supabase
         .from("orders")
         .select("id", { count: "exact", head: true })
-        .not("orio_order_id", "is", null)
-        .in("delivery_status", ["booked", "shipped", "failed_attempt", "ready_for_return"])
+        .not("wakilni_tracking_id", "is", null)
+        .in("delivery_status", ["booked", "shipped", "in_transit", "with_courier", "failed_attempt"])
         .gte("created_at", thirtyDaysAgo)
-        .or(`orio_synced_at.is.null,orio_synced_at.lt.${thirtyMinAgo}`);
+        .or(`wakilni_synced_at.is.null,wakilni_synced_at.lt.${thirtyMinAgo}`);
       if (error) throw error;
       return count || 0;
     },
@@ -187,8 +192,8 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
       onClick: () => setSyncModalOpen(true),
     },
     {
-      id: "stale-orio-sync",
-      label: "Stale OR Sync (>30m)",
+      id: "stale-wakilni-sync",
+      label: "Stale Wakilni Sync (>30m)",
       count: staleSyncCount,
       severity: staleSyncCount > 50 ? "error" : staleSyncCount > 10 ? "warning" : "ok",
       icon: <Activity className="w-4 h-4" />,
