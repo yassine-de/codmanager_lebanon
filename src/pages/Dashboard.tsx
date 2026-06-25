@@ -128,6 +128,35 @@ interface FinancialKPIProps {
   delay?: number;
 }
 
+const LEBANON_DELIVERY_FEE = 9.5;
+const LEBANON_COD_FEE_RATE = 0.05;
+
+interface SellerFinancialOverview {
+  totalDeliveredRevenue: number;
+  alreadyPaid: number;
+  nextPayout: number;
+  unpaidDeliveredRevenue: number;
+  openFees: number;
+  deliveryFees: number;
+  codFees: number;
+  unpaidDeliveredCount: number;
+}
+
+const emptySellerFinancialOverview: SellerFinancialOverview = {
+  totalDeliveredRevenue: 0,
+  alreadyPaid: 0,
+  nextPayout: 0,
+  unpaidDeliveredRevenue: 0,
+  openFees: 0,
+  deliveryFees: 0,
+  codFees: 0,
+  unpaidDeliveredCount: 0,
+};
+
+function readInvoiceTotal(summary: any, key: string): number {
+  return Number(summary?.totals?.[key] ?? 0);
+}
+
 function FinancialKPI({
   title, pkrAmount, percentage, percentLabel, icon: Icon, color, iconBg,
   highlight = false, delay = 0,
@@ -160,6 +189,88 @@ function FinancialKPI({
             {isDataVisible ? `${percentage}%` : <MaskedValue />}
           </span>
           {percentLabel && <p className="text-[10px] text-muted-foreground/40 mt-0.5">{isDataVisible ? percentLabel : <MaskedValue />}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MoneyText({ amount, className = "" }: { amount: number; className?: string }) {
+  const { isDataVisible } = useDataVisibility();
+  return (
+    <span className={className}>
+      {isDataVisible ? formatUSD(amount) : <MaskedValue className="gap-1" />}
+    </span>
+  );
+}
+
+function SellerFinancialHeroCard({
+  title,
+  amount,
+  subtitle,
+  icon: Icon,
+  color,
+  iconBg,
+  highlight = false,
+  delay = 0,
+}: {
+  title: string;
+  amount: number;
+  subtitle: string;
+  icon: LucideIcon;
+  color: string;
+  iconBg: string;
+  highlight?: boolean;
+  delay?: number;
+}) {
+  return (
+    <div
+      className={`rounded-xl border shadow-soft px-5 py-5 animate-slide-up bg-card ${
+        highlight ? "ring-1 ring-success/25 bg-success/[0.03]" : ""
+      }`}
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{title}</p>
+          <MoneyText amount={amount} className="block text-3xl font-bold tabular-nums tracking-tight mt-3" />
+          <p className="text-[11px] text-muted-foreground mt-2">{subtitle}</p>
+        </div>
+        <div className={`p-3 rounded-xl ${iconBg} shrink-0`}>
+          <Icon className={`w-5 h-5 ${color}`} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SellerFinancialMiniCard({
+  title,
+  amount,
+  subtitle,
+  icon: Icon,
+  color,
+  iconBg,
+  delay = 0,
+}: {
+  title: string;
+  amount: number;
+  subtitle: string;
+  icon: LucideIcon;
+  color: string;
+  iconBg: string;
+  delay?: number;
+}) {
+  return (
+    <div className="rounded-xl border shadow-soft px-4 py-4 animate-slide-up bg-card" style={{ animationDelay: `${delay}ms` }}>
+      <div className="flex items-start gap-3">
+        <div className={`p-2.5 rounded-xl ${iconBg} shrink-0`}>
+          <Icon className={`w-4 h-4 ${color}`} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{title}</p>
+          <MoneyText amount={amount} className="block text-xl font-bold tabular-nums mt-2" />
+          <p className="text-[10px] text-muted-foreground mt-1">{subtitle}</p>
         </div>
       </div>
     </div>
@@ -377,6 +488,77 @@ export default function Dashboard() {
     };
   }, [fuRows]);
 
+  const { data: sellerFinancial = emptySellerFinancialOverview } = useQuery({
+    queryKey: ["seller-financial-overview", authUser?.id],
+    queryFn: async (): Promise<SellerFinancialOverview> => {
+      if (!authUser?.id) return emptySellerFinancialOverview;
+
+      const [{ data: deliveredOrders, error: ordersError }, { data: invoices, error: invoicesError }] = await Promise.all([
+        supabase
+          .from("orders")
+          .select("id, total_amount, price, quantity, delivery_status")
+          .eq("seller_id", authUser.id)
+          .in("delivery_status", ["delivered", "paid"]),
+        supabase
+          .from("invoices")
+          .select("id, status, created_at")
+          .eq("seller_id", authUser.id)
+          .in("status", ["open", "ready", "paid"])
+          .order("created_at", { ascending: true }),
+      ]);
+
+      if (ordersError) throw ordersError;
+      if (invoicesError) throw invoicesError;
+
+      const totalDeliveredRevenue = (deliveredOrders || []).reduce((sum: number, order: any) => {
+        return sum + Number(order.total_amount ?? Number(order.price || 0) * Number(order.quantity || 1) ?? 0);
+      }, 0);
+
+      const summaries = await Promise.all(
+        (invoices || []).map(async (invoice: any) => {
+          const { data, error } = await supabase.rpc("get_invoice_summary", { p_invoice_id: invoice.id });
+          if (error) throw error;
+          return { invoice, summary: data as any };
+        })
+      );
+
+      const paidSummaries = summaries.filter(({ invoice }) => invoice.status === "paid");
+      const unpaidSummaries = summaries.filter(({ invoice }) => invoice.status === "open" || invoice.status === "ready");
+
+      const alreadyPaid = paidSummaries.reduce((sum, { summary }) => sum + readInvoiceTotal(summary, "net_payable"), 0);
+      const nextPayout = unpaidSummaries.reduce((sum, { summary }) => sum + readInvoiceTotal(summary, "net_payable"), 0);
+      const unpaidDeliveredRevenue = unpaidSummaries.reduce(
+        (sum, { summary }) => sum + readInvoiceTotal(summary, "delivered_revenue_usd"),
+        0
+      );
+      const deliveryFees = unpaidSummaries.reduce((sum, { summary }) => sum + readInvoiceTotal(summary, "shipping_fees"), 0);
+      const codFees = unpaidSummaries.reduce((sum, { summary }) => sum + readInvoiceTotal(summary, "cod_fees"), 0);
+      const openFees = unpaidSummaries.reduce((sum, { summary }) => {
+        return sum
+          + readInvoiceTotal(summary, "shipping_fees")
+          + readInvoiceTotal(summary, "cod_fees")
+          + readInvoiceTotal(summary, "call_center_fees");
+      }, 0);
+      const unpaidDeliveredCount = unpaidSummaries.reduce(
+        (sum, { summary }) => sum + Number(summary?.counts?.delivered_count ?? 0),
+        0
+      );
+
+      return {
+        totalDeliveredRevenue,
+        alreadyPaid,
+        nextPayout,
+        unpaidDeliveredRevenue,
+        openFees,
+        deliveryFees,
+        codFees,
+        unpaidDeliveredCount,
+      };
+    },
+    enabled: isSeller && !!authUser?.id,
+    refetchInterval: 60_000,
+  });
+
   if (isLoading) {
     return <DashboardSkeleton />;
   }
@@ -491,18 +673,89 @@ export default function Dashboard() {
         {/* ═══════════ FINANCIAL OVERVIEW ═══════════ */}
         <div className="space-y-3">
           <SectionHeader icon={DollarSign} title="Financial Overview" color="text-primary" iconBg="bg-primary/10" delay={160} />
-          <div className="mb-2 flex items-center gap-2">
-            <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md">1 USD = 290 USD</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <FinancialKPI title="Delivered Amount" pkrAmount={kpis.revenue} percentage={100}
-              percentLabel="total delivered" icon={DollarSign} color="text-foreground" iconBg="bg-muted" delay={170} />
-            <FinancialKPI title="Paid Amount" pkrAmount={kpis.paidAmount} percentage={pct(kpis.paidAmount, kpis.revenue)}
-              percentLabel="of delivered" icon={Banknote} color="text-success" iconBg="bg-success/10" delay={180} />
-            <FinancialKPI title="Pending Amount" pkrAmount={kpis.pendingAmount} percentage={pct(kpis.pendingAmount, kpis.revenue)}
-              percentLabel="of delivered" icon={Clock} color="text-warning" iconBg="bg-warning/10"
-              highlight delay={190} />
-          </div>
+          {isSeller ? (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                <SellerFinancialHeroCard
+                  title="Total Delivered Revenue"
+                  amount={sellerFinancial.totalDeliveredRevenue}
+                  subtitle="All delivered orders before fees"
+                  icon={DollarSign}
+                  color="text-foreground"
+                  iconBg="bg-muted"
+                />
+                <SellerFinancialHeroCard
+                  title="Already Paid"
+                  amount={sellerFinancial.alreadyPaid}
+                  subtitle="Net payout from paid invoices"
+                  icon={Banknote}
+                  color="text-success"
+                  iconBg="bg-success/10"
+                />
+                <SellerFinancialHeroCard
+                  title="Next Payout"
+                  amount={sellerFinancial.nextPayout}
+                  subtitle="Open and ready invoices after fees"
+                  icon={Clock}
+                  color="text-warning"
+                  iconBg="bg-warning/10"
+                  highlight
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                <SellerFinancialMiniCard
+                  title="Open Delivered Revenue"
+                  amount={sellerFinancial.unpaidDeliveredRevenue}
+                  subtitle={`${sellerFinancial.unpaidDeliveredCount} delivered order${sellerFinancial.unpaidDeliveredCount === 1 ? "" : "s"}`}
+                  icon={PackageCheck}
+                  color="text-success"
+                  iconBg="bg-success/10"
+                />
+                <SellerFinancialMiniCard
+                  title="Open Fees"
+                  amount={sellerFinancial.openFees}
+                  subtitle="Delivery fees + COD fees"
+                  icon={Activity}
+                  color="text-destructive"
+                  iconBg="bg-destructive/10"
+                />
+                <SellerFinancialMiniCard
+                  title="Delivery Fees"
+                  amount={sellerFinancial.deliveryFees}
+                  subtitle={`${sellerFinancial.unpaidDeliveredCount} x ${formatUSD(LEBANON_DELIVERY_FEE)}`}
+                  icon={Truck}
+                  color="text-info"
+                  iconBg="bg-info/10"
+                />
+                <SellerFinancialMiniCard
+                  title="COD Fees"
+                  amount={sellerFinancial.codFees}
+                  subtitle={`${Math.round(LEBANON_COD_FEE_RATE * 100)}% of open delivered revenue`}
+                  icon={DollarSign}
+                  color="text-primary"
+                  iconBg="bg-primary/10"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Only delivered orders are included in payouts. Delivery fee is {formatUSD(LEBANON_DELIVERY_FEE)} per delivered order, COD fee is {Math.round(LEBANON_COD_FEE_RATE * 100)}%.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md">1 USD = 290 USD</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <FinancialKPI title="Delivered Amount" pkrAmount={kpis.revenue} percentage={100}
+                  percentLabel="total delivered" icon={DollarSign} color="text-foreground" iconBg="bg-muted" delay={170} />
+                <FinancialKPI title="Paid Amount" pkrAmount={kpis.paidAmount} percentage={pct(kpis.paidAmount, kpis.revenue)}
+                  percentLabel="of delivered" icon={Banknote} color="text-success" iconBg="bg-success/10" delay={180} />
+                <FinancialKPI title="Pending Amount" pkrAmount={kpis.pendingAmount} percentage={pct(kpis.pendingAmount, kpis.revenue)}
+                  percentLabel="of delivered" icon={Clock} color="text-warning" iconBg="bg-warning/10"
+                  highlight delay={190} />
+              </div>
+            </>
+          )}
         </div>
 
         {/* ═══════════ CONFIRMATION PERFORMANCE ═══════════ */}
