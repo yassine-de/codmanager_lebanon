@@ -1,17 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export interface OrioCity {
+export interface ShippingCity {
   city_id: number;
   city_name: string;
   province_id: number | null;
 }
 
-export function useOrioCities() {
+export function useShippingCities() {
   return useQuery({
     queryKey: ["orio-cities"],
     queryFn: async () => {
-      const allCities: OrioCity[] = [];
+      const allCities: ShippingCity[] = [];
       const batchSize = 1000;
       let from = 0;
       while (true) {

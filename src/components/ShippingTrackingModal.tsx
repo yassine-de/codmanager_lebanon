@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Package, MapPin, Calendar, User, DollarSign, Truck } from "lucide-react";
 
-interface OrioTrackingModalProps {
+interface ShippingTrackingModalProps {
   orioOrderId: number;
   systemId?: number | null;
   sellerId?: string | null;
@@ -29,7 +29,7 @@ interface TrackingPayload {
   detail: TrackingDetail[];
 }
 
-export default function OrioTrackingModal({ orioOrderId, systemId, sellerId, open, onClose }: OrioTrackingModalProps) {
+export default function ShippingTrackingModal({ orioOrderId, systemId, sellerId, open, onClose }: ShippingTrackingModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<TrackingPayload | null>(null);
@@ -63,12 +63,12 @@ export default function OrioTrackingModal({ orioOrderId, systemId, sellerId, ope
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <Package className="w-4 h-4" />
-            TRACK DETAIL {payload?.consigment_no ? `- ${payload.consigment_no}` : `- ORIO #${orioOrderId}`}
+            TRACK DETAIL {payload?.consigment_no ? `- ${payload.consigment_no}` : `- Shipping #${orioOrderId}`}
           </DialogTitle>
           <div className="flex items-center gap-3 mt-1 flex-wrap">
             {systemId && <span className="text-[10px] font-semibold text-muted-foreground">SYSTEM ID: <span className="text-foreground">{systemId}</span></span>}
             {sellerId && <span className="text-[10px] font-semibold text-muted-foreground">SELLER ID: <span className="text-foreground">{sellerId}</span></span>}
-            <span className="text-[10px] font-semibold text-muted-foreground">ORIO ID: <span className="text-foreground">{orioOrderId}</span></span>
+            <span className="text-[10px] font-semibold text-muted-foreground">SHIPPING ID: <span className="text-foreground">{orioOrderId}</span></span>
           </div>
         </DialogHeader>
 

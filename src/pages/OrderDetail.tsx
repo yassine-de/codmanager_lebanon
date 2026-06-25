@@ -256,12 +256,12 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      {/* ORIO Shipping - Admin only */}
+      {/* Shipping - Admin only */}
       {isDbOrder && (orioSyncStatus || orioOrderId) && authUser?.role === 'admin' && (
         <div className="bg-card rounded-lg border p-5 space-y-4 animate-slide-up" style={{ animationDelay: '200ms' }}>
           <div className="flex items-center gap-2">
             <Truck className="w-4 h-4 text-primary" />
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">ORIO Shipping</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Shipping Sync</h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="rounded-lg border bg-muted/30 p-3">
@@ -276,7 +276,7 @@ export default function OrderDetail() {
             </div>
             {orioOrderId && (
               <div className="rounded-lg border bg-muted/30 p-3">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">ORIO Order ID</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Shipping Order ID</p>
                 <p className="text-sm font-semibold mt-0.5 tabular-nums">{orioOrderId}</p>
               </div>
             )}

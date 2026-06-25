@@ -222,7 +222,7 @@ const Integrations = () => {
 
   const saveApiConfig = async () => {
     if (!features.orioSync) {
-      toast.error("ORIO sync is disabled for Lebanon");
+      toast.error("Legacy shipping sync is disabled for Lebanon");
       return;
     }
 
@@ -456,7 +456,7 @@ const Integrations = () => {
               </div>
               <div>
                 <p className="text-sm font-semibold">API Configuration</p>
-                <p className="text-xs text-muted-foreground">ORIO OMS API settings for order fulfillment</p>
+                <p className="text-xs text-muted-foreground">Shipping API settings for order fulfillment</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -468,7 +468,7 @@ const Integrations = () => {
                 await supabase
                   .from("app_settings")
                   .upsert({ key: "orio_api_enabled", value: String(checked), updated_at: now }, { onConflict: "key" });
-                toast.success(checked ? "ORIO API activated" : "ORIO API deactivated");
+                toast.success(checked ? "Shipping API activated" : "Shipping API deactivated");
               }} />
             </div>
           </div>

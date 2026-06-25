@@ -109,7 +109,7 @@ export default function SystemHealth() {
     },
   });
 
-  const { data: totalOrioOrders = 0 } = useQuery({
+  const { data: totalShippingOrders = 0 } = useQuery({
     queryKey: ["system-health-total-orio"],
     queryFn: async () => {
       const { count } = await supabase
@@ -166,8 +166,8 @@ export default function SystemHealth() {
 
   // ---- Derived ----
   const isLoading = loadingSyncErrors || loadingUnmapped || loadingPending;
-  const healthScore = totalOrioOrders > 0
-    ? Math.round(((totalOrioOrders - syncErrors.length) / totalOrioOrders) * 100)
+  const healthScore = totalShippingOrders > 0
+    ? Math.round(((totalShippingOrders - syncErrors.length) / totalShippingOrders) * 100)
     : 100;
 
   return (
@@ -195,7 +195,7 @@ export default function SystemHealth() {
           color={healthScore >= 95 ? "text-emerald-600" : healthScore >= 80 ? "text-amber-500" : "text-red-500"}
         />
         <KpiCard icon={<Database className="h-4 w-4" />} label="Total Orders" value={String(totalOrders)} />
-        <KpiCard icon={<Truck className="h-4 w-4" />} label="ORIO Synced" value={String(totalOrioOrders)} />
+        <KpiCard icon={<Truck className="h-4 w-4" />} label="Shipping Synced" value={String(totalShippingOrders)} />
         <KpiCard
           icon={<XCircle className="h-4 w-4" />}
           label="Sync Errors"
@@ -219,7 +219,7 @@ export default function SystemHealth() {
       {/* Service Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <ServiceCard
-          title="ORIO API"
+          title="Shipping API"
           status={orioEnabled ? "operational" : "disabled"}
           detail={orioEnabled ? "Integration active" : "Integration disabled"}
         />
@@ -243,7 +243,7 @@ export default function SystemHealth() {
             {syncErrors.length > 0 && <Badge variant="destructive" className="ml-1 text-[9px] px-1.5 py-0">{syncErrors.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="unmapped" className="text-xs gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5" /> Booked w/ ORIO Status
+            <AlertTriangle className="h-3.5 w-3.5" /> Booked w/ Shipping Status
             {unmappedOrders.length > 0 && <Badge variant="warning" className="ml-1 text-[9px] px-1.5 py-0">{unmappedOrders.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="pending" className="text-xs gap-1.5">
@@ -267,8 +267,8 @@ export default function SystemHealth() {
           <IssueTable
             orders={unmappedOrders}
             loading={loadingUnmapped}
-            emptyMessage="No orders stuck in booked status with an ORIO shipping status."
-            showOrioStatus
+            emptyMessage="No orders stuck in booked status with a shipping status."
+            showShippingStatus
           />
         </TabsContent>
 
@@ -328,12 +328,12 @@ function ServiceCard({ title, status, detail }: {
   );
 }
 
-function IssueTable({ orders, loading, emptyMessage, showError, showOrioStatus, retrying, onRetry }: {
+function IssueTable({ orders, loading, emptyMessage, showError, showShippingStatus, retrying, onRetry }: {
   orders: SyncIssueOrder[];
   loading: boolean;
   emptyMessage: string;
   showError?: boolean;
-  showOrioStatus?: boolean;
+  showShippingStatus?: boolean;
   retrying?: string | null;
   onRetry?: (o: SyncIssueOrder) => void;
 }) {
@@ -367,7 +367,7 @@ function IssueTable({ orders, loading, emptyMessage, showError, showOrioStatus, 
                 <TableHead className="text-[11px] font-semibold h-9">System ID</TableHead>
                 <TableHead className="text-[11px] font-semibold h-9">Customer</TableHead>
                 <TableHead className="text-[11px] font-semibold h-9">Delivery Status</TableHead>
-                {showOrioStatus && <TableHead className="text-[11px] font-semibold h-9">ORIO Status</TableHead>}
+                {showShippingStatus && <TableHead className="text-[11px] font-semibold h-9">Shipping Status</TableHead>}
                 {showError && <TableHead className="text-[11px] font-semibold h-9">Error</TableHead>}
                 <TableHead className="text-[11px] font-semibold h-9">Date</TableHead>
                 {onRetry && <TableHead className="text-[11px] font-semibold h-9 text-right">Action</TableHead>}
@@ -382,7 +382,7 @@ function IssueTable({ orders, loading, emptyMessage, showError, showOrioStatus, 
                   <TableCell className="py-2">
                     <Badge variant="secondary" className="text-[10px]">{o.delivery_status || "—"}</Badge>
                   </TableCell>
-                  {showOrioStatus && (
+                  {showShippingStatus && (
                     <TableCell className="py-2">
                       <Badge variant="outline" className="text-[10px]">{o.orio_shipping_status || "—"}</Badge>
                     </TableCell>

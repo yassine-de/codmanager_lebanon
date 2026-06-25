@@ -313,7 +313,7 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
                     Delivery
                     {order.orioShippingStatus && (
                       <span className="ml-2 text-[10px] text-muted-foreground font-normal">
-                        (auto from ORIO Sub Status)
+                        (auto from shipping sub status)
                       </span>
                     )}
                   </Label>

@@ -71,7 +71,7 @@ const startOfYesterday = () => startOfDay(subDaysPKT(new Date(), 1));
 const endOfYesterday   = () => endOfDay(subDaysPKT(new Date(), 1));
 import type { DateRange } from "react-day-picker";
 import OrderHistoryModal from "@/components/OrderHistoryModal";
-import OrioTrackingModal from "@/components/OrioTrackingModal";
+import ShippingTrackingModal from "@/components/ShippingTrackingModal";
 import {
   DndContext,
   closestCenter,
@@ -170,7 +170,7 @@ interface FollowUpRow {
   fu_no_answer_count: number;
 }
 
-// Detect courier from ORIO consignment number prefix
+// Detect courier from consignment number prefix
 function detectCourier(consignmentNo: string | null): string | null {
   if (!consignmentNo) return null;
   const cn = consignmentNo.toUpperCase().trim();
@@ -238,7 +238,7 @@ type ColumnKey =
 
 const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "order_id",  label: "Order ID"   },
-  { key: "orio_id",   label: "ORIO ID"    },
+  { key: "orio_id",   label: "Shipping ID" },
   { key: "customer",  label: "Customer"   },
   { key: "phone",     label: "Phone"      },
   { key: "city",      label: "City"       },
@@ -867,7 +867,7 @@ export default function FollowUps() {
                         <div>
                           <p className="text-sm font-semibold">No orders found</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {activeFilterCount > 0 ? "Try adjusting your filters" : "Orders appear here once shipped to ORIO"}
+                            {activeFilterCount > 0 ? "Try adjusting your filters" : "Orders appear here once shipped"}
                           </p>
                         </div>
                         {activeFilterCount > 0 && (
@@ -914,7 +914,7 @@ export default function FollowUps() {
         )}
 
         {trackingTarget && (
-          <OrioTrackingModal
+          <ShippingTrackingModal
             orioOrderId={trackingTarget.orioId}
             systemId={null}
             sellerId={trackingTarget.sellerId}
@@ -1499,7 +1499,7 @@ function renderCell(
             target="_blank"
             rel="noopener noreferrer"
             className="text-muted-foreground/40 hover:text-[hsl(210,60%,52%)] transition-colors"
-            title="Open in Orio OMS"
+            title="Open shipping order"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>

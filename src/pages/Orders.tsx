@@ -83,7 +83,7 @@ const deliveryConfig: Record<DeliveryStatus, { label: string; cls: string }> = {
   return: { label: 'Return', cls: 'bg-[hsl(340,65%,52%)]/12 text-[hsl(340,65%,52%)] border-[hsl(340,65%,52%)]/20' },
 };
 
-// Pretty label for ORIO sub-status (kept verbatim from API)
+// Pretty label for shipping sub-status (kept verbatim from API)
 const subStatusLabel = (raw?: string | null) => {
   if (!raw) return null;
   return raw.replace(/\b\w/g, (c) => c.toUpperCase());
@@ -803,7 +803,7 @@ export default function Orders() {
                 className="w-full"
               />
             </div>
-            {/* Sub Status (ORIO) - admin only */}
+            {/* Sub Status - admin only */}
             {isAdmin && (
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Sub Status</label>
