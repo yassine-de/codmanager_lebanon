@@ -17,6 +17,14 @@ interface StatusItem {
   onClick: () => void;
 }
 
+const WAKILNI_STATUS_SYNC_INTERVAL_MINUTES: Record<string, number> = {
+  with_courier: 15,
+  failed_attempt: 30,
+  shipped: 60,
+  in_transit: 60,
+  booked: 180,
+};
+
 const severityConfig = {
   ok: {
     dot: "bg-emerald-500",
@@ -96,21 +104,25 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
     refetchInterval: 30_000,
   });
 
-  // Stale Wakilni sync — active Wakilni shipments not checked in >30 min.
+  // Stale Wakilni sync — active Wakilni shipments that are due by their status-specific interval.
   const { data: staleSyncCount = 0 } = useQuery({
     queryKey: ["system-stale-wakilni-sync"],
     queryFn: async () => {
-      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from("orders")
-        .select("id", { count: "exact", head: true })
+        .select("id, delivery_status, wakilni_synced_at")
         .not("wakilni_tracking_id", "is", null)
-        .in("delivery_status", ["booked", "shipped", "in_transit", "with_courier", "failed_attempt"])
-        .gte("created_at", thirtyDaysAgo)
-        .or(`wakilni_synced_at.is.null,wakilni_synced_at.lt.${thirtyMinAgo}`);
+        .in("delivery_status", Object.keys(WAKILNI_STATUS_SYNC_INTERVAL_MINUTES))
+        .gte("created_at", thirtyDaysAgo);
       if (error) throw error;
-      return count || 0;
+
+      const now = Date.now();
+      return (data || []).filter((order) => {
+        if (!order.wakilni_synced_at) return true;
+        const intervalMinutes = WAKILNI_STATUS_SYNC_INTERVAL_MINUTES[order.delivery_status || ""] ?? 180;
+        return now - new Date(order.wakilni_synced_at).getTime() >= intervalMinutes * 60_000;
+      }).length;
     },
     refetchInterval: 60_000,
   });

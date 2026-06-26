@@ -508,6 +508,7 @@ function mapWakilniDeliveryStatus(status?: string | null, statusCode?: string | 
 }
 
 const ACTIVE_WAKILNI_STATUSES = ["pending", "booked", "shipped", "in_transit", "with_courier", "failed_attempt"];
+const STATUS_SYNC_CRON_GRACE_MS = 60_000;
 const STATUS_SYNC_INTERVAL_MINUTES: Record<string, number> = {
   with_courier: 15,
   failed_attempt: 30,
@@ -693,7 +694,7 @@ async function syncActiveStatuses(supabase: ReturnType<typeof createClient>, man
 
   if (!manual && lastRunAt && !Number.isNaN(lastRunAt.getTime())) {
     const nextRunAt = new Date(lastRunAt.getTime() + intervalMinutes * 60_000);
-    if (now < nextRunAt) {
+    if (now.getTime() + STATUS_SYNC_CRON_GRACE_MS < nextRunAt.getTime()) {
       return {
         skipped: true,
         reason: "Status sync interval not reached",
