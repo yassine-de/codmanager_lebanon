@@ -516,7 +516,7 @@ export default function Dashboard() {
     const shippingCost = deliveredCount * ADMIN_SHIPPING_COST_PER_ORDER;
     const codFees = deliveredRevenue * ADMIN_COD_FEE_RATE;
     const sourcingProfit = adminSourcingProfit.totalProfit;
-    const netProfit = deliveredRevenue + sourcingProfit - shippingCost - codFees;
+    const netProfit = shippingCost + codFees + sourcingProfit;
 
     return {
       deliveredRevenue,
@@ -812,7 +812,7 @@ export default function Dashboard() {
                 <SellerFinancialHeroCard
                   title="Net Profit"
                   amount={adminFinancial.netProfit}
-                  subtitle="Delivered revenue + sourcing profit after costs"
+                  subtitle="Shipping profit + COD fees + sourcing profit"
                   icon={TrendingUp}
                   color="text-success"
                   iconBg="bg-success/10"
@@ -840,7 +840,7 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <SellerFinancialMiniCard
-                  title="Shipping Cost"
+                  title="Shipping Profit"
                   amount={adminFinancial.shippingCost}
                   subtitle={`${adminFinancial.deliveredCount} x ${formatUSD(ADMIN_SHIPPING_COST_PER_ORDER)}`}
                   icon={Truck}
@@ -859,7 +859,7 @@ export default function Dashboard() {
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Admin profit uses {formatUSD(ADMIN_SHIPPING_COST_PER_ORDER)} shipping cost per delivered order and {Math.round(ADMIN_COD_FEE_RATE * 100)}% COD fees. Sourcing profit is seller price minus landed price for validated sourcing requests.
+                Admin profit uses {formatUSD(ADMIN_SHIPPING_COST_PER_ORDER)} per delivered order plus {Math.round(ADMIN_COD_FEE_RATE * 100)}% COD fees from delivered revenue. Sourcing profit is seller price minus landed price for validated sourcing requests.
               </p>
             </>
           )}
