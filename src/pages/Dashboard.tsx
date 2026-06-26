@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { DatePresetFilter, type DatePresetValue, getDateRangeFromPreset } from "@/components/DatePresetFilter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { formatPKT as format } from "@/lib/timezone";
+import { endOfDayPKT, formatPKT as format, startOfDayPKT } from "@/lib/timezone";
 import type { LucideIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -130,6 +130,8 @@ interface FinancialKPIProps {
 
 const LEBANON_DELIVERY_FEE = 9.5;
 const LEBANON_COD_FEE_RATE = 0.05;
+const ADMIN_SHIPPING_COST_PER_ORDER = 6;
+const ADMIN_COD_FEE_RATE = 0.02;
 
 interface SellerFinancialOverview {
   totalDeliveredRevenue: number;
@@ -141,6 +143,16 @@ interface SellerFinancialOverview {
   codFees: number;
   unpaidDeliveredCount: number;
 }
+
+interface AdminSourcingProfit {
+  totalProfit: number;
+  count: number;
+}
+
+const emptyAdminSourcingProfit: AdminSourcingProfit = {
+  totalProfit: 0,
+  count: 0,
+};
 
 const emptySellerFinancialOverview: SellerFinancialOverview = {
   totalDeliveredRevenue: 0,
@@ -463,6 +475,60 @@ export default function Dashboard() {
 
   const pct = (val: number, base: number) => base > 0 ? Math.round((val / base) * 100) : 0;
 
+  const dashboardDateRange = useMemo(() => {
+    if (!dateRange?.from) return null;
+    const from = startOfDayPKT(dateRange.from);
+    const to = dateRange.to ? endOfDayPKT(dateRange.to) : endOfDayPKT(dateRange.from);
+    return { from: from.toISOString(), to: to.toISOString() };
+  }, [dateRange]);
+
+  const { data: adminSourcingProfit = emptyAdminSourcingProfit } = useQuery({
+    queryKey: ["admin-dashboard-sourcing-profit", dashboardDateRange?.from, dashboardDateRange?.to],
+    queryFn: async (): Promise<AdminSourcingProfit> => {
+      let query = supabase
+        .from("sourcing_requests")
+        .select("id, quantity, landed_price, seller_price, seller_validated, created_at")
+        .eq("seller_validated", true);
+
+      if (dashboardDateRange) {
+        query = query.gte("created_at", dashboardDateRange.from).lte("created_at", dashboardDateRange.to);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const totalProfit = (data || []).reduce((sum: number, request: any) => {
+        const quantity = Number(request.quantity || 0);
+        const sellerPrice = Number(request.seller_price || 0);
+        const landedPrice = Number(request.landed_price || 0);
+        return sum + (sellerPrice - landedPrice) * quantity;
+      }, 0);
+
+      return { totalProfit, count: data?.length || 0 };
+    },
+    enabled: !isSeller,
+    refetchInterval: 60_000,
+  });
+
+  const adminFinancial = useMemo(() => {
+    const deliveredRevenue = Number(kpis.revenue || 0);
+    const deliveredCount = Number(kpis.delivered || 0);
+    const shippingCost = deliveredCount * ADMIN_SHIPPING_COST_PER_ORDER;
+    const codFees = deliveredRevenue * ADMIN_COD_FEE_RATE;
+    const sourcingProfit = adminSourcingProfit.totalProfit;
+    const netProfit = deliveredRevenue + sourcingProfit - shippingCost - codFees;
+
+    return {
+      deliveredRevenue,
+      deliveredCount,
+      shippingCost,
+      codFees,
+      sourcingProfit,
+      sourcingCount: adminSourcingProfit.count,
+      netProfit,
+    };
+  }, [adminSourcingProfit, kpis.delivered, kpis.revenue]);
+
   // ── Follow-Up KPIs (admin only) ──
   const { data: fuRows = [] } = useQuery({
     queryKey: ["dashboard-follow-ups-kpis"],
@@ -742,18 +808,59 @@ export default function Dashboard() {
             </>
           ) : (
             <>
-              <div className="mb-2 flex items-center gap-2">
-                <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md">1 USD = 290 USD</span>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                <SellerFinancialHeroCard
+                  title="Net Profit"
+                  amount={adminFinancial.netProfit}
+                  subtitle="Delivered revenue + sourcing profit after costs"
+                  icon={TrendingUp}
+                  color="text-success"
+                  iconBg="bg-success/10"
+                  highlight
+                  delay={170}
+                />
+                <SellerFinancialHeroCard
+                  title="Delivered Revenue"
+                  amount={adminFinancial.deliveredRevenue}
+                  subtitle={`${adminFinancial.deliveredCount} delivered order${adminFinancial.deliveredCount === 1 ? "" : "s"}`}
+                  icon={DollarSign}
+                  color="text-foreground"
+                  iconBg="bg-muted"
+                  delay={180}
+                />
+                <SellerFinancialHeroCard
+                  title="Sourcing Profit"
+                  amount={adminFinancial.sourcingProfit}
+                  subtitle={`${adminFinancial.sourcingCount} validated sourcing request${adminFinancial.sourcingCount === 1 ? "" : "s"}`}
+                  icon={Package}
+                  color="text-info"
+                  iconBg="bg-info/10"
+                  delay={190}
+                />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <FinancialKPI title="Delivered Amount" pkrAmount={kpis.revenue} percentage={100}
-                  percentLabel="total delivered" icon={DollarSign} color="text-foreground" iconBg="bg-muted" delay={170} />
-                <FinancialKPI title="Paid Amount" pkrAmount={kpis.paidAmount} percentage={pct(kpis.paidAmount, kpis.revenue)}
-                  percentLabel="of delivered" icon={Banknote} color="text-success" iconBg="bg-success/10" delay={180} />
-                <FinancialKPI title="Pending Amount" pkrAmount={kpis.pendingAmount} percentage={pct(kpis.pendingAmount, kpis.revenue)}
-                  percentLabel="of delivered" icon={Clock} color="text-warning" iconBg="bg-warning/10"
-                  highlight delay={190} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SellerFinancialMiniCard
+                  title="Shipping Cost"
+                  amount={adminFinancial.shippingCost}
+                  subtitle={`${adminFinancial.deliveredCount} x ${formatUSD(ADMIN_SHIPPING_COST_PER_ORDER)}`}
+                  icon={Truck}
+                  color="text-destructive"
+                  iconBg="bg-destructive/10"
+                  delay={200}
+                />
+                <SellerFinancialMiniCard
+                  title="COD Fees"
+                  amount={adminFinancial.codFees}
+                  subtitle={`${Math.round(ADMIN_COD_FEE_RATE * 100)}% of delivered revenue`}
+                  icon={Banknote}
+                  color="text-warning"
+                  iconBg="bg-warning/10"
+                  delay={210}
+                />
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                Admin profit uses {formatUSD(ADMIN_SHIPPING_COST_PER_ORDER)} shipping cost per delivered order and {Math.round(ADMIN_COD_FEE_RATE * 100)}% COD fees. Sourcing profit is seller price minus landed price for validated sourcing requests.
+              </p>
             </>
           )}
         </div>
