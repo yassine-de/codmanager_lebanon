@@ -131,7 +131,8 @@ interface FinancialKPIProps {
 const LEBANON_DELIVERY_FEE = 9.5;
 const LEBANON_COD_FEE_RATE = 0.05;
 const LEBANON_WAKILNI_DELIVERED_COST = 4;
-const LEBANON_SHIPPED_HANDLING_COST = 0.7;
+const LEBANON_WAKILNI_FULFILLMENT_COST = 0.5;
+const LEBANON_PACKAGING_COST = 0.2;
 const LEBANON_MONTHLY_CALL_CENTER_COST = 400;
 const LEBANON_SHIPPED_COST_STATUSES = new Set([
   "booked",
@@ -174,7 +175,8 @@ interface AdminFinancialOverview {
   codRevenue: number;
   sourcingProfit: number;
   wakilniCost: number;
-  shippedHandlingCost: number;
+  fulfillmentCost: number;
+  packagingCost: number;
   callCenterCost: number;
   totalCost: number;
   netProfit: number;
@@ -187,7 +189,8 @@ const emptyAdminFinancialOverview: AdminFinancialOverview = {
   codRevenue: 0,
   sourcingProfit: 0,
   wakilniCost: 0,
-  shippedHandlingCost: 0,
+  fulfillmentCost: 0,
+  packagingCost: 0,
   callCenterCost: 0,
   totalCost: 0,
   netProfit: 0,
@@ -637,7 +640,8 @@ export default function Dashboard() {
     const codRevenue = kpis.revenue * LEBANON_COD_FEE_RATE;
     const shippedCostCount = orders.filter((order) => LEBANON_SHIPPED_COST_STATUSES.has(order.delivery_status || "")).length;
     const wakilniCost = kpis.delivered * LEBANON_WAKILNI_DELIVERED_COST;
-    const shippedHandlingCost = shippedCostCount * LEBANON_SHIPPED_HANDLING_COST;
+    const fulfillmentCost = shippedCostCount * LEBANON_WAKILNI_FULFILLMENT_COST;
+    const packagingCost = shippedCostCount * LEBANON_PACKAGING_COST;
     const sourcingProfit = sourcingProfitRows.reduce((sum: number, row: any) => {
       return sum + (Number(row.seller_price || 0) - Number(row.landed_price || 0)) * Number(row.quantity || 0);
     }, 0);
@@ -669,7 +673,7 @@ export default function Dashboard() {
     const hasActivity = deliveryRevenue > 0 || codRevenue > 0 || sourcingProfit !== 0 || shippedCostCount > 0;
     const callCenterMonths = hasActivity ? Math.max(1, activeMonthKeys.size) : 0;
     const callCenterCost = callCenterMonths * LEBANON_MONTHLY_CALL_CENTER_COST;
-    const totalCost = wakilniCost + shippedHandlingCost + callCenterCost;
+    const totalCost = wakilniCost + fulfillmentCost + packagingCost + callCenterCost;
     const netProfit = deliveryRevenue + codRevenue + sourcingProfit - totalCost;
 
     return {
@@ -677,7 +681,8 @@ export default function Dashboard() {
       codRevenue,
       sourcingProfit,
       wakilniCost,
-      shippedHandlingCost,
+      fulfillmentCost,
+      packagingCost,
       callCenterCost,
       totalCost,
       netProfit,
@@ -890,13 +895,13 @@ export default function Dashboard() {
                 <SellerFinancialHeroCard
                   title="Operating Costs"
                   amount={adminFinancial.totalCost}
-                  subtitle="Wakilni, shipped handling, and call center"
+                  subtitle="Wakilni, fulfilment, packaging, and call center"
                   icon={Activity}
                   color="text-destructive"
                   iconBg="bg-destructive/10"
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                 <SellerFinancialMiniCard
                   title="Delivery Revenue"
                   amount={adminFinancial.deliveryRevenue}
@@ -930,10 +935,18 @@ export default function Dashboard() {
                   iconBg="bg-destructive/10"
                 />
                 <SellerFinancialMiniCard
-                  title="Shipped Handling Cost"
-                  amount={adminFinancial.shippedHandlingCost}
-                  subtitle={`${adminFinancial.shippedCostCount} shipped x ${formatUSD(LEBANON_SHIPPED_HANDLING_COST)}`}
+                  title="Fulfilment Cost"
+                  amount={adminFinancial.fulfillmentCost}
+                  subtitle={`${adminFinancial.shippedCostCount} orders x ${formatUSD(LEBANON_WAKILNI_FULFILLMENT_COST)}`}
                   icon={Navigation}
+                  color="text-warning"
+                  iconBg="bg-warning/10"
+                />
+                <SellerFinancialMiniCard
+                  title="Packaging Cost"
+                  amount={adminFinancial.packagingCost}
+                  subtitle={`${adminFinancial.shippedCostCount} orders x ${formatUSD(LEBANON_PACKAGING_COST)}`}
+                  icon={PackageCheck}
                   color="text-warning"
                   iconBg="bg-warning/10"
                 />
@@ -947,7 +960,7 @@ export default function Dashboard() {
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Admin profit is dashboard-only and not invoice-based. Formula: delivery revenue + COD fee revenue + sourcing profit - Wakilni delivered cost - shipped handling cost - monthly call center cost.
+                Admin profit is dashboard-only and not invoice-based. Formula: delivery revenue + COD fee revenue + sourcing profit - Wakilni delivered cost - fulfilment cost - packaging cost - monthly call center cost.
               </p>
             </>
           )}
