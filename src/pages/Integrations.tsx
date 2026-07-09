@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, RefreshCw, Search, Eye, ExternalLink, AlertTriangle, Loader2, Mail, Save, FileSpreadsheet, Database, Copy, Check, Globe, Key, Hash, Clock, Truck } from "lucide-react";
+import { Plus, Pencil, Trash2, RefreshCw, Search, Eye, ExternalLink, AlertTriangle, Loader2, Mail, Save, FileSpreadsheet, Database, Copy, Check, Globe, Key, Hash, Clock, Truck, Warehouse, PackageCheck } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -75,6 +75,9 @@ const Integrations = () => {
   const [wakilniLastStatusSync, setWakilniLastStatusSync] = useState("");
   const [wakilniStatusSaving, setWakilniStatusSaving] = useState(false);
   const [wakilniStatusSyncing, setWakilniStatusSyncing] = useState(false);
+  const [packagingCost, setPackagingCost] = useState("0.25");
+  const [warehouseRentalMonthly, setWarehouseRentalMonthly] = useState("0");
+  const [financeCostsSaving, setFinanceCostsSaving] = useState(false);
 
   // Service account email
   const [serviceEmail, setServiceEmail] = useState("");
@@ -174,6 +177,43 @@ const Integrations = () => {
       toast.success("Wakilni status interval saved");
     }
     setWakilniStatusSaving(false);
+  };
+
+  const fetchFinanceCostSettings = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("key, value")
+      .in("key", ["lebanon_packaging_cost_usd", "lebanon_warehouse_rental_monthly_usd"]);
+
+    data?.forEach((d) => {
+      if (d.key === "lebanon_packaging_cost_usd") setPackagingCost(d.value || "0.25");
+      if (d.key === "lebanon_warehouse_rental_monthly_usd") setWarehouseRentalMonthly(d.value || "0");
+    });
+  };
+
+  const saveFinanceCostSettings = async () => {
+    const packaging = Math.max(0, Number(packagingCost) || 0);
+    const warehouseRental = Math.max(0, Number(warehouseRentalMonthly) || 0);
+    setFinanceCostsSaving(true);
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("app_settings")
+      .upsert(
+        [
+          { key: "lebanon_packaging_cost_usd", value: String(packaging), updated_at: now },
+          { key: "lebanon_warehouse_rental_monthly_usd", value: String(warehouseRental), updated_at: now },
+        ],
+        { onConflict: "key" }
+      );
+
+    if (error) {
+      toast.error("Error saving finance costs");
+    } else {
+      setPackagingCost(String(packaging));
+      setWarehouseRentalMonthly(String(warehouseRental));
+      toast.success("Finance costs saved");
+    }
+    setFinanceCostsSaving(false);
   };
 
   const triggerWakilniStatusSync = async () => {
@@ -316,6 +356,7 @@ const Integrations = () => {
     fetchServiceEmail();
     fetchSheetImportSettings();
     fetchWakilniStatusSettings();
+    fetchFinanceCostSettings();
     if (features.orioSync) {
       fetchApiConfig();
     } else {
@@ -637,6 +678,52 @@ const Integrations = () => {
           </Button>
           <Button size="sm" className="h-9 text-xs gap-1.5" onClick={saveWakilniStatusSettings} disabled={wakilniStatusSaving}>
             {wakilniStatusSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+            Save
+          </Button>
+        </div>
+      </div>
+
+      <div className="bg-card border rounded-xl p-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="bg-primary/10 rounded-lg p-2">
+            <Warehouse className="w-4 h-4 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs font-semibold">Lebanon Finance Costs</p>
+            <p className="text-xs text-muted-foreground">
+              Used only for the admin profit dashboard. Seller invoices are not changed by these values.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="space-y-1.5">
+            <Label className="text-xs flex items-center gap-1.5">
+              <PackageCheck className="w-3 h-3" /> Packaging per order (USD)
+            </Label>
+            <Input
+              className="h-9 w-[180px] text-xs font-mono"
+              type="number"
+              min="0"
+              step="0.01"
+              value={packagingCost}
+              onChange={(e) => setPackagingCost(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs flex items-center gap-1.5">
+              <Warehouse className="w-3 h-3" /> Warehouse rental monthly (USD)
+            </Label>
+            <Input
+              className="h-9 w-[210px] text-xs font-mono"
+              type="number"
+              min="0"
+              step="0.01"
+              value={warehouseRentalMonthly}
+              onChange={(e) => setWarehouseRentalMonthly(e.target.value)}
+            />
+          </div>
+          <Button size="sm" className="h-9 text-xs gap-1.5" onClick={saveFinanceCostSettings} disabled={financeCostsSaving}>
+            {financeCostsSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
             Save
           </Button>
         </div>

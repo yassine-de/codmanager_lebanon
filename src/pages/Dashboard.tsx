@@ -132,8 +132,9 @@ const LEBANON_DELIVERY_FEE = 9.5;
 const LEBANON_COD_FEE_RATE = 0.05;
 const LEBANON_WAKILNI_DELIVERED_COST = 4;
 const LEBANON_WAKILNI_FULFILLMENT_COST = 0.5;
-const LEBANON_PACKAGING_COST = 0.2;
+const LEBANON_PACKAGING_COST = 0.25;
 const LEBANON_MONTHLY_CALL_CENTER_COST = 400;
+const LEBANON_WAREHOUSE_RENTAL_MONTHLY_COST = 0;
 const LEBANON_SHIPPED_COST_STATUSES = new Set([
   "booked",
   "shipped",
@@ -177,11 +178,14 @@ interface AdminFinancialOverview {
   wakilniCost: number;
   fulfillmentCost: number;
   packagingCost: number;
+  warehouseRentalCost: number;
   callCenterCost: number;
   totalCost: number;
   netProfit: number;
   shippedCostCount: number;
   callCenterMonths: number;
+  packagingCostPerOrder: number;
+  warehouseRentalMonthlyCost: number;
 }
 
 const emptyAdminFinancialOverview: AdminFinancialOverview = {
@@ -191,11 +195,14 @@ const emptyAdminFinancialOverview: AdminFinancialOverview = {
   wakilniCost: 0,
   fulfillmentCost: 0,
   packagingCost: 0,
+  warehouseRentalCost: 0,
   callCenterCost: 0,
   totalCost: 0,
   netProfit: 0,
   shippedCostCount: 0,
   callCenterMonths: 0,
+  packagingCostPerOrder: LEBANON_PACKAGING_COST,
+  warehouseRentalMonthlyCost: LEBANON_WAREHOUSE_RENTAL_MONTHLY_COST,
 };
 
 function readInvoiceTotal(summary: any, key: string): number {
@@ -633,15 +640,40 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   });
 
+  const { data: adminCostSettings = {} } = useQuery({
+    queryKey: ["dashboard-admin-cost-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select("key, value")
+        .in("key", ["lebanon_packaging_cost_usd", "lebanon_warehouse_rental_monthly_usd"]);
+
+      if (error) throw error;
+
+      return (data ?? []).reduce<Record<string, number>>((acc, row) => {
+        acc[row.key] = Number(row.value || 0);
+        return acc;
+      }, {});
+    },
+    enabled: !isSeller,
+    refetchInterval: 60_000,
+  });
+
   const adminFinancial = useMemo<AdminFinancialOverview>(() => {
     if (isSeller) return emptyAdminFinancialOverview;
 
+    const packagingCostPerOrder = Number.isFinite(adminCostSettings.lebanon_packaging_cost_usd)
+      ? adminCostSettings.lebanon_packaging_cost_usd
+      : LEBANON_PACKAGING_COST;
+    const warehouseRentalMonthlyCost = Number.isFinite(adminCostSettings.lebanon_warehouse_rental_monthly_usd)
+      ? adminCostSettings.lebanon_warehouse_rental_monthly_usd
+      : LEBANON_WAREHOUSE_RENTAL_MONTHLY_COST;
     const deliveryRevenue = kpis.delivered * LEBANON_DELIVERY_FEE;
     const codRevenue = kpis.revenue * LEBANON_COD_FEE_RATE;
     const shippedCostCount = orders.filter((order) => LEBANON_SHIPPED_COST_STATUSES.has(order.delivery_status || "")).length;
     const wakilniCost = kpis.delivered * LEBANON_WAKILNI_DELIVERED_COST;
     const fulfillmentCost = shippedCostCount * LEBANON_WAKILNI_FULFILLMENT_COST;
-    const packagingCost = shippedCostCount * LEBANON_PACKAGING_COST;
+    const packagingCost = shippedCostCount * packagingCostPerOrder;
     const sourcingProfit = sourcingProfitRows.reduce((sum: number, row: any) => {
       return sum + (Number(row.seller_price || 0) - Number(row.landed_price || 0)) * Number(row.quantity || 0);
     }, 0);
@@ -673,7 +705,8 @@ export default function Dashboard() {
     const hasActivity = deliveryRevenue > 0 || codRevenue > 0 || sourcingProfit !== 0 || shippedCostCount > 0;
     const callCenterMonths = hasActivity ? Math.max(1, activeMonthKeys.size) : 0;
     const callCenterCost = callCenterMonths * LEBANON_MONTHLY_CALL_CENTER_COST;
-    const totalCost = wakilniCost + fulfillmentCost + packagingCost + callCenterCost;
+    const warehouseRentalCost = callCenterMonths * warehouseRentalMonthlyCost;
+    const totalCost = wakilniCost + fulfillmentCost + packagingCost + warehouseRentalCost + callCenterCost;
     const netProfit = deliveryRevenue + codRevenue + sourcingProfit - totalCost;
 
     return {
@@ -683,13 +716,16 @@ export default function Dashboard() {
       wakilniCost,
       fulfillmentCost,
       packagingCost,
+      warehouseRentalCost,
       callCenterCost,
       totalCost,
       netProfit,
       shippedCostCount,
       callCenterMonths,
+      packagingCostPerOrder,
+      warehouseRentalMonthlyCost,
     };
-  }, [isSeller, kpis.delivered, kpis.revenue, orders, sourcingProfitRows, dateRange]);
+  }, [isSeller, adminCostSettings, kpis.delivered, kpis.revenue, orders, sourcingProfitRows, dateRange]);
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -895,7 +931,7 @@ export default function Dashboard() {
                 <SellerFinancialHeroCard
                   title="Operating Costs"
                   amount={adminFinancial.totalCost}
-                  subtitle="Wakilni, fulfilment, packaging, and call center"
+                  subtitle="Wakilni, fulfilment, packaging, warehouse, and call center"
                   icon={Activity}
                   color="text-destructive"
                   iconBg="bg-destructive/10"
@@ -945,10 +981,18 @@ export default function Dashboard() {
                 <SellerFinancialMiniCard
                   title="Packaging Cost"
                   amount={adminFinancial.packagingCost}
-                  subtitle={`${adminFinancial.shippedCostCount} orders x ${formatUSD(LEBANON_PACKAGING_COST)}`}
+                  subtitle={`${adminFinancial.shippedCostCount} orders x ${formatUSD(adminFinancial.packagingCostPerOrder)}`}
                   icon={PackageCheck}
                   color="text-warning"
                   iconBg="bg-warning/10"
+                />
+                <SellerFinancialMiniCard
+                  title="Warehouse Rental"
+                  amount={adminFinancial.warehouseRentalCost}
+                  subtitle={`${adminFinancial.callCenterMonths} month${adminFinancial.callCenterMonths === 1 ? "" : "s"} x ${formatUSD(adminFinancial.warehouseRentalMonthlyCost)}`}
+                  icon={Store}
+                  color="text-destructive"
+                  iconBg="bg-destructive/10"
                 />
                 <SellerFinancialMiniCard
                   title="Call Center Cost"
@@ -960,7 +1004,7 @@ export default function Dashboard() {
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Admin profit is dashboard-only and not invoice-based. Formula: delivery revenue + COD fee revenue + sourcing profit - Wakilni delivered cost - fulfilment cost - packaging cost - monthly call center cost.
+                Admin profit is dashboard-only and not invoice-based. Formula: delivery revenue + COD fee revenue + sourcing profit - Wakilni delivered cost - fulfilment cost - packaging cost - warehouse rental - monthly call center cost.
               </p>
             </>
           )}
