@@ -130,8 +130,22 @@ interface FinancialKPIProps {
 
 const LEBANON_DELIVERY_FEE = 9.5;
 const LEBANON_COD_FEE_RATE = 0.05;
-const ADMIN_SHIPPING_COST_PER_ORDER = 6;
-const ADMIN_COD_FEE_RATE = 0.02;
+const LEBANON_WAKILNI_DELIVERED_COST = 4;
+const LEBANON_SHIPPED_HANDLING_COST = 0.7;
+const LEBANON_MONTHLY_CALL_CENTER_COST = 400;
+const LEBANON_SHIPPED_COST_STATUSES = new Set([
+  "booked",
+  "shipped",
+  "in_transit",
+  "with_courier",
+  "out_for_delivery",
+  "failed_attempt",
+  "delivered",
+  "paid",
+  "returned",
+  "return",
+  "ready_for_return",
+]);
 
 interface SellerFinancialOverview {
   totalDeliveredRevenue: number;
@@ -144,16 +158,6 @@ interface SellerFinancialOverview {
   unpaidDeliveredCount: number;
 }
 
-interface AdminSourcingProfit {
-  totalProfit: number;
-  count: number;
-}
-
-const emptyAdminSourcingProfit: AdminSourcingProfit = {
-  totalProfit: 0,
-  count: 0,
-};
-
 const emptySellerFinancialOverview: SellerFinancialOverview = {
   totalDeliveredRevenue: 0,
   alreadyPaid: 0,
@@ -165,8 +169,42 @@ const emptySellerFinancialOverview: SellerFinancialOverview = {
   unpaidDeliveredCount: 0,
 };
 
+interface AdminFinancialOverview {
+  deliveryRevenue: number;
+  codRevenue: number;
+  sourcingProfit: number;
+  wakilniCost: number;
+  shippedHandlingCost: number;
+  callCenterCost: number;
+  totalCost: number;
+  netProfit: number;
+  shippedCostCount: number;
+  callCenterMonths: number;
+}
+
+const emptyAdminFinancialOverview: AdminFinancialOverview = {
+  deliveryRevenue: 0,
+  codRevenue: 0,
+  sourcingProfit: 0,
+  wakilniCost: 0,
+  shippedHandlingCost: 0,
+  callCenterCost: 0,
+  totalCost: 0,
+  netProfit: 0,
+  shippedCostCount: 0,
+  callCenterMonths: 0,
+};
+
 function readInvoiceTotal(summary: any, key: string): number {
   return Number(summary?.totals?.[key] ?? 0);
+}
+
+function monthKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function countInclusiveMonths(from: Date, to: Date): number {
+  return Math.max(1, (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()) + 1);
 }
 
 function FinancialKPI({
@@ -454,7 +492,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [datePreset, setDatePreset] = useState<DatePresetValue>("maximum");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  const { kpis, last7, totals7, topProducts, topSellers, isLoading } = useDashboardData(dateRange);
+  const { orders, kpis, last7, totals7, topProducts, topSellers, isLoading } = useDashboardData(dateRange);
 
   // Resolve seller IDs to names
   const sellerIds = useMemo(() => topSellers.map(s => s.sellerId), [topSellers]);
@@ -474,60 +512,6 @@ export default function Dashboard() {
   }, [topSellers, sellerProfiles]);
 
   const pct = (val: number, base: number) => base > 0 ? Math.round((val / base) * 100) : 0;
-
-  const dashboardDateRange = useMemo(() => {
-    if (!dateRange?.from) return null;
-    const from = startOfDayPKT(dateRange.from);
-    const to = dateRange.to ? endOfDayPKT(dateRange.to) : endOfDayPKT(dateRange.from);
-    return { from: from.toISOString(), to: to.toISOString() };
-  }, [dateRange]);
-
-  const { data: adminSourcingProfit = emptyAdminSourcingProfit } = useQuery({
-    queryKey: ["admin-dashboard-sourcing-profit", dashboardDateRange?.from, dashboardDateRange?.to],
-    queryFn: async (): Promise<AdminSourcingProfit> => {
-      let query = supabase
-        .from("sourcing_requests")
-        .select("id, quantity, landed_price, seller_price, seller_validated, created_at")
-        .eq("seller_validated", true);
-
-      if (dashboardDateRange) {
-        query = query.gte("created_at", dashboardDateRange.from).lte("created_at", dashboardDateRange.to);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const totalProfit = (data || []).reduce((sum: number, request: any) => {
-        const quantity = Number(request.quantity || 0);
-        const sellerPrice = Number(request.seller_price || 0);
-        const landedPrice = Number(request.landed_price || 0);
-        return sum + (sellerPrice - landedPrice) * quantity;
-      }, 0);
-
-      return { totalProfit, count: data?.length || 0 };
-    },
-    enabled: !isSeller,
-    refetchInterval: 60_000,
-  });
-
-  const adminFinancial = useMemo(() => {
-    const deliveredRevenue = Number(kpis.revenue || 0);
-    const deliveredCount = Number(kpis.delivered || 0);
-    const shippingCost = deliveredCount * ADMIN_SHIPPING_COST_PER_ORDER;
-    const codFees = deliveredRevenue * ADMIN_COD_FEE_RATE;
-    const sourcingProfit = adminSourcingProfit.totalProfit;
-    const netProfit = shippingCost + codFees + sourcingProfit;
-
-    return {
-      deliveredRevenue,
-      deliveredCount,
-      shippingCost,
-      codFees,
-      sourcingProfit,
-      sourcingCount: adminSourcingProfit.count,
-      netProfit,
-    };
-  }, [adminSourcingProfit, kpis.delivered, kpis.revenue]);
 
   // ── Follow-Up KPIs (admin only) ──
   const { data: fuRows = [] } = useQuery({
@@ -624,6 +608,83 @@ export default function Dashboard() {
     enabled: isSeller && !!authUser?.id,
     refetchInterval: 60_000,
   });
+
+  const { data: sourcingProfitRows = [] } = useQuery({
+    queryKey: ["dashboard-admin-sourcing-profit", dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
+    queryFn: async () => {
+      let query = supabase
+        .from("sourcing_requests")
+        .select("id, quantity, landed_price, seller_price, seller_validated, created_at")
+        .eq("seller_validated", true);
+
+      if (dateRange?.from) {
+        query = query.gte("created_at", startOfDayPKT(dateRange.from).toISOString());
+        query = query.lte("created_at", endOfDayPKT(dateRange.to ?? dateRange.from).toISOString());
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !isSeller,
+    refetchInterval: 60_000,
+  });
+
+  const adminFinancial = useMemo<AdminFinancialOverview>(() => {
+    if (isSeller) return emptyAdminFinancialOverview;
+
+    const deliveryRevenue = kpis.delivered * LEBANON_DELIVERY_FEE;
+    const codRevenue = kpis.revenue * LEBANON_COD_FEE_RATE;
+    const shippedCostCount = orders.filter((order) => LEBANON_SHIPPED_COST_STATUSES.has(order.delivery_status || "")).length;
+    const wakilniCost = kpis.delivered * LEBANON_WAKILNI_DELIVERED_COST;
+    const shippedHandlingCost = shippedCostCount * LEBANON_SHIPPED_HANDLING_COST;
+    const sourcingProfit = sourcingProfitRows.reduce((sum: number, row: any) => {
+      return sum + (Number(row.seller_price || 0) - Number(row.landed_price || 0)) * Number(row.quantity || 0);
+    }, 0);
+
+    const activeMonthKeys = new Set<string>();
+    if (dateRange?.from) {
+      const from = startOfDayPKT(dateRange.from);
+      const to = endOfDayPKT(dateRange.to ?? dateRange.from);
+      const months = countInclusiveMonths(from, to);
+      const cursor = new Date(from);
+      cursor.setDate(1);
+      for (let i = 0; i < months; i += 1) {
+        activeMonthKeys.add(monthKey(cursor));
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+    } else {
+      orders.forEach((order) => {
+        if (
+          order.delivery_status === "delivered" ||
+          order.delivery_status === "paid" ||
+          LEBANON_SHIPPED_COST_STATUSES.has(order.delivery_status || "")
+        ) {
+          activeMonthKeys.add(monthKey(new Date(order.created_at)));
+        }
+      });
+      sourcingProfitRows.forEach((row: any) => activeMonthKeys.add(monthKey(new Date(row.created_at))));
+    }
+
+    const hasActivity = deliveryRevenue > 0 || codRevenue > 0 || sourcingProfit !== 0 || shippedCostCount > 0;
+    const callCenterMonths = hasActivity ? Math.max(1, activeMonthKeys.size) : 0;
+    const callCenterCost = callCenterMonths * LEBANON_MONTHLY_CALL_CENTER_COST;
+    const totalCost = wakilniCost + shippedHandlingCost + callCenterCost;
+    const netProfit = deliveryRevenue + codRevenue + sourcingProfit - totalCost;
+
+    return {
+      deliveryRevenue,
+      codRevenue,
+      sourcingProfit,
+      wakilniCost,
+      shippedHandlingCost,
+      callCenterCost,
+      totalCost,
+      netProfit,
+      shippedCostCount,
+      callCenterMonths,
+    };
+  }, [isSeller, kpis.delivered, kpis.revenue, orders, sourcingProfitRows, dateRange]);
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -812,54 +873,81 @@ export default function Dashboard() {
                 <SellerFinancialHeroCard
                   title="Net Profit"
                   amount={adminFinancial.netProfit}
-                  subtitle="Shipping profit + COD fees + sourcing profit"
+                  subtitle="Revenue minus Lebanon operating costs"
                   icon={TrendingUp}
-                  color="text-success"
-                  iconBg="bg-success/10"
+                  color={adminFinancial.netProfit >= 0 ? "text-success" : "text-destructive"}
+                  iconBg={adminFinancial.netProfit >= 0 ? "bg-success/10" : "bg-destructive/10"}
                   highlight
-                  delay={170}
                 />
                 <SellerFinancialHeroCard
-                  title="Delivered Revenue"
-                  amount={adminFinancial.deliveredRevenue}
-                  subtitle={`${adminFinancial.deliveredCount} delivered order${adminFinancial.deliveredCount === 1 ? "" : "s"}`}
+                  title="Gross Revenue"
+                  amount={adminFinancial.deliveryRevenue + adminFinancial.codRevenue + adminFinancial.sourcingProfit}
+                  subtitle="Delivery fees + COD fees + sourcing profit"
                   icon={DollarSign}
-                  color="text-foreground"
-                  iconBg="bg-muted"
-                  delay={180}
+                  color="text-primary"
+                  iconBg="bg-primary/10"
                 />
                 <SellerFinancialHeroCard
-                  title="Sourcing Profit"
-                  amount={adminFinancial.sourcingProfit}
-                  subtitle={`${adminFinancial.sourcingCount} validated sourcing request${adminFinancial.sourcingCount === 1 ? "" : "s"}`}
-                  icon={Package}
-                  color="text-info"
-                  iconBg="bg-info/10"
-                  delay={190}
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <SellerFinancialMiniCard
-                  title="Shipping Profit"
-                  amount={adminFinancial.shippingCost}
-                  subtitle={`${adminFinancial.deliveredCount} x ${formatUSD(ADMIN_SHIPPING_COST_PER_ORDER)}`}
-                  icon={Truck}
+                  title="Operating Costs"
+                  amount={adminFinancial.totalCost}
+                  subtitle="Wakilni, shipped handling, and call center"
+                  icon={Activity}
                   color="text-destructive"
                   iconBg="bg-destructive/10"
-                  delay={200}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                <SellerFinancialMiniCard
+                  title="Delivery Revenue"
+                  amount={adminFinancial.deliveryRevenue}
+                  subtitle={`${kpis.delivered} delivered x ${formatUSD(LEBANON_DELIVERY_FEE)}`}
+                  icon={Truck}
+                  color="text-success"
+                  iconBg="bg-success/10"
                 />
                 <SellerFinancialMiniCard
-                  title="COD Fees"
-                  amount={adminFinancial.codFees}
-                  subtitle={`${Math.round(ADMIN_COD_FEE_RATE * 100)}% of delivered revenue`}
-                  icon={Banknote}
+                  title="COD Fee Revenue"
+                  amount={adminFinancial.codRevenue}
+                  subtitle={`${Math.round(LEBANON_COD_FEE_RATE * 100)}% of delivered amount`}
+                  icon={DollarSign}
+                  color="text-primary"
+                  iconBg="bg-primary/10"
+                />
+                <SellerFinancialMiniCard
+                  title="Sourcing Profit"
+                  amount={adminFinancial.sourcingProfit}
+                  subtitle="Seller price minus landed price"
+                  icon={PackageCheck}
+                  color="text-info"
+                  iconBg="bg-info/10"
+                />
+                <SellerFinancialMiniCard
+                  title="Wakilni Cost"
+                  amount={adminFinancial.wakilniCost}
+                  subtitle={`${kpis.delivered} delivered x ${formatUSD(LEBANON_WAKILNI_DELIVERED_COST)}`}
+                  icon={Package}
+                  color="text-destructive"
+                  iconBg="bg-destructive/10"
+                />
+                <SellerFinancialMiniCard
+                  title="Shipped Handling Cost"
+                  amount={adminFinancial.shippedHandlingCost}
+                  subtitle={`${adminFinancial.shippedCostCount} shipped x ${formatUSD(LEBANON_SHIPPED_HANDLING_COST)}`}
+                  icon={Navigation}
                   color="text-warning"
                   iconBg="bg-warning/10"
-                  delay={210}
+                />
+                <SellerFinancialMiniCard
+                  title="Call Center Cost"
+                  amount={adminFinancial.callCenterCost}
+                  subtitle={`${adminFinancial.callCenterMonths} month${adminFinancial.callCenterMonths === 1 ? "" : "s"} x ${formatUSD(LEBANON_MONTHLY_CALL_CENTER_COST)}`}
+                  icon={PhoneForwarded}
+                  color="text-destructive"
+                  iconBg="bg-destructive/10"
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Admin profit uses {formatUSD(ADMIN_SHIPPING_COST_PER_ORDER)} per delivered order plus {Math.round(ADMIN_COD_FEE_RATE * 100)}% COD fees from delivered revenue. Sourcing profit is seller price minus landed price for validated sourcing requests.
+                Admin profit is dashboard-only and not invoice-based. Formula: delivery revenue + COD fee revenue + sourcing profit - Wakilni delivered cost - shipped handling cost - monthly call center cost.
               </p>
             </>
           )}
