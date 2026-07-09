@@ -712,7 +712,7 @@ async function syncActiveStatuses(supabase: ReturnType<typeof createClient>, man
     .not("wakilni_tracking_id", "is", null)
     .in("delivery_status", ACTIVE_WAKILNI_STATUSES)
     .order("wakilni_synced_at", { ascending: true, nullsFirst: true })
-    .limit(manual ? 1000 : 500);
+    .limit(500);
 
   if (error) throw error;
 
@@ -723,7 +723,7 @@ async function syncActiveStatuses(supabase: ReturnType<typeof createClient>, man
       if (priorityDiff !== 0) return priorityDiff;
       return new Date(a.wakilni_synced_at || 0).getTime() - new Date(b.wakilni_synced_at || 0).getTime();
     })
-    .slice(0, manual ? 250 : 100);
+    .slice(0, 75);
 
   const results = [];
   for (const order of dueOrders) {
