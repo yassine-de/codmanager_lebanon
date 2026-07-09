@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Invoice Example Lebanon</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 28px; font-family: Arial, sans-serif; color: #111827; background: white; font-size: 12px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #111827; padding-bottom: 18px; margin-bottom: 22px; }
+  .brand { font-size: 24px; font-weight: 800; }
+  .sub { color: #6b7280; margin-top: 4px; }
+  .inv { text-align: right; }
+  .inv-no { font-size: 20px; font-weight: 800; }
+  .status { display: inline-block; margin-top: 7px; color: #1d4ed8; background: #dbeafe; border: 1px solid #bfdbfe; border-radius: 999px; padding: 3px 10px; font-weight: 700; font-size: 10px; }
+  .meta { margin-top: 8px; color: #6b7280; line-height: 1.5; }
+  .seller { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 22px; }
+  .box { border: 1px solid #e5e7eb; border-radius: 8px; padding: 13px 15px; }
+  .label { color: #6b7280; text-transform: uppercase; font-size: 10px; letter-spacing: .05em; margin-bottom: 5px; }
+  .value { font-size: 15px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; margin: 0 0 22px; border: 1px solid #e5e7eb; }
+  th { background: #f9fafb; color: #6b7280; text-transform: uppercase; font-size: 9px; text-align: left; padding: 8px 8px; border-bottom: 1px solid #e5e7eb; }
+  td { padding: 8px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  .right { text-align: right; }
+  .mono { font-family: "Courier New", monospace; font-weight: 700; }
+  .summary { margin-left: auto; width: 390px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+  .row { display: flex; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #f3f4f6; }
+  .row small { display: block; color: #9ca3af; margin-top: 2px; }
+  .plus { background: #f0fdf4; }
+  .minus { background: #fef2f2; }
+  .green { color: #15803d; font-weight: 800; }
+  .red { color: #dc2626; font-weight: 800; }
+  .total { background: #111827; color: white; font-size: 14px; font-weight: 800; border-bottom: 0; }
+  .footer { margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 10px; display: flex; justify-content: space-between; color: #9ca3af; font-size: 10px; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div><div class="brand">COD Manager Lebanon</div><div class="sub">COD operations &amp; seller payouts</div></div>
+    <div class="inv"><div class="inv-no">INV-EXAMPLE</div><div class="status">READY</div><div class="meta">Issued: 06 June 2026<br/>Seller Invoice Example</div></div>
+  </div>
+  <div class="seller">
+    <div class="box"><div class="label">Seller</div><div class="value">Yassine</div></div>
+    <div class="box"><div class="label">Invoice Rule</div><div class="value">9.50 $ delivery + 5% COD</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Order ID</th><th>Customer</th><th>Phone</th><th>Product</th><th class="right">Qty</th><th class="right">Amount</th><th class="right">Delivery Fee</th><th class="right">COD Fee</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">COD-1042</td><td>Hala Akiki</td><td>+96178868015</td><td>Reading Glasses V3</td><td class="right">1</td><td class="right"><strong>26.99 $</strong></td><td class="right red">-9.50 $</td><td class="right red">-1.35 $</td></tr>
+      <tr><td class="mono">COD-1043</td><td>Ahmad</td><td>+9613234921</td><td>Reading Glasses V3</td><td class="right">1</td><td class="right"><strong>26.99 $</strong></td><td class="right red">-9.50 $</td><td class="right red">-1.35 $</td></tr>
+      <tr><td class="mono">COD-1044</td><td>Mazed</td><td>+9613451303</td><td>Back Pain Cream</td><td class="right">2</td><td class="right"><strong>49.98 $</strong></td><td class="right red">-9.50 $</td><td class="right red">-2.50 $</td></tr>
+    </tbody>
+  </table>
+  <div class="summary">
+    <div class="row plus"><div><strong>Delivered Revenue</strong><small>3 delivered orders</small></div><div class="green">103.96 $</div></div>
+    <div class="row minus"><div>Delivery Fees<small>3 x 9.50 $</small></div><div class="red">-28.50 $</div></div>
+    <div class="row minus"><div>COD Fees<small>5% of delivered revenue</small></div><div class="red">-5.20 $</div></div>
+    <div class="row minus"><div>Call Center Fees<small>Not charged</small></div><div class="red">-0.00 $</div></div>
+    <div class="row minus"><div>Warehouse Fees<small>Not Charged</small></div><div class="red">-0.00 $</div></div>
+    <div class="row"><div>Addons / Adjustments</div><div>0.00 $</div></div>
+    <div class="row total"><div>NET PAYABLE TO SELLER</div><div>70.26 $</div></div>
+  </div>
+  <div class="footer"><span>COD Manager Lebanon - INV-EXAMPLE - Yassine</span><span>Generated sample</span></div>
+</body>
+</html>
