@@ -183,7 +183,7 @@ interface AdminFinancialOverview {
   totalCost: number;
   netProfit: number;
   shippedCostCount: number;
-  callCenterMonths: number;
+  operatingDays: number;
   packagingCostPerOrder: number;
   warehouseRentalMonthlyCost: number;
 }
@@ -200,7 +200,7 @@ const emptyAdminFinancialOverview: AdminFinancialOverview = {
   totalCost: 0,
   netProfit: 0,
   shippedCostCount: 0,
-  callCenterMonths: 0,
+  operatingDays: 0,
   packagingCostPerOrder: LEBANON_PACKAGING_COST,
   warehouseRentalMonthlyCost: LEBANON_WAREHOUSE_RENTAL_MONTHLY_COST,
 };
@@ -209,12 +209,14 @@ function readInvoiceTotal(summary: any, key: string): number {
   return Number(summary?.totals?.[key] ?? 0);
 }
 
-function monthKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+function countInclusiveDays(from: Date, to: Date): number {
+  const start = startOfDayPKT(from).getTime();
+  const end = startOfDayPKT(to).getTime();
+  return Math.max(1, Math.floor((end - start) / 86_400_000) + 1);
 }
 
-function countInclusiveMonths(from: Date, to: Date): number {
-  return Math.max(1, (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()) + 1);
+function getMonthDays(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 }
 
 function FinancialKPI({
@@ -678,17 +680,12 @@ export default function Dashboard() {
       return sum + (Number(row.seller_price || 0) - Number(row.landed_price || 0)) * Number(row.quantity || 0);
     }, 0);
 
-    const activeMonthKeys = new Set<string>();
+    const activeDates: Date[] = [];
     if (dateRange?.from) {
       const from = startOfDayPKT(dateRange.from);
-      const to = endOfDayPKT(dateRange.to ?? dateRange.from);
-      const months = countInclusiveMonths(from, to);
-      const cursor = new Date(from);
-      cursor.setDate(1);
-      for (let i = 0; i < months; i += 1) {
-        activeMonthKeys.add(monthKey(cursor));
-        cursor.setMonth(cursor.getMonth() + 1);
-      }
+      const requestedTo = endOfDayPKT(dateRange.to ?? dateRange.from);
+      const today = endOfDayPKT(new Date());
+      activeDates.push(from, requestedTo > today ? today : requestedTo);
     } else {
       orders.forEach((order) => {
         if (
@@ -696,16 +693,25 @@ export default function Dashboard() {
           order.delivery_status === "paid" ||
           LEBANON_SHIPPED_COST_STATUSES.has(order.delivery_status || "")
         ) {
-          activeMonthKeys.add(monthKey(new Date(order.created_at)));
+          activeDates.push(new Date(order.created_at));
         }
       });
-      sourcingProfitRows.forEach((row: any) => activeMonthKeys.add(monthKey(new Date(row.created_at))));
+      sourcingProfitRows.forEach((row: any) => activeDates.push(new Date(row.created_at)));
     }
 
     const hasActivity = deliveryRevenue > 0 || codRevenue > 0 || sourcingProfit !== 0 || shippedCostCount > 0;
-    const callCenterMonths = hasActivity ? Math.max(1, activeMonthKeys.size) : 0;
-    const callCenterCost = callCenterMonths * LEBANON_MONTHLY_CALL_CENTER_COST;
-    const warehouseRentalCost = callCenterMonths * warehouseRentalMonthlyCost;
+    const today = new Date();
+    const periodStart = activeDates.length > 0
+      ? new Date(Math.min(...activeDates.map((date) => date.getTime())))
+      : today;
+    const periodEnd = activeDates.length > 0
+      ? new Date(Math.min(today.getTime(), Math.max(...activeDates.map((date) => date.getTime()))))
+      : today;
+    const operatingDays = hasActivity ? countInclusiveDays(periodStart, periodEnd) : 0;
+    const callCenterDailyCost = LEBANON_MONTHLY_CALL_CENTER_COST / getMonthDays(periodEnd);
+    const warehouseRentalDailyCost = warehouseRentalMonthlyCost / getMonthDays(periodEnd);
+    const callCenterCost = operatingDays * callCenterDailyCost;
+    const warehouseRentalCost = operatingDays * warehouseRentalDailyCost;
     const totalCost = wakilniCost + fulfillmentCost + packagingCost + warehouseRentalCost + callCenterCost;
     const netProfit = deliveryRevenue + codRevenue + sourcingProfit - totalCost;
 
@@ -721,7 +727,7 @@ export default function Dashboard() {
       totalCost,
       netProfit,
       shippedCostCount,
-      callCenterMonths,
+      operatingDays,
       packagingCostPerOrder,
       warehouseRentalMonthlyCost,
     };
@@ -989,7 +995,7 @@ export default function Dashboard() {
                 <SellerFinancialMiniCard
                   title="Warehouse Rental"
                   amount={adminFinancial.warehouseRentalCost}
-                  subtitle={`${adminFinancial.callCenterMonths} month${adminFinancial.callCenterMonths === 1 ? "" : "s"} x ${formatUSD(adminFinancial.warehouseRentalMonthlyCost)}`}
+                  subtitle={`${adminFinancial.operatingDays} day${adminFinancial.operatingDays === 1 ? "" : "s"} from ${formatUSD(adminFinancial.warehouseRentalMonthlyCost)}/month`}
                   icon={Store}
                   color="text-destructive"
                   iconBg="bg-destructive/10"
@@ -997,14 +1003,14 @@ export default function Dashboard() {
                 <SellerFinancialMiniCard
                   title="Call Center Cost"
                   amount={adminFinancial.callCenterCost}
-                  subtitle={`${adminFinancial.callCenterMonths} month${adminFinancial.callCenterMonths === 1 ? "" : "s"} x ${formatUSD(LEBANON_MONTHLY_CALL_CENTER_COST)}`}
+                  subtitle={`${adminFinancial.operatingDays} day${adminFinancial.operatingDays === 1 ? "" : "s"} from ${formatUSD(LEBANON_MONTHLY_CALL_CENTER_COST)}/month`}
                   icon={PhoneForwarded}
                   color="text-destructive"
                   iconBg="bg-destructive/10"
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Admin profit is dashboard-only and not invoice-based. Formula: delivery revenue + COD fee revenue + sourcing profit - Wakilni delivered cost - fulfilment cost - packaging cost - warehouse rental - monthly call center cost.
+                Admin profit is dashboard-only and not invoice-based. Formula: delivery revenue + COD fee revenue + sourcing profit - Wakilni delivered cost - fulfilment cost - packaging cost - prorated warehouse rental - prorated call center cost.
               </p>
             </>
           )}
