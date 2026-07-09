@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import * as pdfjs from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, FileCheck2, FileUp, Search, WalletCards, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Cloud, DownloadCloud, FileCheck2, FileUp, RefreshCw, Search, WalletCards, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,6 +48,9 @@ type ImportHistoryRow = {
   id: string;
   invoice_number: string | null;
   file_name: string;
+  google_drive_file_id?: string | null;
+  google_drive_file_name?: string | null;
+  google_drive_web_view_link?: string | null;
   imported_at: string;
   row_count: number;
   matched_count: number;
@@ -56,6 +59,23 @@ type ImportHistoryRow = {
   unmatched_count: number;
   amount_total_usd: number;
   delivery_fee_total_usd: number;
+};
+
+type DriveFile = {
+  id: string;
+  name: string;
+  mimeType: string;
+  modifiedTime: string;
+  size?: string;
+  webViewLink?: string;
+  imported?: boolean;
+  import?: {
+    id: string;
+    imported_at: string;
+    newly_paid_count: number;
+    already_paid_count: number;
+    unmatched_count: number;
+  } | null;
 };
 
 const money = (value: number) =>
@@ -147,6 +167,13 @@ function getInvoiceNumberFromName(fileName: string) {
   return dateMatch?.[1]?.replace(/_/g, " ") || fileName.replace(/\.pdf$/i, "");
 }
 
+function base64ToFile(base64: string, fileName: string, mimeType = "application/pdf") {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], fileName, { type: mimeType });
+}
+
 function StatusBadge({ status }: { status: MatchedInvoiceRow["matchStatus"] }) {
   if (status === "newly_paid") return <Badge variant="success">Ready to mark paid</Badge>;
   if (status === "already_paid") return <Badge variant="info">Already paid</Badge>;
@@ -163,6 +190,9 @@ export default function WakilniInvoices() {
   const [matchedRows, setMatchedRows] = useState<MatchedInvoiceRow[]>([]);
   const [isParsing, setIsParsing] = useState(false);
   const [search, setSearch] = useState("");
+  const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
+  const [driveFolderId, setDriveFolderId] = useState("");
+  const [sourceDriveFile, setSourceDriveFile] = useState<DriveFile | null>(null);
 
   const isAdmin = authUser?.role === "admin";
 
@@ -230,10 +260,11 @@ export default function WakilniInvoices() {
     ).slice(0, 100);
   }, [matchedRows, search]);
 
-  async function handleFile(file: File | null) {
+  async function handlePdfFile(file: File | null, driveFile: DriveFile | null = null) {
     if (!file) return;
     setIsParsing(true);
     setFileName(file.name);
+    setSourceDriveFile(driveFile);
     setMatchedRows([]);
     try {
       const rows = await extractRowsFromPdf(file);
@@ -247,6 +278,42 @@ export default function WakilniInvoices() {
       setIsParsing(false);
     }
   }
+
+  const scanDrive = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("wakilni-invoice-drive", {
+        body: { action: "list" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as { folder_id: string; files: DriveFile[] };
+    },
+    onSuccess: (data) => {
+      setDriveFolderId(data.folder_id);
+      setDriveFiles(data.files || []);
+      toast.success(`Found ${(data.files || []).length} Wakilni PDF files in Drive`);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Could not scan Google Drive");
+    },
+  });
+
+  const loadDriveFile = useMutation({
+    mutationFn: async (driveFile: DriveFile) => {
+      const { data, error } = await supabase.functions.invoke("wakilni-invoice-drive", {
+        body: { action: "download", file_id: driveFile.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return { driveFile, file: base64ToFile(data.base64, data.file?.name || driveFile.name, data.file?.mimeType || "application/pdf") };
+    },
+    onSuccess: ({ driveFile, file }) => {
+      void handlePdfFile(file, driveFile);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Could not load Drive PDF");
+    },
+  });
 
   async function matchRows(rows: ParsedInvoiceRow[]) {
     const wakilniIds = [...new Set(rows.map((r) => r.wakilniOrderId).filter(Boolean))];
@@ -297,6 +364,9 @@ export default function WakilniInvoices() {
       const insertImport = {
         invoice_number: invoiceNumber,
         file_name: fileName,
+        google_drive_file_id: sourceDriveFile?.id || null,
+        google_drive_file_name: sourceDriveFile?.name || null,
+        google_drive_web_view_link: sourceDriveFile?.webViewLink || null,
         imported_by: authUser?.id || null,
         row_count: matchedRows.length,
         matched_count: matchedRows.filter((row) => !!row.order).length,
@@ -363,6 +433,8 @@ export default function WakilniInvoices() {
       setParsedRows([]);
       setMatchedRows([]);
       setFileName("");
+      setSourceDriveFile(null);
+      if (driveFiles.length > 0) scanDrive.mutate();
       queryClient.invalidateQueries({ queryKey: ["wakilni-invoice-delivered-orders"] });
       queryClient.invalidateQueries({ queryKey: ["wakilni-invoice-imports"] });
     },
@@ -439,8 +511,79 @@ export default function WakilniInvoices() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
+            <Cloud className="h-4 w-4 text-primary" />
+            Google Drive Invoices
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+              Scan the configured Wakilni invoice folder and process PDFs directly from Drive.
+              {driveFolderId && <span className="ml-1 font-mono text-xs">Folder: {driveFolderId}</span>}
+            </div>
+            <Button onClick={() => scanDrive.mutate()} disabled={scanDrive.isPending} variant="outline">
+              <RefreshCw className={`mr-2 h-4 w-4 ${scanDrive.isPending ? "animate-spin" : ""}`} />
+              Scan Drive
+            </Button>
+          </div>
+
+          {driveFiles.length > 0 && (
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>PDF</TableHead>
+                    <TableHead>Modified</TableHead>
+                    <TableHead>Size</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {driveFiles.map((file) => (
+                    <TableRow key={file.id}>
+                      <TableCell>
+                        <div className="font-medium">{file.name}</div>
+                        {file.webViewLink && (
+                          <a className="text-xs text-primary hover:underline" href={file.webViewLink} target="_blank" rel="noreferrer">
+                            Open in Drive
+                          </a>
+                        )}
+                      </TableCell>
+                      <TableCell>{file.modifiedTime ? new Date(file.modifiedTime).toLocaleString("en-GB") : "-"}</TableCell>
+                      <TableCell>{file.size ? `${(Number(file.size) / 1024).toFixed(0)} KB` : "-"}</TableCell>
+                      <TableCell>
+                        {file.imported ? (
+                          <Badge variant="success">Imported</Badge>
+                        ) : (
+                          <Badge variant="outline">New</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant={file.imported ? "outline" : "default"}
+                          onClick={() => loadDriveFile.mutate(file)}
+                          disabled={loadDriveFile.isPending || isParsing}
+                        >
+                          <DownloadCloud className="mr-2 h-4 w-4" />
+                          {file.imported ? "Review" : "Process"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
             <FileUp className="h-4 w-4 text-primary" />
-            Upload Wakilni PDF
+            Manual Upload Backup
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -448,7 +591,7 @@ export default function WakilniInvoices() {
             <Input
               type="file"
               accept="application/pdf"
-              onChange={(event) => void handleFile(event.target.files?.[0] || null)}
+              onChange={(event) => void handlePdfFile(event.target.files?.[0] || null)}
               className="md:max-w-md"
             />
             <Button
@@ -465,6 +608,7 @@ export default function WakilniInvoices() {
               Apply and Mark Paid
             </Button>
             {fileName && <span className="text-xs text-muted-foreground">{fileName}</span>}
+            {sourceDriveFile && <Badge variant="info">Loaded from Drive</Badge>}
           </div>
 
           {matchedRows.length > 0 && (
