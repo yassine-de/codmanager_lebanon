@@ -94,7 +94,7 @@ async function requireAdmin(req: Request, supabaseUrl: string, anonKey: string, 
 }
 
 function normalizeAmount(value: string) {
-  return Number(String(value || "0").replace(",", "."));
+  return Number(String(value || "0").replace(/,/g, "").replace(/\s/g, ""));
 }
 
 function parsePdfDate(value: string | null) {
@@ -139,6 +139,24 @@ function parseInvoiceLine(line: string) {
   };
 }
 
+function parseInvoiceTotalsFromText(text: string) {
+  const read = (currency: "USD" | "LBP", label: string) => {
+    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`${escapedLabel}\\s+${currency}\\s+(-?\\d[\\d,]*(?:\\.\\d+)?)`, "i");
+    const match = text.match(pattern);
+    return match ? normalizeAmount(match[1]) : 0;
+  };
+
+  return {
+    total_collection_usd: read("USD", "Total Collection"),
+    total_wk_fees_usd: read("USD", "Total WK Fees"),
+    grand_total_usd: read("USD", "Grand Total"),
+    total_collection_lbp: read("LBP", "Total Collection"),
+    total_wk_fees_lbp: read("LBP", "Total WK Fees"),
+    grand_total_lbp: read("LBP", "Grand Total"),
+  };
+}
+
 async function extractRowsFromPdfBytes(bytes: Uint8Array) {
   const { getDocument } = await getResolvedPDFJS();
   const doc = await getDocument({
@@ -179,6 +197,50 @@ async function extractRowsFromPdfBytes(bytes: Uint8Array) {
   }
 
   return rows;
+}
+
+async function extractInvoiceDataFromPdfBytes(bytes: Uint8Array) {
+  const { getDocument } = await getResolvedPDFJS();
+  const doc = await getDocument({
+    data: bytes,
+    disableWorker: true,
+    disableFontFace: true,
+    isEvalSupported: false,
+  }).promise;
+  const rows = [];
+  const allLines = [];
+
+  for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
+    const page = await doc.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const items = (content.items || [])
+      .map((item: any) => ({
+        str: String(item.str || "").trim(),
+        x: item.transform?.[4] || 0,
+        y: item.transform?.[5] || 0,
+      }))
+      .filter((item: any) => item.str.length > 0);
+
+    const lineMap = new Map();
+    for (const item of items) {
+      const key = Math.round(item.y / 3) * 3;
+      const existing = lineMap.get(key) || [];
+      existing.push(item);
+      lineMap.set(key, existing);
+    }
+
+    const lines = [...lineMap.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([, lineItems]) => lineItems.sort((a, b) => a.x - b.x).map((item) => item.str).join(" "));
+
+    allLines.push(...lines);
+    for (const line of lines) {
+      const parsed = parseInvoiceLine(line);
+      if (parsed) rows.push(parsed);
+    }
+  }
+
+  return { rows, totals: parseInvoiceTotalsFromText(allLines.join("\n")) };
 }
 
 function getInvoiceFileDate(file: any) {
@@ -294,7 +356,7 @@ function invoiceNumberFromFileName(fileName: string) {
   return fileName.replace(/\.pdf$/i, "");
 }
 
-async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, matchedRows: any[], file: any, userId: string | null = null) {
+async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, matchedRows: any[], file: any, userId: string | null = null, totals: any = {}) {
   const existing = await admin
     .from("wakilni_invoice_imports")
     .select("id, imported_at")
@@ -317,8 +379,24 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
     newly_paid_count: rowsToPay.length,
     already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
     unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
+    warnings_count: matchedRows.filter((row) => row.matchStatus === "amount_mismatch" || row.matchStatus === "not_delivered").length,
     amount_total_usd: matchedRows.reduce((sum, row) => sum + Number(row.collectionUsd || 0), 0),
     delivery_fee_total_usd: matchedRows.reduce((sum, row) => sum + Number(row.deliveryFeeUsd || 0), 0),
+    total_collection_usd: Number(totals.total_collection_usd || matchedRows.reduce((sum, row) => sum + Number(row.collectionUsd || 0), 0)),
+    total_wk_fees_usd: Number(totals.total_wk_fees_usd || matchedRows.reduce((sum, row) => sum + Number(row.deliveryFeeUsd || 0), 0)),
+    grand_total_usd: Number(totals.grand_total_usd || 0),
+    total_collection_lbp: Number(totals.total_collection_lbp || 0),
+    total_wk_fees_lbp: Number(totals.total_wk_fees_lbp || 0),
+    grand_total_lbp: Number(totals.grand_total_lbp || 0),
+    processing_status: "processed",
+    processing_summary: {
+      row_count: matchedRows.length,
+      matched_count: matchedRows.filter((row) => !!row.order).length,
+      newly_paid_count: rowsToPay.length,
+      already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
+      unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
+      warnings_count: matchedRows.filter((row) => row.matchStatus === "amount_mismatch" || row.matchStatus === "not_delivered").length,
+    },
   };
 
   const { data: importRow, error: importError } = await admin
@@ -431,7 +509,7 @@ Deno.serve(async (req) => {
       }
 
       const result = await downloadDriveFile(accessToken, file.id);
-      const rows = await extractRowsFromPdfBytes(result.bytes);
+      const { rows, totals } = await extractInvoiceDataFromPdfBytes(result.bytes);
       const matchedRows = await matchRows(admin, rows);
       if (body.dry_run === true || body.dryRun === true) {
         return jsonResponse({
@@ -445,9 +523,10 @@ Deno.serve(async (req) => {
           already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
           unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
           warnings_count: matchedRows.filter((row) => row.matchStatus === "amount_mismatch" || row.matchStatus === "not_delivered").length,
+          totals,
         });
       }
-      const applied = await applyMatchedInvoice(admin, matchedRows, result.meta, user?.id || null);
+      const applied = await applyMatchedInvoice(admin, matchedRows, result.meta, user?.id || null, totals);
 
       await admin
         .from("app_settings")

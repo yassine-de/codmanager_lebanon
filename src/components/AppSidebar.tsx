@@ -51,6 +51,7 @@ const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUn
   { title: "Alerts", url: "/alerts", icon: Megaphone, permission: "access_to_settings", feature: "alerts" },
   { title: "invoices", url: "/invoices", icon: FileText, permission: "access_to_settings", sellerVisible: true },
   { title: "Wakilni Invoices", url: "/wakilni-invoices", icon: ReceiptText, adminOnly: true },
+  { title: "Wakilni History", url: "/wakilni-invoice-history", icon: FileText, adminOnly: true },
   { title: "Adjustments", url: "/adjustments", icon: ArrowUpDown, permission: "access_to_settings", badge: pendingAdjustments > 0 ? pendingAdjustments : undefined },
   { title: "sourcing", url: "/seller-sourcing", icon: Package2, sellerOnly: true, badge: sourcingUnseen > 0 ? sourcingUnseen : undefined, feature: "sourcing" },
   { title: "sheets", url: "/sheets", icon: FileSpreadsheet, sellerOnly: true },

@@ -24,6 +24,7 @@ import Users from "./pages/Users";
 import Integrations from "./pages/Integrations";
 import Invoices from "./pages/Invoices";
 import WakilniInvoices from "./pages/WakilniInvoices";
+import WakilniInvoiceHistory from "./pages/WakilniInvoiceHistory";
 import SellerSheets from "./pages/SellerSheets";
 import SellerSourcing from "./pages/SellerSourcing";
 import Simulation from "./pages/Simulation";
@@ -170,6 +171,7 @@ function AppRoutes() {
         <Route path="/users" element={<ProtectedRoute permission="access_to_users"><Users /></ProtectedRoute>} />
         <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
         <Route path="/wakilni-invoices" element={<ProtectedRoute permission="access_to_settings"><WakilniInvoices /></ProtectedRoute>} />
+        <Route path="/wakilni-invoice-history" element={<ProtectedRoute permission="access_to_settings"><WakilniInvoiceHistory /></ProtectedRoute>} />
         <Route path="/sheets" element={<ProtectedRoute><SellerSheets /></ProtectedRoute>} />
         <Route path="/seller-sourcing" element={<FeatureRoute feature="sourcing"><ProtectedRoute><SellerSourcing /></ProtectedRoute></FeatureRoute>} />
         <Route path="/simulation" element={<ProtectedRoute><Simulation /></ProtectedRoute>} />

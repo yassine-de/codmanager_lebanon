@@ -1,0 +1,260 @@
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, CheckCircle2, ExternalLink, FileText, RefreshCw, WalletCards } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+type WakilniInvoiceImport = {
+  id: string;
+  invoice_number: string | null;
+  file_name: string;
+  google_drive_file_name: string | null;
+  google_drive_web_view_link: string | null;
+  imported_at: string;
+  row_count: number;
+  matched_count: number;
+  newly_paid_count: number;
+  already_paid_count: number;
+  unmatched_count: number;
+  warnings_count: number;
+  total_collection_usd: number;
+  total_wk_fees_usd: number;
+  grand_total_usd: number;
+  total_collection_lbp: number;
+  total_wk_fees_lbp: number;
+  grand_total_lbp: number;
+  processing_status: string;
+  processing_summary: Record<string, unknown> | null;
+};
+
+const usd = (value: number) =>
+  `${Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+
+const lbp = (value: number) =>
+  `${Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} LBP`;
+
+function ResultBadge({ item }: { item: WakilniInvoiceImport }) {
+  if (item.unmatched_count > 0 || item.warnings_count > 0) {
+    return <Badge variant="warning">{item.unmatched_count + item.warnings_count} issues</Badge>;
+  }
+  return <Badge variant="success">Clean</Badge>;
+}
+
+export default function WakilniInvoiceHistory() {
+  const { authUser } = useAuth();
+  const [search, setSearch] = useState("");
+  const isAdmin = authUser?.role === "admin";
+
+  const { data: invoices = [], isFetching, refetch } = useQuery({
+    queryKey: ["wakilni-invoice-history"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("wakilni_invoice_imports")
+        .select("*")
+        .order("imported_at", { ascending: false });
+      if (error) throw error;
+      return (data || []) as WakilniInvoiceImport[];
+    },
+    enabled: isAdmin,
+  });
+
+  const visibleInvoices = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return invoices;
+    return invoices.filter((item) =>
+      [item.invoice_number, item.file_name, item.google_drive_file_name]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q)),
+    );
+  }, [invoices, search]);
+
+  const totals = useMemo(() => {
+    return visibleInvoices.reduce(
+      (sum, item) => ({
+        count: sum.count + 1,
+        rows: sum.rows + Number(item.row_count || 0),
+        matched: sum.matched + Number(item.matched_count || 0),
+        newlyPaid: sum.newlyPaid + Number(item.newly_paid_count || 0),
+        issues: sum.issues + Number(item.unmatched_count || 0) + Number(item.warnings_count || 0),
+        collectionUsd: sum.collectionUsd + Number(item.total_collection_usd || 0),
+        feesUsd: sum.feesUsd + Number(item.total_wk_fees_usd || 0),
+        grandUsd: sum.grandUsd + Number(item.grand_total_usd || 0),
+        collectionLbp: sum.collectionLbp + Number(item.total_collection_lbp || 0),
+        feesLbp: sum.feesLbp + Number(item.total_wk_fees_lbp || 0),
+        grandLbp: sum.grandLbp + Number(item.grand_total_lbp || 0),
+      }),
+      {
+        count: 0,
+        rows: 0,
+        matched: 0,
+        newlyPaid: 0,
+        issues: 0,
+        collectionUsd: 0,
+        feesUsd: 0,
+        grandUsd: 0,
+        collectionLbp: 0,
+        feesLbp: 0,
+        grandLbp: 0,
+      },
+    );
+  }, [visibleInvoices]);
+
+  if (!isAdmin) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Admin only</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Wakilni invoice history is only available for admins.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Wakilni Invoice History</h1>
+          <p className="text-sm text-muted-foreground">Review imported Wakilni statements, totals, and processing results.</p>
+        </div>
+        <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Card>
+          <CardContent className="flex items-center justify-between p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Grand Total USD</p>
+              <div className="mt-2 text-2xl font-bold">{usd(totals.grandUsd)}</div>
+              <p className="mt-1 text-xs text-muted-foreground">{totals.count} invoices</p>
+            </div>
+            <WalletCards className="h-10 w-10 rounded-lg bg-success/10 p-2 text-success" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center justify-between p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Grand Total LBP</p>
+              <div className="mt-2 text-2xl font-bold">{lbp(totals.grandLbp)}</div>
+              <p className="mt-1 text-xs text-muted-foreground">All imported LBP statements</p>
+            </div>
+            <FileText className="h-10 w-10 rounded-lg bg-info/10 p-2 text-info" />
+          </CardContent>
+        </Card>
+        <Card className={totals.issues > 0 ? "border-warning/50" : ""}>
+          <CardContent className="flex items-center justify-between p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Import Issues</p>
+              <div className="mt-2 text-2xl font-bold">{totals.issues}</div>
+              <p className="mt-1 text-xs text-muted-foreground">{totals.matched} matched rows</p>
+            </div>
+            {totals.issues > 0 ? (
+              <AlertTriangle className="h-10 w-10 rounded-lg bg-warning/10 p-2 text-warning" />
+            ) : (
+              <CheckCircle2 className="h-10 w-10 rounded-lg bg-success/10 p-2 text-success" />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <CardTitle className="text-base">All Wakilni Invoices</CardTitle>
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search invoice..."
+            className="md:max-w-xs"
+          />
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Invoice</TableHead>
+                <TableHead>Imported</TableHead>
+                <TableHead className="text-right">Total Collection USD</TableHead>
+                <TableHead className="text-right">Total WK Fees USD</TableHead>
+                <TableHead className="text-right">Grand Total USD</TableHead>
+                <TableHead className="text-right">Total Collection LBP</TableHead>
+                <TableHead className="text-right">Total WK Fees LBP</TableHead>
+                <TableHead className="text-right">Grand Total LBP</TableHead>
+                <TableHead>Result</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visibleInvoices.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <div className="font-medium">{item.invoice_number || item.file_name}</div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{item.file_name}</span>
+                      {item.google_drive_web_view_link && (
+                        <a href={item.google_drive_web_view_link} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                          <ExternalLink className="inline h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {item.row_count} rows, {item.newly_paid_count} new paid, {item.already_paid_count} already paid
+                    </div>
+                  </TableCell>
+                  <TableCell>{new Date(item.imported_at).toLocaleString("en-GB")}</TableCell>
+                  <TableCell className="text-right font-semibold">{usd(Number(item.total_collection_usd || 0))}</TableCell>
+                  <TableCell className="text-right">{usd(Number(item.total_wk_fees_usd || 0))}</TableCell>
+                  <TableCell className="text-right font-semibold text-success">{usd(Number(item.grand_total_usd || 0))}</TableCell>
+                  <TableCell className="text-right">{lbp(Number(item.total_collection_lbp || 0))}</TableCell>
+                  <TableCell className="text-right">{lbp(Number(item.total_wk_fees_lbp || 0))}</TableCell>
+                  <TableCell className="text-right font-semibold">{lbp(Number(item.grand_total_lbp || 0))}</TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <ResultBadge item={item} />
+                      {(item.unmatched_count > 0 || item.warnings_count > 0) && (
+                        <div className="text-xs text-muted-foreground">
+                          {item.unmatched_count} unmatched, {item.warnings_count} warnings
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {visibleInvoices.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
+                    No Wakilni invoices found.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+            {visibleInvoices.length > 0 && (
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={2}>Total</TableCell>
+                  <TableCell className="text-right">{usd(totals.collectionUsd)}</TableCell>
+                  <TableCell className="text-right">{usd(totals.feesUsd)}</TableCell>
+                  <TableCell className="text-right font-bold">{usd(totals.grandUsd)}</TableCell>
+                  <TableCell className="text-right">{lbp(totals.collectionLbp)}</TableCell>
+                  <TableCell className="text-right">{lbp(totals.feesLbp)}</TableCell>
+                  <TableCell className="text-right font-bold">{lbp(totals.grandLbp)}</TableCell>
+                  <TableCell>{totals.issues} issues</TableCell>
+                </TableRow>
+              </TableFooter>
+            )}
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

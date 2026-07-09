@@ -59,6 +59,13 @@ type ImportHistoryRow = {
   unmatched_count: number;
   amount_total_usd: number;
   delivery_fee_total_usd: number;
+  total_collection_usd?: number;
+  total_wk_fees_usd?: number;
+  grand_total_usd?: number;
+  total_collection_lbp?: number;
+  total_wk_fees_lbp?: number;
+  grand_total_lbp?: number;
+  warnings_count?: number;
 };
 
 type DriveFile = {
@@ -82,6 +89,43 @@ const money = (value: number) =>
   `${Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
 
 const normalizeAmount = (value: string) => Number(value.replace(",", "."));
+const normalizeCurrencyAmount = (value: string) => Number(String(value || "0").replace(/,/g, "").replace(/\s/g, ""));
+
+type InvoiceTotals = {
+  total_collection_usd: number;
+  total_wk_fees_usd: number;
+  grand_total_usd: number;
+  total_collection_lbp: number;
+  total_wk_fees_lbp: number;
+  grand_total_lbp: number;
+};
+
+const emptyInvoiceTotals = (): InvoiceTotals => ({
+  total_collection_usd: 0,
+  total_wk_fees_usd: 0,
+  grand_total_usd: 0,
+  total_collection_lbp: 0,
+  total_wk_fees_lbp: 0,
+  grand_total_lbp: 0,
+});
+
+function parseInvoiceTotalsFromText(text: string): InvoiceTotals {
+  const read = (currency: "USD" | "LBP", label: string) => {
+    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`${escapedLabel}\\s+${currency}\\s+(-?\\d[\\d,]*(?:\\.\\d+)?)`, "i");
+    const match = text.match(pattern);
+    return match ? normalizeCurrencyAmount(match[1]) : 0;
+  };
+
+  return {
+    total_collection_usd: read("USD", "Total Collection"),
+    total_wk_fees_usd: read("USD", "Total WK Fees"),
+    grand_total_usd: read("USD", "Grand Total"),
+    total_collection_lbp: read("LBP", "Total Collection"),
+    total_wk_fees_lbp: read("LBP", "Total WK Fees"),
+    grand_total_lbp: read("LBP", "Grand Total"),
+  };
+}
 
 const parsePdfDate = (value: string | null) => {
   if (!value) return null;
@@ -125,10 +169,11 @@ function parseInvoiceLine(line: string): ParsedInvoiceRow | null {
   };
 }
 
-async function extractRowsFromPdf(file: File): Promise<ParsedInvoiceRow[]> {
+async function extractInvoiceDataFromPdf(file: File): Promise<{ rows: ParsedInvoiceRow[]; totals: InvoiceTotals }> {
   const buffer = await file.arrayBuffer();
   const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
   const rows: ParsedInvoiceRow[] = [];
+  const allLines: string[] = [];
 
   for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
     const page = await doc.getPage(pageNumber);
@@ -153,13 +198,14 @@ async function extractRowsFromPdf(file: File): Promise<ParsedInvoiceRow[]> {
       .sort((a, b) => b[0] - a[0])
       .map(([, lineItems]) => lineItems.sort((a, b) => a.x - b.x).map((item) => item.str).join(" "));
 
+    allLines.push(...lines);
     for (const line of lines) {
       const parsed = parseInvoiceLine(line);
       if (parsed) rows.push(parsed);
     }
   }
 
-  return rows;
+  return { rows, totals: parseInvoiceTotalsFromText(allLines.join("\n")) };
 }
 
 function getInvoiceNumberFromName(fileName: string) {
@@ -193,6 +239,7 @@ export default function WakilniInvoices() {
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
   const [driveFolderId, setDriveFolderId] = useState("");
   const [sourceDriveFile, setSourceDriveFile] = useState<DriveFile | null>(null);
+  const [invoiceTotals, setInvoiceTotals] = useState<InvoiceTotals>(emptyInvoiceTotals);
 
   const isAdmin = authUser?.role === "admin";
 
@@ -267,8 +314,9 @@ export default function WakilniInvoices() {
     setSourceDriveFile(driveFile);
     setMatchedRows([]);
     try {
-      const rows = await extractRowsFromPdf(file);
+      const { rows, totals } = await extractInvoiceDataFromPdf(file);
       setParsedRows(rows);
+      setInvoiceTotals(totals);
       await matchRows(rows);
       toast.success(`Parsed ${rows.length} Wakilni invoice rows`);
     } catch (error) {
@@ -385,6 +433,7 @@ export default function WakilniInvoices() {
       if (!fileName || matchedRows.length === 0) throw new Error("Upload and parse a Wakilni invoice first");
       const invoiceNumber = getInvoiceNumberFromName(fileName);
       const rowsToPay = matchedRows.filter((row) => row.matchStatus === "newly_paid" && row.order);
+      const warningsCount = matchedRows.filter((row) => row.matchStatus === "amount_mismatch" || row.matchStatus === "not_delivered").length;
       const insertImport = {
         invoice_number: invoiceNumber,
         file_name: fileName,
@@ -397,8 +446,24 @@ export default function WakilniInvoices() {
         newly_paid_count: rowsToPay.length,
         already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
         unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
+        warnings_count: warningsCount,
         amount_total_usd: matchedRows.reduce((sum, row) => sum + Number(row.collectionUsd || 0), 0),
         delivery_fee_total_usd: matchedRows.reduce((sum, row) => sum + Number(row.deliveryFeeUsd || 0), 0),
+        total_collection_usd: invoiceTotals.total_collection_usd || matchedRows.reduce((sum, row) => sum + Number(row.collectionUsd || 0), 0),
+        total_wk_fees_usd: invoiceTotals.total_wk_fees_usd || matchedRows.reduce((sum, row) => sum + Number(row.deliveryFeeUsd || 0), 0),
+        grand_total_usd: invoiceTotals.grand_total_usd || 0,
+        total_collection_lbp: invoiceTotals.total_collection_lbp || 0,
+        total_wk_fees_lbp: invoiceTotals.total_wk_fees_lbp || 0,
+        grand_total_lbp: invoiceTotals.grand_total_lbp || 0,
+        processing_status: "processed",
+        processing_summary: {
+          row_count: matchedRows.length,
+          matched_count: matchedRows.filter((row) => !!row.order).length,
+          newly_paid_count: rowsToPay.length,
+          already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
+          unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
+          warnings_count: warningsCount,
+        },
       };
 
       const { data: importRow, error: importError } = await (supabase as any)
@@ -458,6 +523,7 @@ export default function WakilniInvoices() {
       setMatchedRows([]);
       setFileName("");
       setSourceDriveFile(null);
+      setInvoiceTotals(emptyInvoiceTotals());
       if (driveFiles.length > 0) scanDrive.mutate();
       queryClient.invalidateQueries({ queryKey: ["wakilni-invoice-delivered-orders"] });
       queryClient.invalidateQueries({ queryKey: ["wakilni-invoice-imports"] });
