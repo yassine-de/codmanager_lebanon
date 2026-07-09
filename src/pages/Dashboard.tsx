@@ -625,7 +625,7 @@ export default function Dashboard() {
       let query = supabase
         .from("sourcing_requests")
         .select("id, quantity, landed_price, seller_price, seller_validated, created_at")
-        .eq("seller_validated", true);
+        .order("created_at", { ascending: false });
 
       if (dateRange?.from) {
         query = query.gte("created_at", startOfDayPKT(dateRange.from).toISOString());

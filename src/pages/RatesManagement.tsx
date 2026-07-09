@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Phone, Truck, DollarSign, UserCheck, Save, ChevronRight, Percent } from "lucide-react";
+import { Loader2, Phone, Truck, DollarSign, UserCheck, Save, ChevronRight, Percent, Warehouse, PackageCheck } from "lucide-react";
 import { toast } from "sonner";
 
 // --- Types ---
@@ -25,6 +25,11 @@ interface AgentRateValues {
   agent_commission_delivered: number;
 }
 
+interface LebanonFinanceCostValues {
+  packaging_cost_usd: number;
+  warehouse_rental_monthly_usd: number;
+}
+
 const defaultSellerRates: SellerRateValues = {
   dropped_order_rate: 0,
   confirmed_order_rate: 0,
@@ -37,6 +42,11 @@ const defaultSellerRates: SellerRateValues = {
 const defaultAgentRates: AgentRateValues = {
   agent_commission_confirmed: 0,
   agent_commission_delivered: 0,
+};
+
+const defaultLebanonFinanceCosts: LebanonFinanceCostValues = {
+  packaging_cost_usd: 0.25,
+  warehouse_rental_monthly_usd: 0,
 };
 
 // --- Reusable Input ---
@@ -140,6 +150,7 @@ export default function RatesManagement() {
   const [isPerAgent, setIsPerAgent] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [agentRates, setAgentRates] = useState<AgentRateValues>(defaultAgentRates);
+  const [lebanonFinanceCosts, setLebanonFinanceCosts] = useState<LebanonFinanceCostValues>(defaultLebanonFinanceCosts);
 
   // --- Fetch modes ---
   const { data: sellerModeData } = useQuery({
@@ -345,6 +356,35 @@ export default function RatesManagement() {
     }
   }, [agentRateRaw]);
 
+  const { data: lebanonFinanceCostRaw, isLoading: lebanonFinanceCostsLoading } = useQuery({
+    queryKey: ["lebanon-finance-cost-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select("key, value")
+        .in("key", ["lebanon_packaging_cost_usd", "lebanon_warehouse_rental_monthly_usd"]);
+
+      if (error) throw error;
+
+      return (data ?? []).reduce<Record<string, number>>((acc, row) => {
+        acc[row.key] = Number(row.value || 0);
+        return acc;
+      }, {});
+    },
+  });
+
+  useEffect(() => {
+    if (!lebanonFinanceCostRaw) return;
+    setLebanonFinanceCosts({
+      packaging_cost_usd: Number.isFinite(lebanonFinanceCostRaw.lebanon_packaging_cost_usd)
+        ? lebanonFinanceCostRaw.lebanon_packaging_cost_usd
+        : defaultLebanonFinanceCosts.packaging_cost_usd,
+      warehouse_rental_monthly_usd: Number.isFinite(lebanonFinanceCostRaw.lebanon_warehouse_rental_monthly_usd)
+        ? lebanonFinanceCostRaw.lebanon_warehouse_rental_monthly_usd
+        : defaultLebanonFinanceCosts.warehouse_rental_monthly_usd,
+    });
+  }, [lebanonFinanceCostRaw]);
+
   const saveAgentMutation = useMutation({
     mutationFn: async () => {
       const value = JSON.stringify(agentRates);
@@ -360,6 +400,30 @@ export default function RatesManagement() {
     onSuccess: () => {
       toast.success("Agent commission saved");
       queryClient.invalidateQueries({ queryKey: ["agent-rates"] });
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to save"),
+  });
+
+  const saveLebanonFinanceCostsMutation = useMutation({
+    mutationFn: async () => {
+      const packaging = Math.max(0, lebanonFinanceCosts.packaging_cost_usd || 0);
+      const warehouseRental = Math.max(0, lebanonFinanceCosts.warehouse_rental_monthly_usd || 0);
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("app_settings")
+        .upsert(
+          [
+            { key: "lebanon_packaging_cost_usd", value: String(packaging), updated_at: now },
+            { key: "lebanon_warehouse_rental_monthly_usd", value: String(warehouseRental), updated_at: now },
+          ],
+          { onConflict: "key" }
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Lebanon finance costs saved");
+      queryClient.invalidateQueries({ queryKey: ["lebanon-finance-cost-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-admin-cost-settings"] });
     },
     onError: (err: any) => toast.error(err.message || "Failed to save"),
   });
@@ -494,6 +558,84 @@ export default function RatesManagement() {
             )}
           </>
         )}
+      </div>
+
+      <Separator />
+
+      {/* ============ LEBANON ADMIN COSTS ============ */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-1 rounded-full bg-emerald-500" />
+          <h2 className="text-lg font-semibold">Lebanon Operating Costs</h2>
+        </div>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <Warehouse className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div>
+                <CardTitle className="text-sm">Admin Profit Costs</CardTitle>
+                <CardDescription className="text-[10px]">
+                  Used only for the admin profit dashboard. Seller invoices are not changed by these values.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {lebanonFinanceCostsLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-xl border p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <PackageCheck className="h-4 w-4 text-emerald-500" />
+                      <div>
+                        <p className="text-sm font-medium">Packaging</p>
+                        <p className="text-[10px] text-muted-foreground">Wakilni branded bags per sent order</p>
+                      </div>
+                    </div>
+                    <RateInput
+                      label="Packaging per Order"
+                      value={lebanonFinanceCosts.packaging_cost_usd}
+                      onChange={(v) => setLebanonFinanceCosts((p) => ({ ...p, packaging_cost_usd: v }))}
+                      helper="Default from Wakilni bags: 0.25 USD"
+                    />
+                  </div>
+                  <div className="rounded-xl border p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Warehouse className="h-4 w-4 text-emerald-500" />
+                      <div>
+                        <p className="text-sm font-medium">Warehouse Rental</p>
+                        <p className="text-[10px] text-muted-foreground">Monthly warehouse/storage rental from Wakilni</p>
+                      </div>
+                    </div>
+                    <RateInput
+                      label="Monthly Rental"
+                      value={lebanonFinanceCosts.warehouse_rental_monthly_usd}
+                      onChange={(v) => setLebanonFinanceCosts((p) => ({ ...p, warehouse_rental_monthly_usd: v }))}
+                      helper="Example: Fluid CBM Rental Fee from cashbox"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => saveLebanonFinanceCostsMutation.mutate()}
+                    disabled={saveLebanonFinanceCostsMutation.isPending}
+                    className="gap-2"
+                  >
+                    {saveLebanonFinanceCostsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save Lebanon Costs
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Separator />
