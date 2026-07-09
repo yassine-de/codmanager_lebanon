@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?no-check";
+import { getResolvedPDFJS } from "https://esm.sh/unpdf@0.10.1?target=deno";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -92,6 +93,105 @@ async function requireAdmin(req: Request, supabaseUrl: string, anonKey: string, 
   return { admin, user: userData.user };
 }
 
+function normalizeAmount(value: string) {
+  return Number(String(value || "0").replace(",", "."));
+}
+
+function parsePdfDate(value: string | null) {
+  if (!value) return null;
+  const match = value.match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[3]) + 2000;
+  return `${year}-${match[2]}-${match[1]}`;
+}
+
+function parseInvoiceLine(line: string) {
+  const cleaned = line.replace(/\s+/g, " ").trim();
+  if (!cleaned || cleaned.includes("Order Number") || cleaned.startsWith("QUOTI HOME")) return null;
+
+  const moneyMatches = [...cleaned.matchAll(/USD\s+(-?\d+(?:[.,]\d+)?)/gi)];
+  if (moneyMatches.length < 2) return null;
+
+  const firstMoney = moneyMatches[0];
+  const secondMoney = moneyMatches[1];
+  const prefix = cleaned.slice(0, firstMoney.index).trim();
+  const suffix = cleaned.slice((secondMoney.index || 0) + secondMoney[0].length).trim();
+  const orderMatch = prefix.match(/^(\d{6,})\s+#\s*([0-9]*)\s*(.*)$/);
+  if (!orderMatch) return null;
+
+  const dateMatch = cleaned.match(/(\d{2}\.\d{2}\.\d{2})\s*$/);
+  const typeMatch = suffix.match(/\b(Cash|Card|Transfer|Credit)\b/i);
+  const area = suffix
+    .replace(/\b(Cash|Card|Transfer|Credit)\b/i, "")
+    .replace(/(\d{2}\.\d{2}\.\d{2})\s*$/, "")
+    .trim() || null;
+
+  return {
+    wakilniOrderId: orderMatch[1],
+    waybill: orderMatch[2] || null,
+    recipientName: orderMatch[3]?.trim() || "",
+    deliveryFeeUsd: normalizeAmount(firstMoney[1]),
+    collectionUsd: normalizeAmount(secondMoney[1]),
+    collectionType: typeMatch?.[1] || null,
+    area,
+    invoiceDate: parsePdfDate(dateMatch?.[1] || null),
+    rawLine: cleaned,
+  };
+}
+
+async function extractRowsFromPdfBytes(bytes: Uint8Array) {
+  const { getDocument } = await getResolvedPDFJS();
+  const doc = await getDocument({
+    data: bytes,
+    disableWorker: true,
+    disableFontFace: true,
+    isEvalSupported: false,
+  }).promise;
+  const rows = [];
+
+  for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
+    const page = await doc.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const items = (content.items || [])
+      .map((item: any) => ({
+        str: String(item.str || "").trim(),
+        x: item.transform?.[4] || 0,
+        y: item.transform?.[5] || 0,
+      }))
+      .filter((item: any) => item.str.length > 0);
+
+    const lineMap = new Map();
+    for (const item of items) {
+      const key = Math.round(item.y / 3) * 3;
+      const existing = lineMap.get(key) || [];
+      existing.push(item);
+      lineMap.set(key, existing);
+    }
+
+    const lines = [...lineMap.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([, lineItems]) => lineItems.sort((a, b) => a.x - b.x).map((item) => item.str).join(" "));
+
+    for (const line of lines) {
+      const parsed = parseInvoiceLine(line);
+      if (parsed) rows.push(parsed);
+    }
+  }
+
+  return rows;
+}
+
+function getInvoiceFileDate(file: any) {
+  const match = String(file?.name || "").match(/(\d{4}-\d{2}-\d{2})/);
+  const byName = match ? Date.parse(`${match[1]}T00:00:00Z`) : Number.NaN;
+  if (Number.isFinite(byName)) return byName;
+  return Date.parse(file?.modifiedTime || "") || 0;
+}
+
+function sortInvoiceFiles(files: any[]) {
+  return [...files].sort((a, b) => getInvoiceFileDate(b) - getInvoiceFileDate(a));
+}
+
 async function getFolderId(admin: ReturnType<typeof createClient>, requestedFolderId?: string | null) {
   if (requestedFolderId) return requestedFolderId;
   const { data } = await admin
@@ -116,7 +216,7 @@ async function listDriveFiles(accessToken: string, folderId: string) {
   });
   const data = await resp.json();
   if (!resp.ok) throw new Error(`Drive list failed: ${JSON.stringify(data)}`);
-  return data.files || [];
+  return sortInvoiceFiles(data.files || []);
 }
 
 async function downloadDriveFile(accessToken: string, fileId: string) {
@@ -134,7 +234,156 @@ async function downloadDriveFile(accessToken: string, fileId: string) {
   );
   if (!fileResp.ok) throw new Error(`Drive download failed [${fileResp.status}]: ${await fileResp.text()}`);
   const bytes = new Uint8Array(await fileResp.arrayBuffer());
-  return { meta, base64: bytesToBase64(bytes) };
+  return { meta, bytes, base64: bytesToBase64(bytes) };
+}
+
+async function findLatestUnimportedPdf(admin: ReturnType<typeof createClient>, accessToken: string, folderId: string) {
+  const files = await listDriveFiles(accessToken, folderId);
+  const ids = files.map((file: any) => file.id).filter(Boolean);
+  if (ids.length === 0) return { file: null, files };
+
+  const { data: imports } = await admin
+    .from("wakilni_invoice_imports")
+    .select("google_drive_file_id")
+    .in("google_drive_file_id", ids);
+  const importedIds = new Set((imports || []).map((item: any) => item.google_drive_file_id));
+  const candidates = files.filter((file: any) => !importedIds.has(file.id));
+  return { file: candidates[0] || null, files };
+}
+
+async function matchRows(admin: ReturnType<typeof createClient>, rows: any[]) {
+  const wakilniIds = [...new Set(rows.map((r) => r.wakilniOrderId).filter(Boolean))];
+  const waybills = [...new Set(rows.map((r) => r.waybill).filter(Boolean))];
+  const ordersByWakilni = new Map();
+  const ordersByWaybill = new Map();
+
+  for (let i = 0; i < wakilniIds.length; i += 200) {
+    const { data, error } = await admin
+      .from("orders")
+      .select("id, order_id, system_id, customer_name, product_name, quantity, price, total_amount, delivery_status, wakilni_paid_at, wakilni_order_id")
+      .in("wakilni_order_id", wakilniIds.slice(i, i + 200));
+    if (error) throw error;
+    (data || []).forEach((order: any) => order.wakilni_order_id && ordersByWakilni.set(String(order.wakilni_order_id), order));
+  }
+
+  for (let i = 0; i < waybills.length; i += 200) {
+    const { data, error } = await admin
+      .from("orders")
+      .select("id, order_id, system_id, customer_name, product_name, quantity, price, total_amount, delivery_status, wakilni_paid_at, wakilni_order_id")
+      .in("order_id", waybills.slice(i, i + 200));
+    if (error) throw error;
+    (data || []).forEach((order: any) => ordersByWaybill.set(String(order.order_id), order));
+  }
+
+  return rows.map((row) => {
+    const order = ordersByWakilni.get(row.wakilniOrderId) || (row.waybill ? ordersByWaybill.get(row.waybill) : undefined);
+    if (!order) return { ...row, matchStatus: "unmatched", mismatchReason: "No matching order found" };
+    if (order.delivery_status !== "delivered") {
+      return { ...row, order, matchStatus: "not_delivered", mismatchReason: `Order status is ${order.delivery_status || "empty"}` };
+    }
+    const expected = Number(order.total_amount || 0);
+    if (Math.abs(expected - row.collectionUsd) > 0.05) {
+      return { ...row, order, matchStatus: "amount_mismatch", mismatchReason: `System ${expected.toFixed(2)} USD vs Wakilni ${row.collectionUsd.toFixed(2)} USD` };
+    }
+    if (order.wakilni_paid_at) return { ...row, order, matchStatus: "already_paid", mismatchReason: null };
+    return { ...row, order, matchStatus: "newly_paid", mismatchReason: null };
+  });
+}
+
+function invoiceNumberFromFileName(fileName: string) {
+  return fileName.replace(/\.pdf$/i, "");
+}
+
+async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, matchedRows: any[], file: any, userId: string | null = null) {
+  const existing = await admin
+    .from("wakilni_invoice_imports")
+    .select("id, imported_at")
+    .eq("google_drive_file_id", file.id)
+    .maybeSingle();
+  if (existing.data) {
+    return { skipped: true, reason: "Drive file already imported", import_id: existing.data.id };
+  }
+
+  const rowsToPay = matchedRows.filter((row) => row.matchStatus === "newly_paid" && row.order);
+  const insertImport = {
+    invoice_number: invoiceNumberFromFileName(file.name),
+    file_name: file.name,
+    google_drive_file_id: file.id,
+    google_drive_file_name: file.name,
+    google_drive_web_view_link: file.webViewLink || null,
+    imported_by: userId,
+    row_count: matchedRows.length,
+    matched_count: matchedRows.filter((row) => !!row.order).length,
+    newly_paid_count: rowsToPay.length,
+    already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
+    unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
+    amount_total_usd: matchedRows.reduce((sum, row) => sum + Number(row.collectionUsd || 0), 0),
+    delivery_fee_total_usd: matchedRows.reduce((sum, row) => sum + Number(row.deliveryFeeUsd || 0), 0),
+  };
+
+  const { data: importRow, error: importError } = await admin
+    .from("wakilni_invoice_imports")
+    .insert(insertImport)
+    .select("id")
+    .single();
+  if (importError) {
+    if (String(importError.message || "").includes("duplicate")) {
+      return { skipped: true, reason: "Drive file already imported" };
+    }
+    throw importError;
+  }
+
+  const importId = importRow.id;
+  const rowPayload = matchedRows.map((row) => ({
+    import_id: importId,
+    wakilni_order_id: row.wakilniOrderId,
+    waybill: row.waybill,
+    recipient_name: row.recipientName,
+    delivery_fee_usd: row.deliveryFeeUsd,
+    collection_usd: row.collectionUsd,
+    collection_type: row.collectionType,
+    area: row.area,
+    invoice_date: row.invoiceDate,
+    matched_order_id: row.order?.id || null,
+    match_status: row.matchStatus,
+    mismatch_reason: row.mismatchReason,
+  }));
+
+  for (let i = 0; i < rowPayload.length; i += 500) {
+    const { error } = await admin.from("wakilni_invoice_rows").insert(rowPayload.slice(i, i + 500));
+    if (error) throw error;
+  }
+
+  const now = new Date().toISOString();
+  for (let i = 0; i < rowsToPay.length; i += 100) {
+    const batch = rowsToPay.slice(i, i + 100);
+    await Promise.all(batch.map(async (row) => {
+      const { error } = await admin
+        .from("orders")
+        .update({
+          wakilni_paid_at: now,
+          wakilni_paid_by: userId,
+          wakilni_invoice_import_id: importId,
+          wakilni_invoice_number: invoiceNumberFromFileName(file.name),
+          wakilni_invoice_collection_usd: row.collectionUsd,
+          wakilni_invoice_delivery_fee_usd: row.deliveryFeeUsd,
+          wakilni_invoice_matched_at: now,
+        })
+        .eq("id", row.order.id)
+        .is("wakilni_paid_at", null);
+      if (error) throw error;
+    }));
+  }
+
+  return {
+    skipped: false,
+    import_id: importId,
+    row_count: matchedRows.length,
+    newly_paid_count: rowsToPay.length,
+    already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
+    unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
+    warnings_count: matchedRows.filter((row) => row.matchStatus === "amount_mismatch" || row.matchStatus === "not_delivered").length,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -149,7 +398,11 @@ Deno.serve(async (req) => {
     const googleKey = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY");
     if (!googleKey) return jsonResponse({ error: "GOOGLE_SERVICE_ACCOUNT_KEY not configured" }, 500);
 
-    const { admin } = await requireAdmin(req, supabaseUrl, anonKey, serviceRoleKey);
+    const cronRun = action === "process-latest" && body.source === "cron";
+    const authContext = cronRun
+      ? { admin: createClient(supabaseUrl, serviceRoleKey), user: null }
+      : await requireAdmin(req, supabaseUrl, anonKey, serviceRoleKey);
+    const { admin, user } = authContext;
     const folderId = await getFolderId(admin, body.folder_id || body.folderId);
     const accessToken = await getGoogleAccessToken(googleKey);
 
@@ -157,6 +410,59 @@ Deno.serve(async (req) => {
       if (!body.file_id && !body.fileId) throw new Error("file_id is required");
       const result = await downloadDriveFile(accessToken, body.file_id || body.fileId);
       return jsonResponse({ success: true, file: result.meta, base64: result.base64 });
+    }
+
+    if (action === "process-latest") {
+      const { file } = await findLatestUnimportedPdf(admin, accessToken, folderId);
+      await admin
+        .from("app_settings")
+        .upsert(
+          { key: "wakilni_invoice_auto_last_run_at", value: new Date().toISOString(), updated_at: new Date().toISOString() },
+          { onConflict: "key" },
+        );
+
+      if (!file) {
+        return jsonResponse({
+          success: true,
+          skipped: true,
+          reason: "No new Wakilni invoice PDF found",
+          folder_id: folderId,
+        });
+      }
+
+      const result = await downloadDriveFile(accessToken, file.id);
+      const rows = await extractRowsFromPdfBytes(result.bytes);
+      const matchedRows = await matchRows(admin, rows);
+      if (body.dry_run === true || body.dryRun === true) {
+        return jsonResponse({
+          success: true,
+          dry_run: true,
+          folder_id: folderId,
+          file: result.meta,
+          parsed_rows: rows.length,
+          matched_count: matchedRows.filter((row) => !!row.order).length,
+          newly_paid_count: matchedRows.filter((row) => row.matchStatus === "newly_paid").length,
+          already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
+          unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
+          warnings_count: matchedRows.filter((row) => row.matchStatus === "amount_mismatch" || row.matchStatus === "not_delivered").length,
+        });
+      }
+      const applied = await applyMatchedInvoice(admin, matchedRows, result.meta, user?.id || null);
+
+      await admin
+        .from("app_settings")
+        .upsert(
+          { key: "wakilni_invoice_auto_last_processed_file", value: result.meta.name, updated_at: new Date().toISOString() },
+          { onConflict: "key" },
+        );
+
+      return jsonResponse({
+        success: true,
+        folder_id: folderId,
+        file: result.meta,
+        parsed_rows: rows.length,
+        ...applied,
+      });
     }
 
     const files = await listDriveFiles(accessToken, folderId);

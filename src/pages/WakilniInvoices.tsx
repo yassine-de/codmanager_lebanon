@@ -315,6 +315,30 @@ export default function WakilniInvoices() {
     },
   });
 
+  const processLatestDriveFile = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("wakilni-invoice-drive", {
+        body: { action: "process-latest" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data?.skipped) {
+        toast.info(data.reason || "No new Wakilni invoice PDF found");
+      } else {
+        toast.success(`${data?.newly_paid_count || 0} orders marked paid from latest Drive invoice`);
+      }
+      scanDrive.mutate();
+      queryClient.invalidateQueries({ queryKey: ["wakilni-invoice-delivered-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["wakilni-invoice-imports"] });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Could not process latest Drive invoice");
+    },
+  });
+
   async function matchRows(rows: ParsedInvoiceRow[]) {
     const wakilniIds = [...new Set(rows.map((r) => r.wakilniOrderId).filter(Boolean))];
     const waybills = [...new Set(rows.map((r) => r.waybill).filter(Boolean))];
@@ -518,13 +542,19 @@ export default function WakilniInvoices() {
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
-              Scan the configured Wakilni invoice folder and process PDFs directly from Drive.
+              New Wakilni invoices are processed automatically every Saturday at 08:00 Beirut time. You can also scan and process Drive files manually.
               {driveFolderId && <span className="ml-1 font-mono text-xs">Folder: {driveFolderId}</span>}
             </div>
-            <Button onClick={() => scanDrive.mutate()} disabled={scanDrive.isPending} variant="outline">
-              <RefreshCw className={`mr-2 h-4 w-4 ${scanDrive.isPending ? "animate-spin" : ""}`} />
-              Scan Drive
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button onClick={() => processLatestDriveFile.mutate()} disabled={processLatestDriveFile.isPending || isParsing}>
+                <DownloadCloud className="mr-2 h-4 w-4" />
+                Process Latest New
+              </Button>
+              <Button onClick={() => scanDrive.mutate()} disabled={scanDrive.isPending} variant="outline">
+                <RefreshCw className={`mr-2 h-4 w-4 ${scanDrive.isPending ? "animate-spin" : ""}`} />
+                Scan Drive
+              </Button>
+            </div>
           </div>
 
           {driveFiles.length > 0 && (
