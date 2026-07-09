@@ -135,8 +135,7 @@ const LEBANON_WAKILNI_FULFILLMENT_COST = 0.5;
 const LEBANON_PACKAGING_COST = 0.25;
 const LEBANON_MONTHLY_CALL_CENTER_COST = 400;
 const LEBANON_WAREHOUSE_RENTAL_MONTHLY_COST = 0;
-const LEBANON_SHIPPED_COST_STATUSES = new Set([
-  "booked",
+const LEBANON_PROCESSING_COST_STATUSES = new Set([
   "shipped",
   "in_transit",
   "with_courier",
@@ -144,6 +143,8 @@ const LEBANON_SHIPPED_COST_STATUSES = new Set([
   "failed_attempt",
   "delivered",
   "paid",
+  "cancelled",
+  "rejected",
   "returned",
   "return",
   "ready_for_return",
@@ -182,7 +183,7 @@ interface AdminFinancialOverview {
   callCenterCost: number;
   totalCost: number;
   netProfit: number;
-  shippedCostCount: number;
+  processingCostCount: number;
   operatingDays: number;
   packagingCostPerOrder: number;
   warehouseRentalMonthlyCost: number;
@@ -199,7 +200,7 @@ const emptyAdminFinancialOverview: AdminFinancialOverview = {
   callCenterCost: 0,
   totalCost: 0,
   netProfit: 0,
-  shippedCostCount: 0,
+  processingCostCount: 0,
   operatingDays: 0,
   packagingCostPerOrder: LEBANON_PACKAGING_COST,
   warehouseRentalMonthlyCost: LEBANON_WAREHOUSE_RENTAL_MONTHLY_COST,
@@ -672,10 +673,10 @@ export default function Dashboard() {
       : LEBANON_WAREHOUSE_RENTAL_MONTHLY_COST;
     const deliveryRevenue = kpis.delivered * LEBANON_DELIVERY_FEE;
     const codRevenue = kpis.revenue * LEBANON_COD_FEE_RATE;
-    const shippedCostCount = orders.filter((order) => LEBANON_SHIPPED_COST_STATUSES.has(order.delivery_status || "")).length;
+    const processingCostCount = orders.filter((order) => LEBANON_PROCESSING_COST_STATUSES.has(order.delivery_status || "")).length;
     const wakilniCost = kpis.delivered * LEBANON_WAKILNI_DELIVERED_COST;
-    const fulfillmentCost = shippedCostCount * LEBANON_WAKILNI_FULFILLMENT_COST;
-    const packagingCost = shippedCostCount * packagingCostPerOrder;
+    const fulfillmentCost = processingCostCount * LEBANON_WAKILNI_FULFILLMENT_COST;
+    const packagingCost = processingCostCount * packagingCostPerOrder;
     const sourcingProfit = sourcingProfitRows.reduce((sum: number, row: any) => {
       return sum + (Number(row.seller_price || 0) - Number(row.landed_price || 0)) * Number(row.quantity || 0);
     }, 0);
@@ -691,7 +692,7 @@ export default function Dashboard() {
         if (
           order.delivery_status === "delivered" ||
           order.delivery_status === "paid" ||
-          LEBANON_SHIPPED_COST_STATUSES.has(order.delivery_status || "")
+          LEBANON_PROCESSING_COST_STATUSES.has(order.delivery_status || "")
         ) {
           activeDates.push(new Date(order.created_at));
         }
@@ -699,7 +700,7 @@ export default function Dashboard() {
       sourcingProfitRows.forEach((row: any) => activeDates.push(new Date(row.created_at)));
     }
 
-    const hasActivity = deliveryRevenue > 0 || codRevenue > 0 || sourcingProfit !== 0 || shippedCostCount > 0;
+    const hasActivity = deliveryRevenue > 0 || codRevenue > 0 || sourcingProfit !== 0 || processingCostCount > 0;
     const today = new Date();
     const periodStart = activeDates.length > 0
       ? new Date(Math.min(...activeDates.map((date) => date.getTime())))
@@ -726,7 +727,7 @@ export default function Dashboard() {
       callCenterCost,
       totalCost,
       netProfit,
-      shippedCostCount,
+      processingCostCount,
       operatingDays,
       packagingCostPerOrder,
       warehouseRentalMonthlyCost,
@@ -979,7 +980,7 @@ export default function Dashboard() {
                 <SellerFinancialMiniCard
                   title="Fulfilment Cost"
                   amount={adminFinancial.fulfillmentCost}
-                  subtitle={`${adminFinancial.shippedCostCount} orders x ${formatUSD(LEBANON_WAKILNI_FULFILLMENT_COST)}`}
+                  subtitle={`${adminFinancial.processingCostCount} processed orders x ${formatUSD(LEBANON_WAKILNI_FULFILLMENT_COST)}`}
                   icon={Navigation}
                   color="text-warning"
                   iconBg="bg-warning/10"
@@ -987,7 +988,7 @@ export default function Dashboard() {
                 <SellerFinancialMiniCard
                   title="Packaging Cost"
                   amount={adminFinancial.packagingCost}
-                  subtitle={`${adminFinancial.shippedCostCount} orders x ${formatUSD(adminFinancial.packagingCostPerOrder)}`}
+                  subtitle={`${adminFinancial.processingCostCount} processed orders x ${formatUSD(adminFinancial.packagingCostPerOrder)}`}
                   icon={PackageCheck}
                   color="text-warning"
                   iconBg="bg-warning/10"
