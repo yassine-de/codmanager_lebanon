@@ -54,10 +54,13 @@ function PaidBadge({ paid }: { paid: boolean }) {
   return paid ? <Badge variant="success">Paid</Badge> : <Badge variant="warning">Not paid</Badge>;
 }
 
+type SortKey = "created_desc" | "created_asc" | "order_desc" | "order_asc" | "wakilni_desc" | "wakilni_asc" | "amount_desc" | "amount_asc";
+
 export default function WakilniDeliveredOrders() {
   const { authUser } = useAuth();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "paid" | "not_paid">("all");
+  const [sort, setSort] = useState<SortKey>("created_desc");
   const isAdmin = authUser?.role === "admin";
 
   const { data: orders = [], isFetching } = useQuery({
@@ -91,7 +94,7 @@ export default function WakilniDeliveredOrders() {
 
   const filteredOrders = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return orders.filter((order) => {
+    const filtered = orders.filter((order) => {
       const paid = !!order.wakilni_paid_at;
       if (status === "paid" && !paid) return false;
       if (status === "not_paid" && paid) return false;
@@ -111,7 +114,22 @@ export default function WakilniDeliveredOrders() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(q));
     });
-  }, [orders, search, status]);
+    return [...filtered].sort((a, b) => {
+      const orderNumber = (order: DeliveredOrder) => Number(order.order_id || order.system_id || 0);
+      const createdTime = (order: DeliveredOrder) => new Date(order.created_at || 0).getTime();
+      const wakilniNumber = (order: DeliveredOrder) => Number(order.wakilni_order_id || order.wakilni_tracking_id || 0);
+      const amount = (order: DeliveredOrder) => Number(order.total_amount || 0);
+
+      if (sort === "order_asc") return orderNumber(a) - orderNumber(b);
+      if (sort === "order_desc") return orderNumber(b) - orderNumber(a);
+      if (sort === "created_asc") return createdTime(a) - createdTime(b);
+      if (sort === "created_desc") return createdTime(b) - createdTime(a);
+      if (sort === "wakilni_asc") return wakilniNumber(a) - wakilniNumber(b);
+      if (sort === "wakilni_desc") return wakilniNumber(b) - wakilniNumber(a);
+      if (sort === "amount_asc") return amount(a) - amount(b);
+      return amount(b) - amount(a);
+    });
+  }, [orders, search, sort, status]);
 
   const totals = useMemo(() => {
     return filteredOrders.reduce(
@@ -209,6 +227,21 @@ export default function WakilniDeliveredOrders() {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>
                 <SelectItem value="not_paid">Not paid</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sort} onValueChange={(value) => setSort(value as SortKey)}>
+              <SelectTrigger className="w-full md:w-[190px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_desc">Created newest</SelectItem>
+                <SelectItem value="created_asc">Created oldest</SelectItem>
+                <SelectItem value="order_desc">Order ID high</SelectItem>
+                <SelectItem value="order_asc">Order ID low</SelectItem>
+                <SelectItem value="wakilni_desc">Wakilni ID high</SelectItem>
+                <SelectItem value="wakilni_asc">Wakilni ID low</SelectItem>
+                <SelectItem value="amount_desc">Amount high</SelectItem>
+                <SelectItem value="amount_asc">Amount low</SelectItem>
               </SelectContent>
             </Select>
             <div className="relative md:w-[320px]">
