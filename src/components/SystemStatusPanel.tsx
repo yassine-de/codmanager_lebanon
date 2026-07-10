@@ -23,6 +23,7 @@ const WAKILNI_STATUS_SYNC_INTERVAL_MINUTES: Record<string, number> = {
   shipped: 60,
   in_transit: 60,
   booked: 180,
+  delivered: 720,
 };
 
 const severityConfig = {
@@ -111,14 +112,17 @@ export default function SystemStatusPanel({ dateRange }: { dateRange?: DateRange
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("orders")
-        .select("id, delivery_status, wakilni_synced_at")
+        .select("id, delivery_status, wakilni_synced_at, delivered_at, created_at")
         .not("wakilni_tracking_id", "is", null)
-        .in("delivery_status", Object.keys(WAKILNI_STATUS_SYNC_INTERVAL_MINUTES))
-        .gte("created_at", thirtyDaysAgo);
+        .in("delivery_status", Object.keys(WAKILNI_STATUS_SYNC_INTERVAL_MINUTES));
       if (error) throw error;
 
       const now = Date.now();
       return (data || []).filter((order) => {
+        if (order.delivery_status === "delivered") {
+          const deliveredAt = order.delivered_at || order.created_at;
+          if (!deliveredAt || new Date(deliveredAt).getTime() < new Date(thirtyDaysAgo).getTime()) return false;
+        }
         if (!order.wakilni_synced_at) return true;
         const intervalMinutes = WAKILNI_STATUS_SYNC_INTERVAL_MINUTES[order.delivery_status || ""] ?? 180;
         return now - new Date(order.wakilni_synced_at).getTime() >= intervalMinutes * 60_000;

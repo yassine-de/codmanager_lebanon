@@ -508,6 +508,7 @@ function mapWakilniDeliveryStatus(status?: string | null, statusCode?: string | 
 }
 
 const ACTIVE_WAKILNI_STATUSES = ["pending", "booked", "shipped", "in_transit", "with_courier", "failed_attempt"];
+const DELIVERED_WAKILNI_RECHECK_DAYS = 30;
 const STATUS_SYNC_CRON_GRACE_MS = 60_000;
 const STATUS_SYNC_INTERVAL_MINUTES: Record<string, number> = {
   with_courier: 15,
@@ -516,6 +517,7 @@ const STATUS_SYNC_INTERVAL_MINUTES: Record<string, number> = {
   in_transit: 60,
   booked: 180,
   pending: 180,
+  delivered: 720,
 };
 const STATUS_SYNC_PRIORITY: Record<string, number> = {
   with_courier: 1,
@@ -524,6 +526,7 @@ const STATUS_SYNC_PRIORITY: Record<string, number> = {
   in_transit: 4,
   booked: 5,
   pending: 6,
+  delivered: 7,
 };
 
 function getStatusSyncIntervalMinutes(status: string | null | undefined) {
@@ -706,17 +709,33 @@ async function syncActiveStatuses(supabase: ReturnType<typeof createClient>, man
     }
   }
 
-  const { data: orders, error } = await supabase
+  const { data: activeOrders, error: activeError } = await supabase
     .from("orders")
-    .select("id, order_id, system_id, wakilni_order_id, wakilni_tracking_id, delivery_status, wakilni_synced_at")
+    .select("id, order_id, system_id, wakilni_order_id, wakilni_tracking_id, delivery_status, wakilni_synced_at, delivered_at")
     .not("wakilni_tracking_id", "is", null)
     .in("delivery_status", ACTIVE_WAKILNI_STATUSES)
     .order("wakilni_synced_at", { ascending: true, nullsFirst: true })
     .limit(500);
 
-  if (error) throw error;
+  if (activeError) throw activeError;
 
-  const dueOrders = (orders || [])
+  const deliveredCutoff = new Date(now.getTime() - DELIVERED_WAKILNI_RECHECK_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { data: deliveredOrders, error: deliveredError } = await supabase
+    .from("orders")
+    .select("id, order_id, system_id, wakilni_order_id, wakilni_tracking_id, delivery_status, wakilni_synced_at, delivered_at")
+    .not("wakilni_tracking_id", "is", null)
+    .eq("delivery_status", "delivered")
+    .gte("delivered_at", deliveredCutoff)
+    .order("wakilni_synced_at", { ascending: true, nullsFirst: true })
+    .limit(500);
+
+  if (deliveredError) throw deliveredError;
+
+  const ordersById = new Map();
+  [...(activeOrders || []), ...(deliveredOrders || [])].forEach((order: any) => ordersById.set(order.id, order));
+  const orders = [...ordersById.values()];
+
+  const dueOrders = orders
     .filter((order: any) => isOrderDueForStatusSync(order, now, manual))
     .sort((a: any, b: any) => {
       const priorityDiff = (STATUS_SYNC_PRIORITY[a.delivery_status] ?? 99) - (STATUS_SYNC_PRIORITY[b.delivery_status] ?? 99);
@@ -759,7 +778,9 @@ async function syncActiveStatuses(supabase: ReturnType<typeof createClient>, man
     success: true,
     failed_order_retries: failedRetries,
     interval_minutes: intervalMinutes,
-    active_candidates: (orders || []).length,
+    active_candidates: (activeOrders || []).length,
+    delivered_recheck_candidates: (deliveredOrders || []).length,
+    delivered_recheck_days: DELIVERED_WAKILNI_RECHECK_DAYS,
     due: dueOrders.length,
     checked: results.length,
     updated: results.filter((result: any) => result.updated).length,
