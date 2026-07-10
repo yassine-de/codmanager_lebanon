@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type WakilniInvoiceImport = {
   id: string;
@@ -32,6 +34,22 @@ type WakilniInvoiceImport = {
   processing_summary: Record<string, unknown> | null;
 };
 
+type WakilniInvoiceIssueRow = {
+  id: string;
+  import_id: string;
+  wakilni_order_id: string | null;
+  waybill: string | null;
+  recipient_name: string | null;
+  delivery_fee_usd: number | null;
+  collection_usd: number | null;
+  collection_type: string | null;
+  area: string | null;
+  invoice_date: string | null;
+  matched_order_id: string | null;
+  match_status: string;
+  mismatch_reason: string | null;
+};
+
 const usd = (value: number) =>
   `${Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
@@ -48,6 +66,7 @@ function ResultBadge({ item }: { item: WakilniInvoiceImport }) {
 export default function WakilniInvoiceHistory() {
   const { authUser } = useAuth();
   const [search, setSearch] = useState("");
+  const [issueInvoice, setIssueInvoice] = useState<WakilniInvoiceImport | null>(null);
   const isAdmin = authUser?.role === "admin";
 
   const { data: invoices = [], isFetching, refetch } = useQuery({
@@ -61,6 +80,22 @@ export default function WakilniInvoiceHistory() {
       return (data || []) as WakilniInvoiceImport[];
     },
     enabled: isAdmin,
+  });
+
+  const { data: issueRows = [], isFetching: isFetchingIssues } = useQuery({
+    queryKey: ["wakilni-invoice-issues", issueInvoice?.id],
+    queryFn: async () => {
+      if (!issueInvoice?.id) return [];
+      const { data, error } = await (supabase as any)
+        .from("wakilni_invoice_rows")
+        .select("id,import_id,wakilni_order_id,waybill,recipient_name,delivery_fee_usd,collection_usd,collection_type,area,invoice_date,matched_order_id,match_status,mismatch_reason")
+        .eq("import_id", issueInvoice.id)
+        .in("match_status", ["unmatched", "not_delivered", "amount_mismatch"])
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data || []) as WakilniInvoiceIssueRow[];
+    },
+    enabled: isAdmin && !!issueInvoice?.id,
   });
 
   const visibleInvoices = useMemo(() => {
@@ -220,7 +255,17 @@ export default function WakilniInvoiceHistory() {
                   <TableCell className="text-right font-semibold">{lbp(Number(item.grand_total_lbp || 0))}</TableCell>
                   <TableCell>
                     <div className="space-y-1">
-                      <ResultBadge item={item} />
+                      {item.unmatched_count > 0 || item.warnings_count > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setIssueInvoice(item)}
+                          className="text-left text-warning underline-offset-2 hover:underline"
+                        >
+                          <ResultBadge item={item} />
+                        </button>
+                      ) : (
+                        <ResultBadge item={item} />
+                      )}
                       {(item.unmatched_count > 0 || item.warnings_count > 0) && (
                         <div className="text-xs text-muted-foreground">
                           {item.unmatched_count} unmatched, {item.warnings_count} warnings
@@ -255,6 +300,75 @@ export default function WakilniInvoiceHistory() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={!!issueInvoice} onOpenChange={(open) => !open && setIssueInvoice(null)}>
+        <DialogContent className="max-w-[1100px]">
+          <DialogHeader>
+            <DialogTitle>Wakilni Invoice Issues</DialogTitle>
+            <DialogDescription>
+              {issueInvoice?.invoice_number || issueInvoice?.file_name || "Invoice"} - rows that could not be cleanly reconciled.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Unmatched</p>
+              <p className="text-xl font-bold text-destructive">{issueInvoice?.unmatched_count || 0}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Warnings</p>
+              <p className="text-xl font-bold text-warning">{issueInvoice?.warnings_count || 0}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Total Issues</p>
+              <p className="text-xl font-bold">{(issueInvoice?.unmatched_count || 0) + (issueInvoice?.warnings_count || 0)}</p>
+            </div>
+          </div>
+          <ScrollArea className="max-h-[60vh] rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Wakilni Order</TableHead>
+                  <TableHead>Waybill</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead className="text-right">Collection</TableHead>
+                  <TableHead className="text-right">WK Fee</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {issueRows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-mono text-xs">{row.wakilni_order_id || "-"}</TableCell>
+                    <TableCell className="font-mono text-xs">{row.waybill ? `#${row.waybill}` : "-"}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{row.recipient_name || "-"}</div>
+                      <div className="max-w-[240px] truncate text-xs text-muted-foreground" title={row.area || ""}>{row.area || "-"}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={row.match_status === "unmatched" ? "destructive" : "warning"}>
+                        {row.match_status.replace(/_/g, " ")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[320px] text-xs text-muted-foreground">
+                      {row.mismatch_reason || "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">{usd(Number(row.collection_usd || 0))}</TableCell>
+                    <TableCell className="text-right">{usd(Number(row.delivery_fee_usd || 0))}</TableCell>
+                  </TableRow>
+                ))}
+                {issueRows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                      {isFetchingIssues ? "Loading issue rows..." : "No issue rows found for this invoice."}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
