@@ -41,6 +41,9 @@ type DeliveredOrder = {
 const money = (value: number) =>
   `${Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
+const formatDateTime = (value: string | null | undefined) =>
+  value ? new Date(value).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
+
 const shortWakilniId = (order: DeliveredOrder) => {
   const value = order.wakilni_order_id || order.wakilni_tracking_id || "";
   if (!value) return "-";
@@ -219,6 +222,7 @@ export default function WakilniDeliveredOrders() {
             <TableHeader>
               <TableRow>
                 <TableHead>Order ID</TableHead>
+                <TableHead>Created</TableHead>
                 <TableHead>Wakilni ID</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Customer</TableHead>
@@ -241,6 +245,10 @@ export default function WakilniDeliveredOrders() {
                     <TableCell>
                       <div className="font-mono font-semibold">#{order.order_id || order.system_id || "-"}</div>
                       {order.system_id && <div className="text-xs text-muted-foreground">System {order.system_id}</div>}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{formatDateTime(order.created_at)}</div>
+                      <div className="text-xs text-muted-foreground">System created</div>
                     </TableCell>
                     <TableCell className="font-mono text-xs" title={order.wakilni_order_id || order.wakilni_tracking_id || ""}>
                       {shortWakilniId(order)}
@@ -279,7 +287,7 @@ export default function WakilniDeliveredOrders() {
               })}
               {filteredOrders.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-12 text-center text-muted-foreground">
+                  <TableCell colSpan={11} className="py-12 text-center text-muted-foreground">
                     {isFetching ? "Loading delivered orders..." : "No delivered orders found."}
                   </TableCell>
                 </TableRow>
@@ -288,7 +296,7 @@ export default function WakilniDeliveredOrders() {
             {filteredOrders.length > 0 && (
               <TableFooter>
                 <TableRow>
-                  <TableCell colSpan={5}>Total</TableCell>
+                  <TableCell colSpan={6}>Total</TableCell>
                   <TableCell className="text-right font-bold">{money(totals.systemAmount)}</TableCell>
                   <TableCell className="text-right font-bold">{money(totals.wakilniAmount)}</TableCell>
                   <TableCell className="text-right font-bold">{money(totals.difference)}</TableCell>
