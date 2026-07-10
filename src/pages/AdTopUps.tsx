@@ -210,51 +210,58 @@ export default function AdTopUps() {
   });
 
   return (
-    <div className="max-w-6xl space-y-5">
+    <div className="max-w-6xl space-y-4 sm:space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Ad Top-ups</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Ad Top-ups</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             {isAdmin ? "Capture seller ad-account top-ups and include them in invoices." : "Your ad-account top-ups and invoice status."}
           </p>
         </div>
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search top-ups..." className="pl-9" />
+          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search top-ups..." className="h-11 sm:h-9 pl-9" />
         </div>
       </div>
 
       {isAdmin && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.1fr_0.8fr_1.2fr]">
+        <Card className="border-primary/20">
+          <CardContent className="p-3 sm:p-4">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold sm:hidden">
+              <BadgeDollarSign className="h-4 w-4 text-primary" />
+              Quick Add
+            </div>
+            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-[1.1fr_0.8fr_1.2fr]">
               <SearchableSelect
                 value={sellerId}
                 onValueChange={setSellerId}
                 options={sellerOptions}
                 placeholder="Seller"
                 allLabel="Choose seller"
+                className="h-12 sm:h-9 w-full"
               />
               <Input
                 inputMode="decimal"
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 placeholder="Amount USD"
+                className="h-12 sm:h-9 text-base sm:text-xs"
               />
               <Input
                 value={adAccountName}
                 onChange={(event) => setAdAccountName(event.target.value)}
                 placeholder="Ad account name"
+                className="h-12 sm:h-9 text-base sm:text-xs"
               />
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+            <div className="mt-2.5 grid grid-cols-1 gap-2.5 md:grid-cols-[1fr_auto]">
               <Textarea
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
-                placeholder="Note, e.g. requested via personal WhatsApp"
-                className="min-h-[42px]"
+                placeholder="Note, e.g. personal WhatsApp"
+                className="min-h-[72px] sm:min-h-[42px] text-base sm:text-xs"
               />
-              <Button onClick={() => createTopUpMutation.mutate()} disabled={createTopUpMutation.isPending} className="h-[42px] gap-2">
+              <Button onClick={() => createTopUpMutation.mutate()} disabled={createTopUpMutation.isPending} className="h-12 sm:h-[42px] gap-2 text-sm">
                 {createTopUpMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 Save Top-up
               </Button>
@@ -263,37 +270,37 @@ export default function AdTopUps() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="rounded-lg bg-warning/10 p-2 text-warning"><Clock className="h-4 w-4" /></div>
-            <div>
-              <p className="text-xs text-muted-foreground">Open</p>
-              <p className="text-xl font-bold tabular-nums">{formatUSD(stats.open)}</p>
+          <CardContent className="p-2.5 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className="rounded-lg bg-warning/10 p-1.5 sm:p-2 text-warning w-fit"><Clock className="h-4 w-4" /></div>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Open</p>
+              <p className="text-sm sm:text-xl font-bold tabular-nums truncate">{formatUSD(stats.open)}</p>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="rounded-lg bg-info/10 p-2 text-info"><ReceiptText className="h-4 w-4" /></div>
-            <div>
-              <p className="text-xs text-muted-foreground">Invoiced</p>
-              <p className="text-xl font-bold tabular-nums">{formatUSD(stats.invoiced)}</p>
+          <CardContent className="p-2.5 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className="rounded-lg bg-info/10 p-1.5 sm:p-2 text-info w-fit"><ReceiptText className="h-4 w-4" /></div>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Invoiced</p>
+              <p className="text-sm sm:text-xl font-bold tabular-nums truncate">{formatUSD(stats.invoiced)}</p>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="rounded-lg bg-success/10 p-2 text-success"><Wallet className="h-4 w-4" /></div>
-            <div>
-              <p className="text-xs text-muted-foreground">Paid</p>
-              <p className="text-xl font-bold tabular-nums">{formatUSD(stats.paid)}</p>
+          <CardContent className="p-2.5 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className="rounded-lg bg-success/10 p-1.5 sm:p-2 text-success w-fit"><Wallet className="h-4 w-4" /></div>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Paid</p>
+              <p className="text-sm sm:text-xl font-bold tabular-nums truncate">{formatUSD(stats.paid)}</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
+      <Card className="hidden sm:block">
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
@@ -338,6 +345,50 @@ export default function AdTopUps() {
           )}
         </CardContent>
       </Card>
+
+      <div className="space-y-2 sm:hidden">
+        {isLoading ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-12">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </CardContent>
+          </Card>
+        ) : filteredTopUps.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">
+              No ad top-ups found.
+            </CardContent>
+          </Card>
+        ) : filteredTopUps.map((topUp) => (
+          <Card key={topUp.id}>
+            <CardContent className="p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">{topUp.ad_account_name}</p>
+                  {isAdmin && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {sellerNameMap[topUp.seller_id] || topUp.seller_id.slice(0, 8)}
+                    </p>
+                  )}
+                </div>
+                <p className="font-bold tabular-nums shrink-0">{formatUSD(Number(topUp.amount_usd || 0))}</p>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5" />
+                  {format(new Date(topUp.topup_date), "dd MMM yyyy")}
+                </span>
+                <TopUpStatusBadge status={topUp.status} />
+              </div>
+              {topUp.note && (
+                <p className="mt-2 rounded-md bg-muted px-2.5 py-2 text-xs text-muted-foreground">
+                  {topUp.note}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
