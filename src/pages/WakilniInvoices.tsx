@@ -40,7 +40,7 @@ type MatchedInvoiceRow = ParsedInvoiceRow & {
     wakilni_paid_at: string | null;
     wakilni_order_id: string | null;
   };
-  matchStatus: "newly_paid" | "already_paid" | "not_delivered" | "amount_mismatch" | "amount_adjusted" | "rejected_zero_collection" | "unmatched";
+  matchStatus: "newly_paid" | "already_paid" | "not_delivered" | "amount_mismatch" | "amount_adjusted" | "rejected_zero_collection" | "yellow_store_purchase" | "unmatched";
   mismatchReason: string | null;
 };
 
@@ -225,6 +225,7 @@ function StatusBadge({ status }: { status: MatchedInvoiceRow["matchStatus"] }) {
   if (status === "already_paid") return <Badge variant="info">Already paid</Badge>;
   if (status === "amount_adjusted") return <Badge variant="warning">Amount adjusted</Badge>;
   if (status === "rejected_zero_collection") return <Badge variant="warning">Rejected correction</Badge>;
+  if (status === "yellow_store_purchase") return <Badge variant="info">Yellow Store purchase</Badge>;
   if (status === "amount_mismatch") return <Badge variant="warning">Amount mismatch</Badge>;
   if (status === "not_delivered") return <Badge variant="warning">Not delivered</Badge>;
   return <Badge variant="destructive">Unmatched</Badge>;
@@ -295,6 +296,10 @@ export default function WakilniInvoices() {
       already: matchedRows.filter((r) => r.matchStatus === "already_paid").length,
       unmatched: matchedRows.filter((r) => r.matchStatus === "unmatched").length,
       warnings: matchedRows.filter((r) => ["amount_adjusted", "rejected_zero_collection", "amount_mismatch", "not_delivered"].includes(r.matchStatus)).length,
+      yellowStore: matchedRows.filter((r) => r.matchStatus === "yellow_store_purchase").length,
+      yellowStoreAmount: matchedRows
+        .filter((r) => r.matchStatus === "yellow_store_purchase")
+        .reduce((sum, row) => sum + Math.abs(Number(row.collectionUsd || 0)), 0),
       collection: matchedRows.reduce((sum, row) => sum + Number(row.collectionUsd || 0), 0),
     };
   }, [matchedRows]);
@@ -414,6 +419,10 @@ export default function WakilniInvoices() {
     }
 
     const nextRows = rows.map((row) => {
+      if (String(row.recipientName || "").toLowerCase().includes("wakilni yellow store")) {
+        const amount = Math.abs(Number(row.collectionUsd || 0));
+        return { ...row, matchStatus: "yellow_store_purchase", mismatchReason: `Yellow Store product purchase paid by Wakilni (${money(amount)})` } as MatchedInvoiceRow;
+      }
       const order = ordersByWakilni.get(row.wakilniOrderId) || (row.waybill ? ordersByWaybill.get(row.waybill) : undefined);
       if (!order) return { ...row, matchStatus: "unmatched", mismatchReason: "No matching order found" } as MatchedInvoiceRow;
       if (Number(row.collectionUsd || 0) <= 0 && order.delivery_status === "delivered") {
@@ -440,6 +449,7 @@ export default function WakilniInvoices() {
       const rowsToPay = matchedRows.filter((row) => ["newly_paid", "amount_adjusted"].includes(row.matchStatus) && row.order);
       const rowsToReject = matchedRows.filter((row) => row.matchStatus === "rejected_zero_collection" && row.order);
       const warningsCount = matchedRows.filter((row) => ["amount_adjusted", "rejected_zero_collection", "amount_mismatch", "not_delivered"].includes(row.matchStatus)).length;
+      const yellowStoreRows = matchedRows.filter((row) => row.matchStatus === "yellow_store_purchase");
       const insertImport = {
         invoice_number: invoiceNumber,
         file_name: fileName,
@@ -469,6 +479,8 @@ export default function WakilniInvoices() {
           already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
           unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
           warnings_count: warningsCount,
+          yellow_store_purchase_count: yellowStoreRows.length,
+          yellow_store_purchase_usd: yellowStoreRows.reduce((sum, row) => sum + Math.abs(Number(row.collectionUsd || 0)), 0),
         },
       };
 
@@ -781,12 +793,13 @@ export default function WakilniInvoices() {
           </div>
 
           {matchedRows.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-7">
               <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Rows</p><p className="text-xl font-bold">{preview.totalRows}</p></div>
               <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Ready</p><p className="text-xl font-bold text-success">{preview.ready}</p></div>
               <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Already</p><p className="text-xl font-bold text-info">{preview.already}</p></div>
               <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Warnings</p><p className="text-xl font-bold text-warning">{preview.warnings}</p></div>
               <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Unmatched</p><p className="text-xl font-bold text-destructive">{preview.unmatched}</p></div>
+              <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Yellow Store</p><p className="text-xl font-bold text-info">{money(preview.yellowStoreAmount)}</p></div>
               <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Collection</p><p className="text-xl font-bold">{money(preview.collection)}</p></div>
             </div>
           )}

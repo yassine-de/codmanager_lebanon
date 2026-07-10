@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, ExternalLink, FileText, RefreshCw, WalletCards } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, FileText, PackageCheck, RefreshCw, WalletCards } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,11 @@ type WakilniInvoiceIssueRow = {
   matched_order_id: string | null;
   match_status: string;
   mismatch_reason: string | null;
+};
+
+type WakilniInvoiceYellowStoreRow = {
+  import_id: string;
+  collection_usd: number | null;
 };
 
 const usd = (value: number) =>
@@ -98,6 +103,30 @@ export default function WakilniInvoiceHistory() {
     enabled: isAdmin && !!issueInvoice?.id,
   });
 
+  const { data: yellowStoreRows = [] } = useQuery({
+    queryKey: ["wakilni-invoice-yellow-store-rows"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("wakilni_invoice_rows")
+        .select("import_id,collection_usd")
+        .eq("match_status", "yellow_store_purchase");
+      if (error) throw error;
+      return (data || []) as WakilniInvoiceYellowStoreRow[];
+    },
+    enabled: isAdmin,
+  });
+
+  const yellowStoreByImport = useMemo(() => {
+    const map = new Map<string, { count: number; amount: number }>();
+    for (const row of yellowStoreRows) {
+      const current = map.get(row.import_id) || { count: 0, amount: 0 };
+      current.count += 1;
+      current.amount += Math.abs(Number(row.collection_usd || 0));
+      map.set(row.import_id, current);
+    }
+    return map;
+  }, [yellowStoreRows]);
+
   const visibleInvoices = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return invoices;
@@ -119,6 +148,8 @@ export default function WakilniInvoiceHistory() {
         collectionUsd: sum.collectionUsd + Number(item.total_collection_usd || 0),
         feesUsd: sum.feesUsd + Number(item.total_wk_fees_usd || 0),
         grandUsd: sum.grandUsd + Number(item.grand_total_usd || 0),
+        yellowStoreUsd: sum.yellowStoreUsd + Number(yellowStoreByImport.get(item.id)?.amount || 0),
+        yellowStoreCount: sum.yellowStoreCount + Number(yellowStoreByImport.get(item.id)?.count || 0),
         collectionLbp: sum.collectionLbp + Number(item.total_collection_lbp || 0),
         feesLbp: sum.feesLbp + Number(item.total_wk_fees_lbp || 0),
         grandLbp: sum.grandLbp + Number(item.grand_total_lbp || 0),
@@ -132,12 +163,14 @@ export default function WakilniInvoiceHistory() {
         collectionUsd: 0,
         feesUsd: 0,
         grandUsd: 0,
+        yellowStoreUsd: 0,
+        yellowStoreCount: 0,
         collectionLbp: 0,
         feesLbp: 0,
         grandLbp: 0,
       },
     );
-  }, [visibleInvoices]);
+  }, [visibleInvoices, yellowStoreByImport]);
 
   if (!isAdmin) {
     return (
@@ -167,7 +200,7 @@ export default function WakilniInvoiceHistory() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
         <Card>
           <CardContent className="flex items-center justify-between p-5">
             <div>
@@ -202,6 +235,16 @@ export default function WakilniInvoiceHistory() {
             )}
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="flex items-center justify-between p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Yellow Store Purchases</p>
+              <div className="mt-2 text-2xl font-bold">{usd(totals.yellowStoreUsd)}</div>
+              <p className="mt-1 text-xs text-muted-foreground">{totals.yellowStoreCount} invoice rows</p>
+            </div>
+            <PackageCheck className="h-10 w-10 rounded-lg bg-info/10 p-2 text-info" />
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -222,6 +265,7 @@ export default function WakilniInvoiceHistory() {
                 <TableHead>Imported</TableHead>
                 <TableHead className="text-right">Total Collection USD</TableHead>
                 <TableHead className="text-right">Total WK Fees USD</TableHead>
+                <TableHead className="text-right">Yellow Store USD</TableHead>
                 <TableHead className="text-right">Grand Total USD</TableHead>
                 <TableHead className="text-right">Total Collection LBP</TableHead>
                 <TableHead className="text-right">Total WK Fees LBP</TableHead>
@@ -249,6 +293,7 @@ export default function WakilniInvoiceHistory() {
                   <TableCell>{new Date(item.imported_at).toLocaleString("en-GB")}</TableCell>
                   <TableCell className="text-right font-semibold">{usd(Number(item.total_collection_usd || 0))}</TableCell>
                   <TableCell className="text-right">{usd(Number(item.total_wk_fees_usd || 0))}</TableCell>
+                  <TableCell className="text-right">{usd(Number(yellowStoreByImport.get(item.id)?.amount || 0))}</TableCell>
                   <TableCell className="text-right font-semibold text-success">{usd(Number(item.grand_total_usd || 0))}</TableCell>
                   <TableCell className="text-right">{lbp(Number(item.total_collection_lbp || 0))}</TableCell>
                   <TableCell className="text-right">{lbp(Number(item.total_wk_fees_lbp || 0))}</TableCell>
@@ -277,7 +322,7 @@ export default function WakilniInvoiceHistory() {
               ))}
               {visibleInvoices.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="py-12 text-center text-muted-foreground">
                     No Wakilni invoices found.
                   </TableCell>
                 </TableRow>
@@ -289,6 +334,7 @@ export default function WakilniInvoiceHistory() {
                   <TableCell colSpan={2}>Total</TableCell>
                   <TableCell className="text-right">{usd(totals.collectionUsd)}</TableCell>
                   <TableCell className="text-right">{usd(totals.feesUsd)}</TableCell>
+                  <TableCell className="text-right">{usd(totals.yellowStoreUsd)}</TableCell>
                   <TableCell className="text-right font-bold">{usd(totals.grandUsd)}</TableCell>
                   <TableCell className="text-right">{lbp(totals.collectionLbp)}</TableCell>
                   <TableCell className="text-right">{lbp(totals.feesLbp)}</TableCell>

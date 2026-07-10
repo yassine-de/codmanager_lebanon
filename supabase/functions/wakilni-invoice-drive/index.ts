@@ -338,6 +338,10 @@ async function matchRows(admin: ReturnType<typeof createClient>, rows: any[]) {
   }
 
   return rows.map((row) => {
+    if (String(row.recipientName || "").toLowerCase().includes("wakilni yellow store")) {
+      const amount = Math.abs(Number(row.collectionUsd || 0));
+      return { ...row, matchStatus: "yellow_store_purchase", mismatchReason: `Yellow Store product purchase paid by Wakilni (${amount.toFixed(2)} USD)` };
+    }
     const order = ordersByWakilni.get(row.wakilniOrderId) || (row.waybill ? ordersByWaybill.get(row.waybill) : undefined);
     if (!order) return { ...row, matchStatus: "unmatched", mismatchReason: "No matching order found" };
     if (Number(row.collectionUsd || 0) <= 0 && order.delivery_status === "delivered") {
@@ -385,6 +389,7 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
   const rowsToPay = matchedRows.filter((row) => ["newly_paid", "amount_adjusted"].includes(row.matchStatus) && row.order);
   const rowsToReject = matchedRows.filter((row) => row.matchStatus === "rejected_zero_collection" && row.order);
   const warningStatuses = ["amount_adjusted", "rejected_zero_collection", "amount_mismatch", "not_delivered"];
+  const yellowStoreRows = matchedRows.filter((row) => row.matchStatus === "yellow_store_purchase");
   const insertImport = {
     invoice_number: invoiceNumberFromFileName(file.name),
     file_name: file.name,
@@ -414,6 +419,8 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
       already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
       unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
       warnings_count: matchedRows.filter((row) => warningStatuses.includes(row.matchStatus)).length,
+      yellow_store_purchase_count: yellowStoreRows.length,
+      yellow_store_purchase_usd: yellowStoreRows.reduce((sum, row) => sum + Math.abs(Number(row.collectionUsd || 0)), 0),
     },
   };
 
@@ -613,6 +620,10 @@ Deno.serve(async (req) => {
           already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
           unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
           warnings_count: matchedRows.filter((row) => ["amount_adjusted", "rejected_zero_collection", "amount_mismatch", "not_delivered"].includes(row.matchStatus)).length,
+          yellow_store_purchase_count: matchedRows.filter((row) => row.matchStatus === "yellow_store_purchase").length,
+          yellow_store_purchase_usd: matchedRows
+            .filter((row) => row.matchStatus === "yellow_store_purchase")
+            .reduce((sum, row) => sum + Math.abs(Number(row.collectionUsd || 0)), 0),
           totals,
         });
       }
