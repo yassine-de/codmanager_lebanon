@@ -15,6 +15,8 @@ type DeliveredOrder = {
   system_id: number | null;
   created_at: string;
   updated_at: string;
+  delivered_at: string | null;
+  delivered_status_at?: string | null;
   customer_name: string | null;
   customer_phone: string | null;
   customer_city: string | null;
@@ -68,14 +70,37 @@ export default function WakilniDeliveredOrders() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("orders")
-        .select("id,order_id,system_id,created_at,updated_at,customer_name,customer_phone,customer_city,product_name,quantity,total_amount,delivery_status,wakilni_order_id,wakilni_tracking_id,wakilni_paid_at,wakilni_invoice_number,wakilni_invoice_collection_usd,wakilni_invoice_delivery_fee_usd,wakilni_invoice_import_id")
+        .select("id,order_id,system_id,created_at,updated_at,delivered_at,customer_name,customer_phone,customer_city,product_name,quantity,total_amount,delivery_status,wakilni_order_id,wakilni_tracking_id,wakilni_paid_at,wakilni_invoice_number,wakilni_invoice_collection_usd,wakilni_invoice_delivery_fee_usd,wakilni_invoice_import_id")
         .eq("delivery_status", "delivered")
         .order("updated_at", { ascending: false })
         .limit(10000);
       if (error) throw error;
       const orderRows = (data || []) as DeliveredOrder[];
+      const orderIds = [...new Set(orderRows.map((order) => order.order_id).filter(Boolean))] as string[];
+      const deliveredHistoryByOrder = new Map<string, string>();
+
+      for (let i = 0; i < orderIds.length; i += 500) {
+        const { data: historyRows, error: historyError } = await (supabase as any)
+          .from("order_history")
+          .select("order_id,created_at")
+          .eq("field_changed", "delivery_status")
+          .eq("new_value", "delivered")
+          .in("order_id", orderIds.slice(i, i + 500))
+          .order("created_at", { ascending: false });
+        if (historyError) throw historyError;
+        (historyRows || []).forEach((row: any) => {
+          if (row.order_id && !deliveredHistoryByOrder.has(row.order_id)) {
+            deliveredHistoryByOrder.set(row.order_id, row.created_at);
+          }
+        });
+      }
+
+      const withDeliveredStatusAt = orderRows.map((order) => ({
+        ...order,
+        delivered_status_at: order.delivered_at || (order.order_id ? deliveredHistoryByOrder.get(order.order_id) || null : null),
+      }));
       const importIds = [...new Set(orderRows.map((order) => order.wakilni_invoice_import_id).filter(Boolean))];
-      if (importIds.length === 0) return orderRows;
+      if (importIds.length === 0) return withDeliveredStatusAt;
 
       const { data: imports, error: importsError } = await (supabase as any)
         .from("wakilni_invoice_imports")
@@ -84,7 +109,7 @@ export default function WakilniDeliveredOrders() {
       if (importsError) throw importsError;
 
       const importsById = new Map((imports || []).map((item: any) => [item.id, item]));
-      return orderRows.map((order) => ({
+      return withDeliveredStatusAt.map((order) => ({
         ...order,
         invoice: order.wakilni_invoice_import_id ? importsById.get(order.wakilni_invoice_import_id) || null : null,
       }));
@@ -256,6 +281,7 @@ export default function WakilniDeliveredOrders() {
               <TableRow>
                 <TableHead>Order ID</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead>Delivered</TableHead>
                 <TableHead>Wakilni ID</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Customer</TableHead>
@@ -282,6 +308,10 @@ export default function WakilniDeliveredOrders() {
                     <TableCell>
                       <div className="font-medium">{formatDateTime(order.created_at)}</div>
                       <div className="text-xs text-muted-foreground">System created</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{formatDateTime(order.delivered_status_at)}</div>
+                      <div className="text-xs text-muted-foreground">Set delivered</div>
                     </TableCell>
                     <TableCell className="font-mono text-xs" title={order.wakilni_order_id || order.wakilni_tracking_id || ""}>
                       {shortWakilniId(order)}
@@ -320,7 +350,7 @@ export default function WakilniDeliveredOrders() {
               })}
               {filteredOrders.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} className="py-12 text-center text-muted-foreground">
+                  <TableCell colSpan={12} className="py-12 text-center text-muted-foreground">
                     {isFetching ? "Loading delivered orders..." : "No delivered orders found."}
                   </TableCell>
                 </TableRow>
@@ -329,7 +359,7 @@ export default function WakilniDeliveredOrders() {
             {filteredOrders.length > 0 && (
               <TableFooter>
                 <TableRow>
-                  <TableCell colSpan={6}>Total</TableCell>
+                  <TableCell colSpan={7}>Total</TableCell>
                   <TableCell className="text-right font-bold">{money(totals.systemAmount)}</TableCell>
                   <TableCell className="text-right font-bold">{money(totals.wakilniAmount)}</TableCell>
                   <TableCell className="text-right font-bold">{money(totals.difference)}</TableCell>
