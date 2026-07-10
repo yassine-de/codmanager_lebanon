@@ -608,7 +608,7 @@ export default function WakilniInvoices() {
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
-              New Wakilni invoices are processed automatically every Saturday at 08:00 Beirut time. You can also scan and process Drive files manually.
+              New Wakilni invoices are processed automatically every Saturday at 16:00 Beirut time. You can also scan and process Drive files manually.
               {driveFolderId && <span className="ml-1 font-mono text-xs">Folder: {driveFolderId}</span>}
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
