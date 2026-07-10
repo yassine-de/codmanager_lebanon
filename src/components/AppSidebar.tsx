@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { LayoutDashboard, ShoppingCart, Package, BarChart3, Package2, BoxIcon, Settings, Users, ChevronDown, Link2, CheckSquare, Store, DollarSign, PhoneForwarded, FileText, FileSpreadsheet, Calculator, ListChecks, BadgeDollarSign, MessageSquare, Megaphone, ArrowUpDown, Activity, ClipboardCheck, Inbox, CheckCircle2, Zap, Sparkles, Send, ReceiptText } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Package, BarChart3, Package2, BoxIcon, Settings, Users, ChevronDown, Link2, CheckSquare, Store, DollarSign, PhoneForwarded, FileText, FileSpreadsheet, Calculator, ListChecks, BadgeDollarSign, MessageSquare, Megaphone, ArrowUpDown, Activity, ClipboardCheck, Inbox, CheckCircle2, Zap, Sparkles, Send, ReceiptText, Truck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -50,8 +50,6 @@ const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUn
   { title: "Support", url: "/support", icon: MessageSquare, permission: "access_to_settings", badge: supportUnread > 0 ? supportUnread : undefined, feature: "support" },
   { title: "Alerts", url: "/alerts", icon: Megaphone, permission: "access_to_settings", feature: "alerts" },
   { title: "invoices", url: "/invoices", icon: FileText, permission: "access_to_settings", sellerVisible: true },
-  { title: "Wakilni Invoices", url: "/wakilni-invoices", icon: ReceiptText, adminOnly: true },
-  { title: "Wakilni History", url: "/wakilni-invoice-history", icon: FileText, adminOnly: true },
   { title: "Adjustments", url: "/adjustments", icon: ArrowUpDown, permission: "access_to_settings", badge: pendingAdjustments > 0 ? pendingAdjustments : undefined },
   { title: "sourcing", url: "/seller-sourcing", icon: Package2, sellerOnly: true, badge: sourcingUnseen > 0 ? sourcingUnseen : undefined, feature: "sourcing" },
   { title: "sheets", url: "/sheets", icon: FileSpreadsheet, sellerOnly: true },
@@ -80,6 +78,12 @@ const settingsSubItems = [
   { title: "Rates", url: "/rates", icon: BadgeDollarSign, permission: "access_to_settings" },
   { title: "integrations", url: "/integrations", icon: Link2, permission: "access_to_settings" },
   { title: "System Health", url: "/system-health", icon: Activity, permission: "access_to_settings", feature: "orioSync" as FeatureKey },
+];
+
+const wakilniSubItems = [
+  { title: "Delivered Orders", url: "/wakilni-delivered-orders", icon: Truck },
+  { title: "Process Invoices", url: "/wakilni-invoices", icon: ReceiptText },
+  { title: "Invoice History", url: "/wakilni-invoice-history", icon: FileText },
 ];
 
 const getWhatsappSubItems = (inboxUnread: number) => [
@@ -278,6 +282,8 @@ export function AppSidebar() {
   const isSettingsActive = ["/settings", "/users", "/integrations", "/rates", "/system-health"].some((p) =>
     location.pathname.startsWith(p)
   );
+  const showWakilni = isAdmin && hasPermission("access_to_settings");
+  const isWakilniActive = location.pathname.startsWith("/wakilni-");
 
   return (
     <Sidebar collapsible="icon">
@@ -407,6 +413,48 @@ export function AppSidebar() {
                                             {(sub as any).badge.toLocaleString()}
                                           </span>
                                         )}
+                                      </NavLink>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+                                );
+                              })}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </SidebarMenuItem>
+                      </Collapsible>
+                    )}
+
+                    {showWakilni && item.url === '/invoices' && (
+                      <Collapsible defaultOpen={isWakilniActive} className="group/wakilni">
+                        <SidebarMenuItem>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton
+                              isActive={isWakilniActive}
+                              className="h-9 text-[13px] cursor-pointer rounded-lg"
+                            >
+                              <ReceiptText className="mr-2 h-4 w-4 opacity-70" />
+                              {!collapsed && (
+                                <>
+                                  <span className="flex-1">Wakilni</span>
+                                  <ChevronDown className="ml-auto h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]/wakilni:rotate-180 opacity-50" />
+                                </>
+                              )}
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {wakilniSubItems.map((sub) => {
+                                const isSubActive = location.pathname.startsWith(sub.url);
+                                return (
+                                  <SidebarMenuSubItem key={sub.url}>
+                                    <SidebarMenuSubButton asChild isActive={isSubActive} className="text-[13px] h-8 rounded-lg">
+                                      <NavLink
+                                        to={sub.url}
+                                        className="hover:bg-sidebar-accent/70"
+                                        activeClassName="lebanon-active-nav bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                      >
+                                        <sub.icon className="mr-2 h-3.5 w-3.5 opacity-60" />
+                                        <span>{sub.title}</span>
                                       </NavLink>
                                     </SidebarMenuSubButton>
                                   </SidebarMenuSubItem>
