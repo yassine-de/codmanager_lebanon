@@ -23,6 +23,7 @@ import SettingsPage from "./pages/Settings";
 import Users from "./pages/Users";
 import Integrations from "./pages/Integrations";
 import Invoices from "./pages/Invoices";
+import AdTopUps from "./pages/AdTopUps";
 import WakilniInvoices from "./pages/WakilniInvoices";
 import WakilniInvoiceHistory from "./pages/WakilniInvoiceHistory";
 import WakilniDeliveredOrders from "./pages/WakilniDeliveredOrders";
@@ -171,6 +172,7 @@ function AppRoutes() {
         <Route path="/integrations" element={<ProtectedRoute permission="access_to_settings"><Integrations /></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute permission="access_to_users"><Users /></ProtectedRoute>} />
         <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
+        <Route path="/ad-topups" element={<ProtectedRoute><AdTopUps /></ProtectedRoute>} />
         <Route path="/wakilni-invoices" element={<ProtectedRoute permission="access_to_settings"><WakilniInvoices /></ProtectedRoute>} />
         <Route path="/wakilni-invoice-history" element={<ProtectedRoute permission="access_to_settings"><WakilniInvoiceHistory /></ProtectedRoute>} />
         <Route path="/wakilni-delivered-orders" element={<ProtectedRoute permission="access_to_settings"><WakilniDeliveredOrders /></ProtectedRoute>} />

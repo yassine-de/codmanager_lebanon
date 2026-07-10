@@ -211,6 +211,12 @@ export default function Invoices() {
       // Auto-create a new open invoice for this seller
       const inv = invoices.find(i => i.id === invoiceId);
       if (inv) {
+        await (supabase as any)
+          .from("ad_topups")
+          .update({ status: "invoiced", invoiced_at: new Date().toISOString() })
+          .eq("invoice_id", invoiceId)
+          .eq("status", "open");
+
         const { data: existingOpen } = await supabase
           .from("invoices")
           .select("id")
@@ -229,6 +235,8 @@ export default function Invoices() {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoice-summaries"] });
       queryClient.invalidateQueries({ queryKey: ["invoice-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ad-topups"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-ad-topup-summary"] });
       toast.success("Invoice finalized and sent to seller");
     },
     onError: () => toast.error("Failed to finalize invoice"),
@@ -249,6 +257,15 @@ export default function Invoices() {
         .eq("id", invoiceId);
       if (error) throw error;
       await logInvoiceHistory(invoiceId, "status_change", "status", currentStatus, newStatus);
+
+      await (supabase as any)
+        .from("ad_topups")
+        .update({
+          status: isPaid ? "invoiced" : "paid",
+          paid_at: isPaid ? null : new Date().toISOString(),
+        })
+        .eq("invoice_id", invoiceId)
+        .in("status", isPaid ? ["paid"] : ["open", "invoiced"]);
 
       // When marking as paid: carry negative balance to next open invoice
       if (!isPaid && netPayable !== undefined && netPayable < 0 && sellerId) {
@@ -289,6 +306,8 @@ export default function Invoices() {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoice-summaries"] });
       queryClient.invalidateQueries({ queryKey: ["invoice-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ad-topups"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-ad-topup-summary"] });
       toast.success("Payment status updated");
     },
   });
@@ -303,12 +322,19 @@ export default function Invoices() {
           .update({ status: "open", finalized_at: null } as any)
           .eq("id", invoiceId);
         if (error) throw error;
+        await (supabase as any)
+          .from("ad_topups")
+          .update({ status: "open", invoiced_at: null })
+          .eq("invoice_id", invoiceId)
+          .eq("status", "invoiced");
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoice-summaries"] });
       queryClient.invalidateQueries({ queryKey: ["invoice-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ad-topups"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-ad-topup-summary"] });
       toast.success("Invoice reverted to open");
     },
   });

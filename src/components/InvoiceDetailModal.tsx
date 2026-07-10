@@ -33,10 +33,17 @@ export function InvoiceDetailModal({
     mutationFn: async (addonId: string) => {
       const { error } = await supabase.rpc("remove_invoice_addon", { p_addon_id: addonId } as any);
       if (error) throw error;
+      await (supabase as any)
+        .from("ad_topups")
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+        .eq("invoice_addon_id", addonId)
+        .neq("status", "paid");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoice-summary"] });
       queryClient.invalidateQueries({ queryKey: ["invoice-summaries"] });
+      queryClient.invalidateQueries({ queryKey: ["ad-topups"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-ad-topup-summary"] });
       setConfirmDeleteId(null);
       toast.success("Addon removed");
     },

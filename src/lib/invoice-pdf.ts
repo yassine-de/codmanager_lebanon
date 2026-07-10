@@ -36,6 +36,15 @@ export function downloadInvoicePDF(summary: InvoiceSummaryResponse, sellerName: 
     }).join("")
     : `<tr><td colspan="8" class="empty">No delivered orders</td></tr>`;
 
+  const addonRows = summary.addons.length
+    ? summary.addons.map((addon, i) => `
+        <tr class="${i % 2 ? "s" : ""}">
+          <td>${fmtDate(addon.created_at)}</td>
+          <td>${addon.reason || (addon.type === "in" ? "Bonus" : "Deduction")}</td>
+          <td class="r ${addon.type === "in" ? "g" : "r-val"}">${addon.type === "in" ? "+" : "-"}${usd(addon.amount)}</td>
+        </tr>`).join("")
+    : "";
+
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -160,6 +169,20 @@ tfoot tr td.r-ft{background:#fef2f2;color:#dc2626}
     </table>
   </div>
 </div>
+
+${summary.addons.length > 0 ? `
+<div class="section">
+  <div class="sh" style="background:#eef2ff;color:#4338ca;border-left:4px solid #4f46e5">
+    Additional Items
+    <span class="badge">${summary.addons.length}</span>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Description</th><th class="r">Amount</th></tr>
+    </thead>
+    <tbody>${addonRows}</tbody>
+  </table>
+</div>` : ""}
 
 <!-- FINAL SUMMARY -->
 <div class="fee-list">

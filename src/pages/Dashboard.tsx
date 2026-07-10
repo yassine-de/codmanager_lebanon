@@ -315,6 +315,7 @@ function SellerFinancialMiniCard({
   color,
   iconBg,
   delay = 0,
+  onClick,
 }: {
   title: string;
   amount: number;
@@ -323,9 +324,16 @@ function SellerFinancialMiniCard({
   color: string;
   iconBg: string;
   delay?: number;
+  onClick?: () => void;
 }) {
   return (
-    <div className="rounded-xl border shadow-soft px-4 py-4 animate-slide-up bg-card" style={{ animationDelay: `${delay}ms` }}>
+    <div
+      onClick={onClick}
+      className={`rounded-xl border shadow-soft px-4 py-4 animate-slide-up bg-card ${
+        onClick ? "cursor-pointer hover:shadow-elevated hover:-translate-y-0.5 transition-all duration-200" : ""
+      }`}
+      style={{ animationDelay: `${delay}ms` }}
+    >
       <div className="flex items-start gap-3">
         <div className={`p-2.5 rounded-xl ${iconBg} shrink-0`}>
           <Icon className={`w-4 h-4 ${color}`} />
@@ -622,6 +630,26 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   });
 
+  const { data: sellerAdTopupSummary = { open: 0, invoiced: 0 } } = useQuery({
+    queryKey: ["seller-ad-topup-summary", authUser?.id],
+    queryFn: async () => {
+      if (!authUser?.id) return { open: 0, invoiced: 0 };
+      const { data, error } = await (supabase as any)
+        .from("ad_topups")
+        .select("amount_usd, status")
+        .eq("seller_id", authUser.id)
+        .in("status", ["open", "invoiced"]);
+      if (error) throw error;
+      return (data || []).reduce((acc: { open: number; invoiced: number }, row: any) => {
+        if (row.status === "open") acc.open += Number(row.amount_usd || 0);
+        if (row.status === "invoiced") acc.invoiced += Number(row.amount_usd || 0);
+        return acc;
+      }, { open: 0, invoiced: 0 });
+    },
+    enabled: isSeller && !!authUser?.id,
+    refetchInterval: 60_000,
+  });
+
   const { data: sourcingProfitRows = [] } = useQuery({
     queryKey: ["dashboard-admin-sourcing-profit", dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
@@ -877,7 +905,7 @@ export default function Dashboard() {
                   highlight
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
                 <SellerFinancialMiniCard
                   title="Open Delivered Revenue"
                   amount={sellerFinancial.unpaidDeliveredRevenue}
@@ -909,6 +937,15 @@ export default function Dashboard() {
                   icon={DollarSign}
                   color="text-primary"
                   iconBg="bg-primary/10"
+                />
+                <SellerFinancialMiniCard
+                  title="Ad Top-ups"
+                  amount={sellerAdTopupSummary.open}
+                  subtitle={`${formatUSD(sellerAdTopupSummary.invoiced)} already invoiced`}
+                  icon={Banknote}
+                  color="text-warning"
+                  iconBg="bg-warning/10"
+                  onClick={() => navigate("/ad-topups")}
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">

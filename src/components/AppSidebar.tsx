@@ -50,6 +50,7 @@ const getNavItems = (orderCount: number, sourcingUnseen: number, adminSourcingUn
   { title: "Support", url: "/support", icon: MessageSquare, permission: "access_to_settings", badge: supportUnread > 0 ? supportUnread : undefined, feature: "support" },
   { title: "Alerts", url: "/alerts", icon: Megaphone, permission: "access_to_settings", feature: "alerts" },
   { title: "invoices", url: "/invoices", icon: FileText, permission: "access_to_settings", sellerVisible: true },
+  { title: "Ad Top-ups", url: "/ad-topups", icon: BadgeDollarSign, permission: "access_to_settings", sellerVisible: true },
   { title: "Adjustments", url: "/adjustments", icon: ArrowUpDown, permission: "access_to_settings", badge: pendingAdjustments > 0 ? pendingAdjustments : undefined },
   { title: "sourcing", url: "/seller-sourcing", icon: Package2, sellerOnly: true, badge: sourcingUnseen > 0 ? sourcingUnseen : undefined, feature: "sourcing" },
   { title: "sheets", url: "/sheets", icon: FileSpreadsheet, sellerOnly: true },
