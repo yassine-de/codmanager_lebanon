@@ -359,6 +359,19 @@ function invoiceNumberFromFileName(fileName: string) {
   return fileName.replace(/\.pdf$/i, "");
 }
 
+async function getHistoryActorId(admin: ReturnType<typeof createClient>, userId: string | null) {
+  if (userId) return userId;
+  const { data, error } = await admin
+    .from("users")
+    .select("id")
+    .eq("role", "admin")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) console.error("Could not resolve history actor:", error);
+  return data?.id || null;
+}
+
 async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, matchedRows: any[], file: any, userId: string | null = null, totals: any = {}) {
   const existing = await admin
     .from("wakilni_invoice_imports")
@@ -438,6 +451,7 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
   }
 
   const now = new Date().toISOString();
+  const historyActorId = await getHistoryActorId(admin, userId);
   for (let i = 0; i < rowsToReject.length; i += 100) {
     const batch = rowsToReject.slice(i, i + 100);
     await Promise.all(batch.map(async (row) => {
@@ -456,16 +470,18 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
         .eq("delivery_status", "delivered");
       if (error) throw error;
 
-      const { error: historyError } = await admin.from("order_history").insert({
-        order_id: row.order.order_id,
-        changed_by: userId,
-        changed_by_role: userId ? "admin" : "system",
-        field_changed: "delivery_status",
-        old_value: row.order.delivery_status,
-        new_value: "rejected",
-        action_type: "wakilni_invoice_zero_collection",
-      });
-      if (historyError) console.error("order_history insert failed:", historyError);
+      if (historyActorId) {
+        const { error: historyError } = await admin.from("order_history").insert({
+          order_id: row.order.order_id,
+          changed_by: historyActorId,
+          changed_by_role: userId ? "admin" : "system",
+          field_changed: "delivery_status",
+          old_value: row.order.delivery_status,
+          new_value: "rejected",
+          action_type: "wakilni_invoice_zero_collection",
+        });
+        if (historyError) console.error("order_history insert failed:", historyError);
+      }
     }));
   }
 
@@ -500,27 +516,29 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
       if (error) throw error;
 
       if (adjusted) {
-        const { error: historyError } = await admin.from("order_history").insert([
-          {
-            order_id: row.order.order_id,
-            changed_by: userId,
-            changed_by_role: userId ? "admin" : "system",
-            field_changed: "total_amount",
-            old_value: expected.toFixed(2),
-            new_value: nextTotal.toFixed(2),
-            action_type: "wakilni_invoice_amount_adjustment",
-          },
-          {
-            order_id: row.order.order_id,
-            changed_by: userId,
-            changed_by_role: userId ? "admin" : "system",
-            field_changed: "price",
-            old_value: Number(row.order.price || 0).toFixed(2),
-            new_value: nextPrice.toFixed(2),
-            action_type: "wakilni_invoice_amount_adjustment",
-          },
-        ]);
-        if (historyError) console.error("order_history insert failed:", historyError);
+        if (historyActorId) {
+          const { error: historyError } = await admin.from("order_history").insert([
+            {
+              order_id: row.order.order_id,
+              changed_by: historyActorId,
+              changed_by_role: userId ? "admin" : "system",
+              field_changed: "total_amount",
+              old_value: expected.toFixed(2),
+              new_value: nextTotal.toFixed(2),
+              action_type: "wakilni_invoice_amount_adjustment",
+            },
+            {
+              order_id: row.order.order_id,
+              changed_by: historyActorId,
+              changed_by_role: userId ? "admin" : "system",
+              field_changed: "price",
+              old_value: Number(row.order.price || 0).toFixed(2),
+              new_value: nextPrice.toFixed(2),
+              action_type: "wakilni_invoice_amount_adjustment",
+            },
+          ]);
+          if (historyError) console.error("order_history insert failed:", historyError);
+        }
       }
     }));
   }
