@@ -97,6 +97,11 @@ function normalizeAmount(value: string) {
   return Number(String(value || "0").replace(/,/g, "").replace(/\s/g, ""));
 }
 
+function toUsdAmount(value: string, currency: "USD" | "LBP") {
+  const amount = normalizeAmount(value);
+  return currency === "LBP" ? Number((amount / 100000).toFixed(2)) : amount;
+}
+
 function parsePdfDate(value: string | null) {
   if (!value) return null;
   const match = value.match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
@@ -109,11 +114,11 @@ function parseInvoiceLine(line: string) {
   const cleaned = line.replace(/\s+/g, " ").trim();
   if (!cleaned || cleaned.includes("Order Number") || cleaned.startsWith("QUOTI HOME")) return null;
 
-  const moneyMatches = [...cleaned.matchAll(/USD\s+(-?\d+(?:[.,]\d+)?)/gi)];
-  if (moneyMatches.length < 2) return null;
+  const moneyMatches = [...cleaned.matchAll(/\b(USD|LBP)\s+(-?\d[\d,]*(?:[.,]\d+)?)/gi)];
+  if (moneyMatches.length < 1) return null;
 
   const firstMoney = moneyMatches[0];
-  const secondMoney = moneyMatches[1];
+  const secondMoney = moneyMatches[1] || moneyMatches[0];
   const prefix = cleaned.slice(0, firstMoney.index).trim();
   const suffix = cleaned.slice((secondMoney.index || 0) + secondMoney[0].length).trim();
   const orderMatch = prefix.match(/^(\d{6,})\s+#\s*([0-9]*)\s*(.*)$/);
@@ -130,8 +135,8 @@ function parseInvoiceLine(line: string) {
     wakilniOrderId: orderMatch[1],
     waybill: orderMatch[2] || null,
     recipientName: orderMatch[3]?.trim() || "",
-    deliveryFeeUsd: normalizeAmount(firstMoney[1]),
-    collectionUsd: normalizeAmount(secondMoney[1]),
+    deliveryFeeUsd: moneyMatches.length > 1 ? toUsdAmount(firstMoney[2], String(firstMoney[1]).toUpperCase() as "USD" | "LBP") : 0,
+    collectionUsd: toUsdAmount(secondMoney[2], String(secondMoney[1]).toUpperCase() as "USD" | "LBP"),
     collectionType: typeMatch?.[1] || null,
     area,
     invoiceDate: parsePdfDate(dateMatch?.[1] || null),
