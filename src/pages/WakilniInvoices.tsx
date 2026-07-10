@@ -603,7 +603,11 @@ export default function WakilniInvoices() {
       return { paid: rowsToPay.length };
     },
     onSuccess: ({ paid }) => {
-      toast.success(`${paid} delivered orders marked as Paid from Wakilni`);
+      toast.success(
+        paid > 0
+          ? `${paid} delivered orders marked as Paid from Wakilni`
+          : "Wakilni invoice imported for review. No delivered orders were marked paid.",
+      );
       setParsedRows([]);
       setMatchedRows([]);
       setFileName("");
@@ -784,9 +788,9 @@ export default function WakilniInvoices() {
             </Button>
             <Button
               onClick={() => applyImport.mutate()}
-              disabled={matchedRows.length === 0 || applyImport.isPending || preview.ready === 0}
+              disabled={matchedRows.length === 0 || applyImport.isPending}
             >
-              Apply and Mark Paid
+              {preview.ready > 0 ? "Apply and Mark Paid" : "Import for Review"}
             </Button>
             {fileName && <span className="text-xs text-muted-foreground">{fileName}</span>}
             {sourceDriveFile && <Badge variant="info">Loaded from Drive</Badge>}
