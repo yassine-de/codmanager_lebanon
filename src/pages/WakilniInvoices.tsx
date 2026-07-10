@@ -40,7 +40,7 @@ type MatchedInvoiceRow = ParsedInvoiceRow & {
     wakilni_paid_at: string | null;
     wakilni_order_id: string | null;
   };
-  matchStatus: "newly_paid" | "already_paid" | "not_delivered" | "amount_mismatch" | "unmatched";
+  matchStatus: "newly_paid" | "already_paid" | "not_delivered" | "amount_mismatch" | "amount_adjusted" | "rejected_zero_collection" | "unmatched";
   mismatchReason: string | null;
 };
 
@@ -223,6 +223,8 @@ function base64ToFile(base64: string, fileName: string, mimeType = "application/
 function StatusBadge({ status }: { status: MatchedInvoiceRow["matchStatus"] }) {
   if (status === "newly_paid") return <Badge variant="success">Ready to mark paid</Badge>;
   if (status === "already_paid") return <Badge variant="info">Already paid</Badge>;
+  if (status === "amount_adjusted") return <Badge variant="warning">Amount adjusted</Badge>;
+  if (status === "rejected_zero_collection") return <Badge variant="warning">Rejected correction</Badge>;
   if (status === "amount_mismatch") return <Badge variant="warning">Amount mismatch</Badge>;
   if (status === "not_delivered") return <Badge variant="warning">Not delivered</Badge>;
   return <Badge variant="destructive">Unmatched</Badge>;
@@ -292,7 +294,7 @@ export default function WakilniInvoices() {
       ready: matchedRows.filter((r) => r.matchStatus === "newly_paid").length,
       already: matchedRows.filter((r) => r.matchStatus === "already_paid").length,
       unmatched: matchedRows.filter((r) => r.matchStatus === "unmatched").length,
-      warnings: matchedRows.filter((r) => r.matchStatus === "amount_mismatch" || r.matchStatus === "not_delivered").length,
+      warnings: matchedRows.filter((r) => ["amount_adjusted", "rejected_zero_collection", "amount_mismatch", "not_delivered"].includes(r.matchStatus)).length,
       collection: matchedRows.reduce((sum, row) => sum + Number(row.collectionUsd || 0), 0),
     };
   }, [matchedRows]);
@@ -414,14 +416,17 @@ export default function WakilniInvoices() {
     const nextRows = rows.map((row) => {
       const order = ordersByWakilni.get(row.wakilniOrderId) || (row.waybill ? ordersByWaybill.get(row.waybill) : undefined);
       if (!order) return { ...row, matchStatus: "unmatched", mismatchReason: "No matching order found" } as MatchedInvoiceRow;
+      if (Number(row.collectionUsd || 0) <= 0 && order.delivery_status === "delivered") {
+        return { ...row, order, matchStatus: "rejected_zero_collection", mismatchReason: "Wakilni collection is 0.00, order should be rejected instead of delivered" } as MatchedInvoiceRow;
+      }
       if (order.delivery_status !== "delivered") {
         return { ...row, order, matchStatus: "not_delivered", mismatchReason: `Order status is ${order.delivery_status || "empty"}` } as MatchedInvoiceRow;
       }
+      if (order.wakilni_paid_at) return { ...row, order, matchStatus: "already_paid", mismatchReason: null } as MatchedInvoiceRow;
       const expected = Number(order.total_amount || 0);
       if (Math.abs(expected - row.collectionUsd) > 0.05) {
-        return { ...row, order, matchStatus: "amount_mismatch", mismatchReason: `System ${money(expected)} vs Wakilni ${money(row.collectionUsd)}` } as MatchedInvoiceRow;
+        return { ...row, order, matchStatus: "amount_adjusted", mismatchReason: `System amount adjusted from ${money(expected)} to Wakilni ${money(row.collectionUsd)}` } as MatchedInvoiceRow;
       }
-      if (order.wakilni_paid_at) return { ...row, order, matchStatus: "already_paid", mismatchReason: null } as MatchedInvoiceRow;
       return { ...row, order, matchStatus: "newly_paid", mismatchReason: null } as MatchedInvoiceRow;
     });
 
@@ -432,8 +437,9 @@ export default function WakilniInvoices() {
     mutationFn: async () => {
       if (!fileName || matchedRows.length === 0) throw new Error("Upload and parse a Wakilni invoice first");
       const invoiceNumber = getInvoiceNumberFromName(fileName);
-      const rowsToPay = matchedRows.filter((row) => row.matchStatus === "newly_paid" && row.order);
-      const warningsCount = matchedRows.filter((row) => row.matchStatus === "amount_mismatch" || row.matchStatus === "not_delivered").length;
+      const rowsToPay = matchedRows.filter((row) => ["newly_paid", "amount_adjusted"].includes(row.matchStatus) && row.order);
+      const rowsToReject = matchedRows.filter((row) => row.matchStatus === "rejected_zero_collection" && row.order);
+      const warningsCount = matchedRows.filter((row) => ["amount_adjusted", "rejected_zero_collection", "amount_mismatch", "not_delivered"].includes(row.matchStatus)).length;
       const insertImport = {
         invoice_number: invoiceNumber,
         file_name: fileName,
@@ -495,14 +501,14 @@ export default function WakilniInvoices() {
       }
 
       const now = new Date().toISOString();
-      for (let i = 0; i < rowsToPay.length; i += 100) {
-        const batch = rowsToPay.slice(i, i + 100);
+      for (let i = 0; i < rowsToReject.length; i += 100) {
+        const batch = rowsToReject.slice(i, i + 100);
         await Promise.all(batch.map(async (row) => {
           const { error } = await (supabase as any)
             .from("orders")
             .update({
-              wakilni_paid_at: now,
-              wakilni_paid_by: authUser?.id || null,
+              delivery_status: "rejected",
+              updated_at: now,
               wakilni_invoice_import_id: importId,
               wakilni_invoice_number: invoiceNumber,
               wakilni_invoice_collection_usd: row.collectionUsd,
@@ -510,8 +516,75 @@ export default function WakilniInvoices() {
               wakilni_invoice_matched_at: now,
             })
             .eq("id", row.order!.id)
+            .eq("delivery_status", "delivered");
+          if (error) throw error;
+
+          const { error: historyError } = await (supabase as any).from("order_history").insert({
+            order_id: row.order!.order_id,
+            changed_by: authUser?.id || null,
+            changed_by_role: authUser?.role || "admin",
+            field_changed: "delivery_status",
+            old_value: row.order!.delivery_status,
+            new_value: "rejected",
+            action_type: "wakilni_invoice_zero_collection",
+          });
+          if (historyError) throw historyError;
+        }));
+      }
+
+      for (let i = 0; i < rowsToPay.length; i += 100) {
+        const batch = rowsToPay.slice(i, i + 100);
+        await Promise.all(batch.map(async (row) => {
+          const quantity = Math.max(1, Number(row.order!.quantity || 1));
+          const expected = Number(row.order!.total_amount || 0);
+          const adjusted = row.matchStatus === "amount_adjusted";
+          const nextTotal = Number(row.collectionUsd || 0);
+          const nextPrice = Number((nextTotal / quantity).toFixed(2));
+          const updatePayload: Record<string, unknown> = {
+            wakilni_paid_at: now,
+            wakilni_paid_by: authUser?.id || null,
+            wakilni_invoice_import_id: importId,
+            wakilni_invoice_number: invoiceNumber,
+            wakilni_invoice_collection_usd: row.collectionUsd,
+            wakilni_invoice_delivery_fee_usd: row.deliveryFeeUsd,
+            wakilni_invoice_matched_at: now,
+          };
+          if (adjusted) {
+            updatePayload.total_amount = nextTotal;
+            updatePayload.price = nextPrice;
+            updatePayload.updated_at = now;
+          }
+
+          const { error } = await (supabase as any)
+            .from("orders")
+            .update(updatePayload)
+            .eq("id", row.order!.id)
             .is("wakilni_paid_at", null);
           if (error) throw error;
+
+          if (adjusted) {
+            const { error: historyError } = await (supabase as any).from("order_history").insert([
+              {
+                order_id: row.order!.order_id,
+                changed_by: authUser?.id || null,
+                changed_by_role: authUser?.role || "admin",
+                field_changed: "total_amount",
+                old_value: expected.toFixed(2),
+                new_value: nextTotal.toFixed(2),
+                action_type: "wakilni_invoice_amount_adjustment",
+              },
+              {
+                order_id: row.order!.order_id,
+                changed_by: authUser?.id || null,
+                changed_by_role: authUser?.role || "admin",
+                field_changed: "price",
+                old_value: Number(row.order!.price || 0).toFixed(2),
+                new_value: nextPrice.toFixed(2),
+                action_type: "wakilni_invoice_amount_adjustment",
+              },
+            ]);
+            if (historyError) throw historyError;
+          }
         }));
       }
 

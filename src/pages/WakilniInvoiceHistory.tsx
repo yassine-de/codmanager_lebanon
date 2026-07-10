@@ -90,7 +90,7 @@ export default function WakilniInvoiceHistory() {
         .from("wakilni_invoice_rows")
         .select("id,import_id,wakilni_order_id,waybill,recipient_name,delivery_fee_usd,collection_usd,collection_type,area,invoice_date,matched_order_id,match_status,mismatch_reason")
         .eq("import_id", issueInvoice.id)
-        .in("match_status", ["unmatched", "not_delivered", "amount_mismatch"])
+        .in("match_status", ["unmatched", "not_delivered", "amount_mismatch", "amount_adjusted", "rejected_zero_collection"])
         .order("created_at", { ascending: true });
       if (error) throw error;
       return (data || []) as WakilniInvoiceIssueRow[];

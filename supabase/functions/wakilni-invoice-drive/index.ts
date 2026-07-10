@@ -340,14 +340,17 @@ async function matchRows(admin: ReturnType<typeof createClient>, rows: any[]) {
   return rows.map((row) => {
     const order = ordersByWakilni.get(row.wakilniOrderId) || (row.waybill ? ordersByWaybill.get(row.waybill) : undefined);
     if (!order) return { ...row, matchStatus: "unmatched", mismatchReason: "No matching order found" };
+    if (Number(row.collectionUsd || 0) <= 0 && order.delivery_status === "delivered") {
+      return { ...row, order, matchStatus: "rejected_zero_collection", mismatchReason: "Wakilni collection is 0.00, order should be rejected instead of delivered" };
+    }
     if (order.delivery_status !== "delivered") {
       return { ...row, order, matchStatus: "not_delivered", mismatchReason: `Order status is ${order.delivery_status || "empty"}` };
     }
+    if (order.wakilni_paid_at) return { ...row, order, matchStatus: "already_paid", mismatchReason: null };
     const expected = Number(order.total_amount || 0);
     if (Math.abs(expected - row.collectionUsd) > 0.05) {
-      return { ...row, order, matchStatus: "amount_mismatch", mismatchReason: `System ${expected.toFixed(2)} USD vs Wakilni ${row.collectionUsd.toFixed(2)} USD` };
+      return { ...row, order, matchStatus: "amount_adjusted", mismatchReason: `System amount adjusted from ${expected.toFixed(2)} USD to Wakilni ${row.collectionUsd.toFixed(2)} USD` };
     }
-    if (order.wakilni_paid_at) return { ...row, order, matchStatus: "already_paid", mismatchReason: null };
     return { ...row, order, matchStatus: "newly_paid", mismatchReason: null };
   });
 }
@@ -366,7 +369,9 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
     return { skipped: true, reason: "Drive file already imported", import_id: existing.data.id };
   }
 
-  const rowsToPay = matchedRows.filter((row) => row.matchStatus === "newly_paid" && row.order);
+  const rowsToPay = matchedRows.filter((row) => ["newly_paid", "amount_adjusted"].includes(row.matchStatus) && row.order);
+  const rowsToReject = matchedRows.filter((row) => row.matchStatus === "rejected_zero_collection" && row.order);
+  const warningStatuses = ["amount_adjusted", "rejected_zero_collection", "amount_mismatch", "not_delivered"];
   const insertImport = {
     invoice_number: invoiceNumberFromFileName(file.name),
     file_name: file.name,
@@ -379,7 +384,7 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
     newly_paid_count: rowsToPay.length,
     already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
     unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
-    warnings_count: matchedRows.filter((row) => row.matchStatus === "amount_mismatch" || row.matchStatus === "not_delivered").length,
+    warnings_count: matchedRows.filter((row) => warningStatuses.includes(row.matchStatus)).length,
     amount_total_usd: matchedRows.reduce((sum, row) => sum + Number(row.collectionUsd || 0), 0),
     delivery_fee_total_usd: matchedRows.reduce((sum, row) => sum + Number(row.deliveryFeeUsd || 0), 0),
     total_collection_usd: Number(totals.total_collection_usd || matchedRows.reduce((sum, row) => sum + Number(row.collectionUsd || 0), 0)),
@@ -395,7 +400,7 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
       newly_paid_count: rowsToPay.length,
       already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
       unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
-      warnings_count: matchedRows.filter((row) => row.matchStatus === "amount_mismatch" || row.matchStatus === "not_delivered").length,
+      warnings_count: matchedRows.filter((row) => warningStatuses.includes(row.matchStatus)).length,
     },
   };
 
@@ -433,14 +438,14 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
   }
 
   const now = new Date().toISOString();
-  for (let i = 0; i < rowsToPay.length; i += 100) {
-    const batch = rowsToPay.slice(i, i + 100);
+  for (let i = 0; i < rowsToReject.length; i += 100) {
+    const batch = rowsToReject.slice(i, i + 100);
     await Promise.all(batch.map(async (row) => {
       const { error } = await admin
         .from("orders")
         .update({
-          wakilni_paid_at: now,
-          wakilni_paid_by: userId,
+          delivery_status: "rejected",
+          updated_at: now,
           wakilni_invoice_import_id: importId,
           wakilni_invoice_number: invoiceNumberFromFileName(file.name),
           wakilni_invoice_collection_usd: row.collectionUsd,
@@ -448,8 +453,75 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
           wakilni_invoice_matched_at: now,
         })
         .eq("id", row.order.id)
+        .eq("delivery_status", "delivered");
+      if (error) throw error;
+
+      const { error: historyError } = await admin.from("order_history").insert({
+        order_id: row.order.order_id,
+        changed_by: userId,
+        changed_by_role: userId ? "admin" : "system",
+        field_changed: "delivery_status",
+        old_value: row.order.delivery_status,
+        new_value: "rejected",
+        action_type: "wakilni_invoice_zero_collection",
+      });
+      if (historyError) console.error("order_history insert failed:", historyError);
+    }));
+  }
+
+  for (let i = 0; i < rowsToPay.length; i += 100) {
+    const batch = rowsToPay.slice(i, i + 100);
+    await Promise.all(batch.map(async (row) => {
+      const quantity = Math.max(1, Number(row.order.quantity || 1));
+      const expected = Number(row.order.total_amount || 0);
+      const adjusted = row.matchStatus === "amount_adjusted";
+      const nextTotal = Number(row.collectionUsd || 0);
+      const nextPrice = Number((nextTotal / quantity).toFixed(2));
+      const updatePayload: Record<string, unknown> = {
+        wakilni_paid_at: now,
+        wakilni_paid_by: userId,
+        wakilni_invoice_import_id: importId,
+        wakilni_invoice_number: invoiceNumberFromFileName(file.name),
+        wakilni_invoice_collection_usd: row.collectionUsd,
+        wakilni_invoice_delivery_fee_usd: row.deliveryFeeUsd,
+        wakilni_invoice_matched_at: now,
+      };
+      if (adjusted) {
+        updatePayload.total_amount = nextTotal;
+        updatePayload.price = nextPrice;
+        updatePayload.updated_at = now;
+      }
+
+      const { error } = await admin
+        .from("orders")
+        .update(updatePayload)
+        .eq("id", row.order.id)
         .is("wakilni_paid_at", null);
       if (error) throw error;
+
+      if (adjusted) {
+        const { error: historyError } = await admin.from("order_history").insert([
+          {
+            order_id: row.order.order_id,
+            changed_by: userId,
+            changed_by_role: userId ? "admin" : "system",
+            field_changed: "total_amount",
+            old_value: expected.toFixed(2),
+            new_value: nextTotal.toFixed(2),
+            action_type: "wakilni_invoice_amount_adjustment",
+          },
+          {
+            order_id: row.order.order_id,
+            changed_by: userId,
+            changed_by_role: userId ? "admin" : "system",
+            field_changed: "price",
+            old_value: Number(row.order.price || 0).toFixed(2),
+            new_value: nextPrice.toFixed(2),
+            action_type: "wakilni_invoice_amount_adjustment",
+          },
+        ]);
+        if (historyError) console.error("order_history insert failed:", historyError);
+      }
     }));
   }
 
@@ -460,7 +532,7 @@ async function applyMatchedInvoice(admin: ReturnType<typeof createClient>, match
     newly_paid_count: rowsToPay.length,
     already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
     unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
-    warnings_count: matchedRows.filter((row) => row.matchStatus === "amount_mismatch" || row.matchStatus === "not_delivered").length,
+    warnings_count: matchedRows.filter((row) => warningStatuses.includes(row.matchStatus)).length,
   };
 }
 
@@ -522,7 +594,7 @@ Deno.serve(async (req) => {
           newly_paid_count: matchedRows.filter((row) => row.matchStatus === "newly_paid").length,
           already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
           unmatched_count: matchedRows.filter((row) => row.matchStatus === "unmatched").length,
-          warnings_count: matchedRows.filter((row) => row.matchStatus === "amount_mismatch" || row.matchStatus === "not_delivered").length,
+          warnings_count: matchedRows.filter((row) => ["amount_adjusted", "rejected_zero_collection", "amount_mismatch", "not_delivered"].includes(row.matchStatus)).length,
           totals,
         });
       }
