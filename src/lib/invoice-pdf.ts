@@ -10,7 +10,6 @@ const fmtDate = (iso: string) =>
 export function downloadInvoicePDF(summary: InvoiceSummaryResponse, sellerName: string, autoPrint = false) {
   const inv = summary.invoice;
   const tot = summary.totals;
-  const cc  = summary.call_center_breakdown;
   const cnt = summary.counts;
 
   const statusColor: Record<string, string> = { paid: "#15803d", open: "#b45309", ready: "#1d4ed8" };
@@ -197,14 +196,6 @@ ${summary.addons.length > 0 ? `
     <div class="fee-row fee-minus">
       <span class="fee-lbl">COD Fees<small>${summary.rates?.cod_fee_percentage??0}% of delivered revenue</small></span>
       <span class="r-val">−${usd(tot?.cod_fees??0)}</span>
-    </div>
-    <div class="fee-row fee-minus">
-      <span class="fee-lbl">Call Center Fees<small>Not charged for Lebanon invoices</small></span>
-      <span class="r-val">−${usd(tot?.call_center_fees??0)}</span>
-    </div>
-    <div class="fee-row fee-minus">
-      <span class="fee-lbl">Warehouse Fees<small>Not Charged</small></span>
-      <span class="r-val">-${usd(0)}</span>
     </div>
     ${(tot?.addon_net??0)!==0?`
     <div class="fee-row">

@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Loader2, Package, Truck, Phone, CreditCard, ArrowDownCircle, ArrowUpCircle, BarChart3, ArrowUpDown, Wallet, Trash2 } from "lucide-react";
+import { Loader2, Package, Truck, CreditCard, ArrowDownCircle, ArrowUpCircle, BarChart3, ArrowUpDown, Wallet, Trash2 } from "lucide-react";
 import { formatUSD } from "@/lib/currency";
 import { InvoiceOrdersTable } from "@/components/invoice/InvoiceOrdersTable";
 
@@ -66,7 +66,6 @@ export function InvoiceDetailModal({
   const counts = summary?.counts;
   const totals = summary?.totals;
   const rates = summary?.rates;
-  const callCenterBreakdown = summary?.call_center_breakdown;
   const productWeightMap = Object.fromEntries(deliveredOrders.map((order) => [order.product_name, order.weight_kg ?? null]));
 
   const SectionHeader = ({ icon: Icon, title, color, count }: { icon: any; title: string; color: string; count?: number }) => (
@@ -130,28 +129,7 @@ export function InvoiceDetailModal({
                 </div>
               </div>
 
-              {/* SECTION 3: CALL CENTER FEES (summary only) */}
-              <SectionHeader icon={Phone} title="Call Center Fees" color="text-warning" count={counts?.total_orders_count ?? 0} />
-              <div className="px-4 py-2 space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Confirmed orders ({callCenterBreakdown?.confirmed_count ?? 0} × {formatUSD(callCenterBreakdown?.confirmed_rate ?? 0)})</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(callCenterBreakdown?.confirmed_fees ?? 0)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Dropped orders ({callCenterBreakdown?.dropped_count ?? 0} × {formatUSD(callCenterBreakdown?.dropped_rate ?? 0)})</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(callCenterBreakdown?.dropped_fees ?? 0)}</span>
-                </div>
-                <div className="border-t pt-1 mt-1 flex justify-between text-xs font-bold">
-                  <span>Total Call Center</span>
-                  <span className="tabular-nums text-destructive">-{formatUSD(totals?.call_center_fees ?? 0)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Warehouse Fees <span className="text-[10px]">(Not Charged)</span></span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(0)}</span>
-                </div>
-              </div>
-
-              {/* SECTION 4: COD FEES */}
+              {/* SECTION 3: COD FEES */}
               <SectionHeader icon={CreditCard} title={`COD Fees (${rates?.cod_fee_percentage ?? 0}%)`} color="text-orange-500" />
               <div className="px-4 py-2">
                 <div className="flex justify-between text-xs">
@@ -247,14 +225,6 @@ export function InvoiceDetailModal({
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">COD Fees</span>
                   <span className="tabular-nums font-semibold text-destructive">-{formatUSD(totals?.cod_fees ?? 0)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Call Center Fees</span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(totals?.call_center_fees ?? 0)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Warehouse Fees <span className="text-[10px]">(Not Charged)</span></span>
-                  <span className="tabular-nums font-semibold text-destructive">-{formatUSD(0)}</span>
                 </div>
                 {(totals?.addon_net ?? 0) !== 0 && (
                   <div className="flex justify-between text-xs">

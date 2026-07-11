@@ -116,6 +116,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
 
   const n = (v: number | "") => typeof v === "number" ? v : 0;
   const totalPrice = n(quantity) * n(landedPrice);
+  const sellerInvoiceAmount = n(quantity) * n(sellerPrice);
   const sourcingProfit = n(sellerPrice) > 0 && n(landedPrice) > 0 ? n(sellerPrice) - n(landedPrice) : 0;
   const profitMargin = n(sellerPrice) > 0 ? ((sourcingProfit / n(sellerPrice)) * 100) : 0;
 
@@ -192,7 +193,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
       paymentStatus === "paid" &&
       paymentMethod === "from_invoice" &&
       request.payment_status !== "paid" &&
-      totalPrice > 0
+      sellerInvoiceAmount > 0
     ) {
       // Find or create open invoice for this seller
       let openInvoiceId: string | null = null;
@@ -223,7 +224,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
         .insert({
           invoice_id: openInvoiceId,
           type: "out",
-          amount: totalPrice,
+          amount: sellerInvoiceAmount,
           reason: `Sourcing: ${request.product_name}`,
         });
       if (addonErr) throw addonErr;

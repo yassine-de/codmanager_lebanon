@@ -131,7 +131,6 @@ export default function Invoices() {
         deliveredCount: summary?.counts.delivered_count ?? 0,
         totalAmountUsd: summary?.totals.delivered_revenue_usd ?? 0,
         shippingFees: summary?.totals.shipping_fees ?? 0,
-        callCenterFees: summary?.totals.call_center_fees ?? 0,
         codFees: summary?.totals.cod_fees ?? 0,
         addonNet: summary?.totals.addon_net ?? 0,
         previousBalance: summary?.totals.previous_balance ?? inv.previous_balance ?? 0,
@@ -527,7 +526,6 @@ export default function Invoices() {
                 <TableHead className="text-[11px] font-semibold text-center">Delivered</TableHead>
                 <TableHead className="text-[11px] font-semibold text-right">Revenue</TableHead>
                 <TableHead className="text-[11px] font-semibold text-right">Shipping</TableHead>
-                <TableHead className="text-[11px] font-semibold text-right">Call Center</TableHead>
                 <TableHead className="text-[11px] font-semibold text-right">COD</TableHead>
                 <TableHead className="text-[11px] font-semibold text-right">Net Payable</TableHead>
                 {!isSeller && <TableHead className="text-[11px] font-semibold text-center">Ready</TableHead>}
@@ -540,7 +538,7 @@ export default function Invoices() {
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isSeller ? 9 : 13} className="text-center text-xs text-muted-foreground py-16">
+                  <TableCell colSpan={isSeller ? 10 : 12} className="text-center text-xs text-muted-foreground py-16">
                     <FileText className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
                     <p className="font-medium">{t("no_invoices")}</p>
                   </TableCell>
@@ -571,7 +569,6 @@ export default function Invoices() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{formatUSD(inv.totalAmountUsd)}</TableCell>
                       <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.shippingFees)}</TableCell>
-                      <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.callCenterFees)}</TableCell>
                       <TableCell className="text-right tabular-nums text-destructive">-{formatUSD(inv.codFees)}</TableCell>
                       <TableCell className="text-right tabular-nums font-bold text-success">{formatUSD(inv.netPayable)}</TableCell>
                       {!isSeller && (
