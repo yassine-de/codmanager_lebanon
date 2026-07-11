@@ -108,7 +108,7 @@ export function InvoiceDetailModal({
               )}
 
               {/* SECTION 2: SHIPPING FEES (summary only — count × rate by weight bracket) */}
-              <SectionHeader icon={Truck} title={`Delivery Fees${isAdmin && (counts?.cross_delivered_count ?? 0) > 0 ? ` (incl. ${counts.cross_delivered_count} cross-invoice)` : ''}`} color="text-info" count={counts?.delivered_count ?? 0} />
+              <SectionHeader icon={Truck} title={`Delivery Fees (9.50 $)${isAdmin && (counts?.cross_delivered_count ?? 0) > 0 ? ` (incl. ${counts.cross_delivered_count} cross-invoice)` : ''}`} color="text-info" count={counts?.delivered_count ?? 0} />
               <div className="px-4 py-2 space-y-1.5">
                 {shippingBreakdown.length === 0 ? (
                   <div className="text-center py-2 text-muted-foreground text-xs">No delivery fees</div>
