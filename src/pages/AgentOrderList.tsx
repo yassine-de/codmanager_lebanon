@@ -82,6 +82,7 @@ const statusOptions = [
     label: `No Answer ${index + 1}`,
   })),
   { value: "cancelled", label: "Cancelled" },
+  { value: "double", label: "Double" },
   { value: "wrong_number", label: "Wrong Number" },
 ];
 
@@ -91,6 +92,7 @@ const statusClass: Record<string, string> = {
   postponed: "bg-amber-500/10 text-amber-700 border-amber-500/20",
   no_answer: "bg-blue-500/10 text-blue-700 border-blue-500/20",
   cancelled: "bg-destructive/10 text-destructive border-destructive/20",
+  double: "bg-orange-500/10 text-orange-700 border-orange-500/20",
   wrong_number: "bg-rose-500/10 text-rose-700 border-rose-500/20",
 };
 
