@@ -76,13 +76,13 @@ const statusOptions = [
   { value: "new", label: "New" },
   { value: "confirmed", label: "Confirmed" },
   { value: "postponed", label: "Postponed" },
+  { value: "double", label: "Double" },
   { value: "no_answer", label: "No Answer" },
   ...Array.from({ length: 9 }, (_, index) => ({
     value: `no_answer_${index + 1}`,
     label: `No Answer ${index + 1}`,
   })),
   { value: "cancelled", label: "Cancelled" },
-  { value: "double", label: "Double" },
   { value: "wrong_number", label: "Wrong Number" },
 ];
 
