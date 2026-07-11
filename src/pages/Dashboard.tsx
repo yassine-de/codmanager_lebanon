@@ -356,6 +356,46 @@ function SellerFinancialMiniCard({
   );
 }
 
+function SellerSourcingPaymentCard({
+  paid,
+  open,
+  paidCount,
+  openCount,
+  onClick,
+}: {
+  paid: number;
+  open: number;
+  paidCount: number;
+  openCount: number;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className="rounded-xl border shadow-soft px-4 py-4 animate-slide-up bg-card cursor-pointer hover:shadow-elevated hover:-translate-y-0.5 transition-all duration-200"
+    >
+      <div className="flex items-start gap-3">
+        <div className="p-2.5 rounded-xl bg-success/10 shrink-0">
+          <PackageCheck className="w-4 h-4 text-success" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Sourcing</p>
+          <div className="mt-2 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-muted-foreground">Paid · {paidCount}</span>
+              <MoneyText amount={paid} className="text-sm font-bold tabular-nums text-success" />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-muted-foreground">Open · {openCount}</span>
+              <MoneyText amount={open} className="text-sm font-bold tabular-nums text-warning" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Section Header ── */
 function SectionHeader({ icon: Icon, title, color, iconBg, delay = 0 }: {
   icon: LucideIcon; title: string; color: string; iconBg: string; delay?: number;
@@ -939,7 +979,7 @@ export default function Dashboard() {
                   highlight
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
                 <SellerFinancialMiniCard
                   title="Open Delivered Revenue"
                   amount={sellerFinancial.unpaidDeliveredRevenue}
@@ -947,14 +987,6 @@ export default function Dashboard() {
                   icon={PackageCheck}
                   color="text-success"
                   iconBg="bg-success/10"
-                />
-                <SellerFinancialMiniCard
-                  title="Open Fees"
-                  amount={sellerFinancial.openFees}
-                  subtitle="Delivery fees + COD fees"
-                  icon={Activity}
-                  color="text-destructive"
-                  iconBg="bg-destructive/10"
                 />
                 <SellerFinancialMiniCard
                   title="Delivery Fees"
@@ -981,24 +1013,11 @@ export default function Dashboard() {
                   iconBg="bg-warning/10"
                   onClick={() => navigate("/ad-topups")}
                 />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <SellerFinancialMiniCard
-                  title="Sourcing Paid"
-                  amount={sellerFinancial.sourcingPaid}
-                  subtitle={`${sellerFinancial.sourcingPaidCount} paid item${sellerFinancial.sourcingPaidCount === 1 ? "" : "s"}`}
-                  icon={CheckCircle2}
-                  color="text-success"
-                  iconBg="bg-success/10"
-                  onClick={() => navigate("/seller-sourcing")}
-                />
-                <SellerFinancialMiniCard
-                  title="Sourcing Open"
-                  amount={sellerFinancial.sourcingOpen}
-                  subtitle={`${sellerFinancial.sourcingOpenCount} open item${sellerFinancial.sourcingOpenCount === 1 ? "" : "s"}`}
-                  icon={Hourglass}
-                  color="text-warning"
-                  iconBg="bg-warning/10"
+                <SellerSourcingPaymentCard
+                  paid={sellerFinancial.sourcingPaid}
+                  open={sellerFinancial.sourcingOpen}
+                  paidCount={sellerFinancial.sourcingPaidCount}
+                  openCount={sellerFinancial.sourcingOpenCount}
                   onClick={() => navigate("/seller-sourcing")}
                 />
               </div>
