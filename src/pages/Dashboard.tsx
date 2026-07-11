@@ -159,6 +159,10 @@ interface SellerFinancialOverview {
   deliveryFees: number;
   codFees: number;
   unpaidDeliveredCount: number;
+  sourcingPaid: number;
+  sourcingOpen: number;
+  sourcingPaidCount: number;
+  sourcingOpenCount: number;
 }
 
 const emptySellerFinancialOverview: SellerFinancialOverview = {
@@ -170,6 +174,10 @@ const emptySellerFinancialOverview: SellerFinancialOverview = {
   deliveryFees: 0,
   codFees: 0,
   unpaidDeliveredCount: 0,
+  sourcingPaid: 0,
+  sourcingOpen: 0,
+  sourcingPaidCount: 0,
+  sourcingOpenCount: 0,
 };
 
 interface AdminFinancialOverview {
@@ -564,7 +572,11 @@ export default function Dashboard() {
     queryFn: async (): Promise<SellerFinancialOverview> => {
       if (!authUser?.id) return emptySellerFinancialOverview;
 
-      const [{ data: deliveredOrders, error: ordersError }, { data: invoices, error: invoicesError }] = await Promise.all([
+      const [
+        { data: deliveredOrders, error: ordersError },
+        { data: invoices, error: invoicesError },
+        { data: sourcingRequests, error: sourcingError },
+      ] = await Promise.all([
         supabase
           .from("orders")
           .select("id, total_amount, price, quantity, delivery_status")
@@ -576,10 +588,15 @@ export default function Dashboard() {
           .eq("seller_id", authUser.id)
           .in("status", ["open", "ready", "paid"])
           .order("created_at", { ascending: true }),
+        supabase
+          .from("sourcing_requests")
+          .select("id, quantity, seller_price, payment_status, status, seller_validated")
+          .eq("seller_id", authUser.id),
       ]);
 
       if (ordersError) throw ordersError;
       if (invoicesError) throw invoicesError;
+      if (sourcingError) throw sourcingError;
 
       const totalDeliveredRevenue = (deliveredOrders || []).reduce((sum: number, order: any) => {
         return sum + Number(order.total_amount ?? Number(order.price || 0) * Number(order.quantity || 1) ?? 0);
@@ -614,6 +631,19 @@ export default function Dashboard() {
         (sum, { summary }) => sum + Number(summary?.counts?.delivered_count ?? 0),
         0
       );
+      const activeSourcingRequests = (sourcingRequests || []).filter((request: any) => {
+        return request.status !== "cancelled" && request.seller_validated !== false;
+      });
+      const sourcingPaid = activeSourcingRequests.reduce((sum: number, request: any) => {
+        if (request.payment_status !== "paid") return sum;
+        return sum + Number(request.seller_price || 0) * Number(request.quantity || 0);
+      }, 0);
+      const sourcingOpen = activeSourcingRequests.reduce((sum: number, request: any) => {
+        if (request.payment_status === "paid") return sum;
+        return sum + Number(request.seller_price || 0) * Number(request.quantity || 0);
+      }, 0);
+      const sourcingPaidCount = activeSourcingRequests.filter((request: any) => request.payment_status === "paid").length;
+      const sourcingOpenCount = activeSourcingRequests.length - sourcingPaidCount;
 
       return {
         totalDeliveredRevenue,
@@ -624,6 +654,10 @@ export default function Dashboard() {
         deliveryFees,
         codFees,
         unpaidDeliveredCount,
+        sourcingPaid,
+        sourcingOpen,
+        sourcingPaidCount,
+        sourcingOpenCount,
       };
     },
     enabled: isSeller && !!authUser?.id,
@@ -905,7 +939,7 @@ export default function Dashboard() {
                   highlight
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                 <SellerFinancialMiniCard
                   title="Open Delivered Revenue"
                   amount={sellerFinancial.unpaidDeliveredRevenue}
@@ -948,8 +982,28 @@ export default function Dashboard() {
                   onClick={() => navigate("/ad-topups")}
                 />
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SellerFinancialMiniCard
+                  title="Sourcing Paid"
+                  amount={sellerFinancial.sourcingPaid}
+                  subtitle={`${sellerFinancial.sourcingPaidCount} paid item${sellerFinancial.sourcingPaidCount === 1 ? "" : "s"}`}
+                  icon={CheckCircle2}
+                  color="text-success"
+                  iconBg="bg-success/10"
+                  onClick={() => navigate("/seller-sourcing")}
+                />
+                <SellerFinancialMiniCard
+                  title="Sourcing Open"
+                  amount={sellerFinancial.sourcingOpen}
+                  subtitle={`${sellerFinancial.sourcingOpenCount} open item${sellerFinancial.sourcingOpenCount === 1 ? "" : "s"}`}
+                  icon={Hourglass}
+                  color="text-warning"
+                  iconBg="bg-warning/10"
+                  onClick={() => navigate("/seller-sourcing")}
+                />
+              </div>
               <p className="text-[11px] text-muted-foreground">
-                Only delivered orders are included in payouts. Delivery fee is {formatUSD(LEBANON_DELIVERY_FEE)} per delivered order, COD fee is {Math.round(LEBANON_COD_FEE_RATE * 100)}%.
+                Only delivered orders are included in payouts. Sourcing amounts are based on seller price x quantity. Delivery fee is {formatUSD(LEBANON_DELIVERY_FEE)} per delivered order, COD fee is {Math.round(LEBANON_COD_FEE_RATE * 100)}%.
               </p>
             </>
           ) : (
