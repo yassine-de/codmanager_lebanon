@@ -118,6 +118,10 @@ function getCell(row: string[], mapping: Record<string, string>, key: string): s
   return row[idx] ?? "";
 }
 
+function normalizeSku(raw: string): string {
+  return String(raw || "").trim();
+}
+
 // ── Google Sheets helpers ──
 
 function extractSpreadsheetId(url: string): string | null {
@@ -316,7 +320,7 @@ Deno.serve(async (req) => {
         const address = getCell(row, mapping, "address");
         const city = getCell(row, mapping, "city");
         const productName = getCell(row, mapping, "product_name");
-        const sku = getCell(row, mapping, "sku");
+        const sku = normalizeSku(getCell(row, mapping, "sku"));
         const qtyStr = getCell(row, mapping, "quantity");
         const priceStr = getCell(row, mapping, "price");
         const totalStr = getCell(row, mapping, "total");
@@ -395,36 +399,49 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Duplicate check
-        const today = new Date();
-        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
-
-        const { data: existing } = await supabase
-          .from("orders").select("id")
+        // Duplicate check: same sheet + same phone + same SKU means same seller order.
+        const { data: existingOrders } = await supabase
+          .from("orders").select("id, order_id, variant_sku, product_name")
+          .eq("source_sheet_id", sheet.id)
           .eq("customer_phone", normalizedPhone)
-          .eq("product_name", product.name)
-          .eq("seller_id", sheet.seller_id)
-          .gte("created_at", startOfDay)
-          .lt("created_at", endOfDay)
-          .limit(1);
+          .limit(25);
 
-        if (existing && existing.length > 0) {
+        const normalizedImportSku = sku.toLowerCase();
+        const existing = (existingOrders || []).find((order) => {
+          const existingSku = String(order.variant_sku || "").trim().toLowerCase();
+          if (existingSku) return existingSku === normalizedImportSku;
+          return order.product_name === product.name;
+        });
+
+        if (existing) {
           await supabase.from("integration_errors").insert({
             sheet_id: sheet.id,
             order_data: orderData as any,
-            error_message: `Duplicate: same phone "${normalizedPhone}" + product "${product.name}" already exists today`,
+            error_message: `Duplicate: same sheet + phone "${normalizedPhone}" + SKU "${sku}" already exists`,
           });
           errorsCount++;
           continue;
         }
 
-        const { data: generatedId } = await supabase.rpc("generate_order_id", {
-          p_seller_id: sheet.seller_id,
-        });
+        let importOrderId = String(orderData.order_id || "").trim();
+        if (!importOrderId) {
+          const { data: generatedId, error: idError } = await supabase.rpc("generate_order_id", {
+            p_seller_id: sheet.seller_id,
+          });
+          if (idError) {
+            await supabase.from("integration_errors").insert({
+              sheet_id: sheet.id,
+              order_data: orderData as any,
+              error_message: `Order ID generation failed: ${idError.message}`,
+            });
+            errorsCount++;
+            continue;
+          }
+          importOrderId = generatedId;
+        }
 
         const { error: insertError } = await supabase.from("orders").insert({
-          order_id: generatedId || orderData.order_id,
+          order_id: importOrderId,
           seller_id: sheet.seller_id,
           customer_name: orderData.customer_name,
           customer_phone: normalizedPhone,
@@ -432,7 +449,7 @@ Deno.serve(async (req) => {
           customer_city: orderData.city,
           product_name: product.name,
           variant_name: variant ? String(variant.name || "") || null : null,
-          variant_sku: variant ? String(variant.sku || sku) : (sku !== product.sku ? sku : null),
+          variant_sku: sku,
           product_url: product.product_url || "",
           video_url: product.video_url || "",
           quantity: orderData.quantity,
