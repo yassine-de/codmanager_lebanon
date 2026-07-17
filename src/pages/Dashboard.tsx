@@ -672,7 +672,7 @@ export default function Dashboard() {
         0
       );
       const activeSourcingRequests = (sourcingRequests || []).filter((request: any) => {
-        return request.status !== "cancelled" && request.seller_validated !== false;
+        return request.status !== "cancelled" && request.seller_validated === true;
       });
       const sourcingPaid = activeSourcingRequests.reduce((sum: number, request: any) => {
         if (request.payment_status !== "paid") return sum;
