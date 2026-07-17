@@ -668,7 +668,7 @@ export function EditSourcingModal({ request, open, onOpenChange }: EditSourcingM
               {paymentStatus === "paid" && paymentMethod === "from_invoice" && (
                 <div className="rounded-lg border border-warning/25 bg-warning/10 px-4 py-2.5">
                   <p className="text-xs text-warning font-medium">
-                    💡 Total amount ({totalPrice.toLocaleString()} $) will be added to the seller's invoice for deduction.
+                    💡 Seller cost ({sellerInvoiceAmount.toLocaleString()} $) will be added to the seller's invoice for deduction.
                   </p>
                 </div>
               )}
