@@ -259,6 +259,37 @@ function sortInvoiceFiles(files: any[]) {
   return [...files].sort((a, b) => getInvoiceFileDate(b) - getInvoiceFileDate(a));
 }
 
+function aggregateInvoiceRows(rows: any[]) {
+  const map = new Map();
+  const passthrough = [];
+
+  for (const row of rows) {
+    if (!row?.wakilniOrderId) {
+      passthrough.push(row);
+      continue;
+    }
+
+    const key = `${row.wakilniOrderId}|${row.waybill || ""}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...row, sourceRowCount: 1, rawLines: [row.rawLine].filter(Boolean) });
+      continue;
+    }
+
+    existing.deliveryFeeUsd = Number((Number(existing.deliveryFeeUsd || 0) + Number(row.deliveryFeeUsd || 0)).toFixed(2));
+    existing.collectionUsd = Number((Number(existing.collectionUsd || 0) + Number(row.collectionUsd || 0)).toFixed(2));
+    existing.recipientName = existing.recipientName || row.recipientName;
+    existing.collectionType = existing.collectionType || row.collectionType;
+    existing.area = existing.area || row.area;
+    existing.invoiceDate = existing.invoiceDate || row.invoiceDate;
+    existing.sourceRowCount = Number(existing.sourceRowCount || 1) + 1;
+    existing.rawLines = [...(existing.rawLines || []), row.rawLine].filter(Boolean);
+    existing.rawLine = existing.rawLines.join(" | ");
+  }
+
+  return [...map.values(), ...passthrough];
+}
+
 async function getFolderId(admin: ReturnType<typeof createClient>, requestedFolderId?: string | null) {
   if (requestedFolderId) return requestedFolderId;
   const { data } = await admin
@@ -612,7 +643,8 @@ Deno.serve(async (req) => {
 
       const result = await downloadDriveFile(accessToken, file.id);
       const { rows, totals } = await extractInvoiceDataFromPdfBytes(result.bytes);
-      const matchedRows = await matchRows(admin, rows);
+      const aggregatedRows = aggregateInvoiceRows(rows);
+      const matchedRows = await matchRows(admin, aggregatedRows);
       if (body.dry_run === true || body.dryRun === true) {
         return jsonResponse({
           success: true,
@@ -620,6 +652,7 @@ Deno.serve(async (req) => {
           folder_id: folderId,
           file: result.meta,
           parsed_rows: rows.length,
+          invoice_rows: aggregatedRows.length,
           matched_count: matchedRows.filter((row) => !!row.order).length,
           newly_paid_count: matchedRows.filter((row) => row.matchStatus === "newly_paid").length,
           already_paid_count: matchedRows.filter((row) => row.matchStatus === "already_paid").length,
@@ -646,6 +679,7 @@ Deno.serve(async (req) => {
         folder_id: folderId,
         file: result.meta,
         parsed_rows: rows.length,
+        invoice_rows: aggregatedRows.length,
         ...applied,
       });
     }

@@ -24,6 +24,8 @@ type ParsedInvoiceRow = {
   area: string | null;
   invoiceDate: string | null;
   rawLine: string;
+  sourceRowCount?: number;
+  rawLines?: string[];
 };
 
 type MatchedInvoiceRow = ParsedInvoiceRow & {
@@ -212,6 +214,37 @@ async function extractInvoiceDataFromPdf(file: File): Promise<{ rows: ParsedInvo
   return { rows, totals: parseInvoiceTotalsFromText(allLines.join("\n")) };
 }
 
+function aggregateInvoiceRows(rows: ParsedInvoiceRow[]): ParsedInvoiceRow[] {
+  const map = new Map<string, ParsedInvoiceRow>();
+  const passthrough: ParsedInvoiceRow[] = [];
+
+  for (const row of rows) {
+    if (!row.wakilniOrderId) {
+      passthrough.push(row);
+      continue;
+    }
+
+    const key = `${row.wakilniOrderId}|${row.waybill || ""}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...row, sourceRowCount: 1, rawLines: [row.rawLine].filter(Boolean) });
+      continue;
+    }
+
+    existing.deliveryFeeUsd = Number((Number(existing.deliveryFeeUsd || 0) + Number(row.deliveryFeeUsd || 0)).toFixed(2));
+    existing.collectionUsd = Number((Number(existing.collectionUsd || 0) + Number(row.collectionUsd || 0)).toFixed(2));
+    existing.recipientName = existing.recipientName || row.recipientName;
+    existing.collectionType = existing.collectionType || row.collectionType;
+    existing.area = existing.area || row.area;
+    existing.invoiceDate = existing.invoiceDate || row.invoiceDate;
+    existing.sourceRowCount = Number(existing.sourceRowCount || 1) + 1;
+    existing.rawLines = [...(existing.rawLines || []), row.rawLine].filter(Boolean);
+    existing.rawLine = existing.rawLines.join(" | ");
+  }
+
+  return [...map.values(), ...passthrough];
+}
+
 function getInvoiceNumberFromName(fileName: string) {
   const dateMatch = fileName.match(/cashbox.*?([A-Za-z]{3}_[A-Za-z]{3}_\d{2},?\d{4}_[0-9_]+)/i);
   return dateMatch?.[1]?.replace(/_/g, " ") || fileName.replace(/\.pdf$/i, "");
@@ -326,10 +359,11 @@ export default function WakilniInvoices() {
     setMatchedRows([]);
     try {
       const { rows, totals } = await extractInvoiceDataFromPdf(file);
-      setParsedRows(rows);
+      const aggregatedRows = aggregateInvoiceRows(rows);
+      setParsedRows(aggregatedRows);
       setInvoiceTotals(totals);
-      await matchRows(rows);
-      toast.success(`Parsed ${rows.length} Wakilni invoice rows`);
+      await matchRows(aggregatedRows);
+      toast.success(`Parsed ${rows.length} Wakilni invoice rows into ${aggregatedRows.length} order rows`);
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "Could not parse PDF");
