@@ -18,7 +18,6 @@ import { SellerAlertsBanner } from "@/components/SellerAlertsBanner";
 import { useDataVisibility } from "@/contexts/DataVisibilityContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Input } from "@/components/ui/input";
-import { downloadAgentDebugLog } from "@/lib/agent-debug-log";
 
 const languages: { value: Language; label: string; flag: string }[] = [
   { value: "en", label: "English", flag: "🇬🇧" },
@@ -199,11 +198,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuItem className="text-sm gap-2.5 cursor-pointer rounded-lg" onClick={() => navigate('/settings')}>
                     <Settings className="h-4 w-4" /> {t("settings")}
                   </DropdownMenuItem>
-                  {authUser?.role !== "seller" && (
-                    <DropdownMenuItem className="text-sm gap-2.5 cursor-pointer rounded-lg" onClick={downloadAgentDebugLog}>
-                      <Info className="h-4 w-4" /> Download Debug Log
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-sm gap-2.5 cursor-pointer rounded-lg text-destructive focus:text-destructive" onClick={handleLogout}>
                     <LogOut className="h-4 w-4" /> {t("logout")}

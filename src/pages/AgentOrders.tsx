@@ -17,12 +17,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { CitySelect } from "@/components/CitySelect";
 import { formatPKT as format } from "@/lib/timezone";
-import { appendAgentDebugLog, downloadAgentDebugLog } from "@/lib/agent-debug-log";
+import { appendAgentDebugLog } from "@/lib/agent-debug-log";
 import { toast } from "sonner";
 import {
   Play, ChevronRight, Phone, PhoneOff, MessageCircle, User, MapPin, Package, DollarSign,
   Video, Store, Tag, StickyNote, CalendarIcon, ExternalLink, AlertCircle, Zap,
-  Pencil, Plus, Trash2, X, Check, Loader2, Clock, RotateCcw, Copy, AlertTriangle, Download
+  Pencil, Plus, Trash2, X, Check, Loader2, Clock, RotateCcw, Copy, AlertTriangle
 } from "lucide-react";
 
 
@@ -979,10 +979,6 @@ const AgentOrders = () => {
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
           Start Smart Confirmation
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="gap-2" onClick={downloadAgentDebugLog}>
-          <Download className="h-4 w-4" />
-          Download Debug Log
         </Button>
       </div>
     );

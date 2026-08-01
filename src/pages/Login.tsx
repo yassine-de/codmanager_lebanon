@@ -8,7 +8,7 @@ import { Package, LogIn, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { appendAgentDebugLog, downloadAgentDebugLog } from "@/lib/agent-debug-log";
+import { appendAgentDebugLog } from "@/lib/agent-debug-log";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -122,15 +122,6 @@ const Login = () => {
                 Sign in
               </Button>
             </form>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="mt-4 w-full text-xs text-muted-foreground"
-              onClick={downloadAgentDebugLog}
-            >
-              Download Debug Log
-            </Button>
           </CardContent>
         </Card>
       </div>
