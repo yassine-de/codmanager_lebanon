@@ -761,12 +761,32 @@ export default function Orders() {
     && sellerTrackableDeliveryStatuses.includes(order.deliveryStatus)
     && !!(order.wakilniTrackingId || order.wakilniOrderId);
 
+  const hasTrackingReference = (order: Order) => !!(order.wakilniTrackingId || order.wakilniOrderId);
+
   const handleSellerOrderIdClick = (order: Order) => {
     if (!canSellerTrackOrder(order)) {
       toast.info("Tracking is not available yet");
       return;
     }
     setSellerTrackingOrderId(order.id);
+  };
+
+  const handleTrackingClick = (order: Order) => {
+    if (isAdmin) {
+      setTrackingTarget({
+        trackingId: order.wakilniTrackingId ?? null,
+        wakilniOrderId: order.wakilniOrderId ?? null,
+        systemId: order.systemId ?? null,
+        sellerId: order.id,
+      });
+      return;
+    }
+
+    if (hasTrackingReference(order)) {
+      setSellerTrackingOrderId(order.id);
+    } else {
+      toast.info("Tracking is not available yet");
+    }
   };
 
   return (
@@ -1053,7 +1073,7 @@ export default function Orders() {
                   <span className="inline-flex items-center gap-1">System ID {sortKey === 'systemId' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}</span>
                 </th>}
                 {isCol('id') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Seller ID</th>}
-                {isAdmin && isCol('wakilniId') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Wakilni ID</th>}
+                {isCol('wakilniId') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Wakilni ID</th>}
                 {isCol('createdAt') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('createdAt')}>
                   <span className="inline-flex items-center gap-1">Created {sortKey === 'createdAt' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}</span>
                 </th>}
@@ -1139,19 +1159,14 @@ export default function Orders() {
                       )}
                     </td>
                   )}
-                  {isAdmin && isCol('wakilniId') && (
+                  {isCol('wakilniId') && (
                     <td className="py-2.5 px-4 text-xs" onClick={(e) => e.stopPropagation()}>
-                      {(order as any).wakilniTrackingId || (order as any).wakilniOrderId ? (
+                      {hasTrackingReference(order) ? (
                         (() => {
-                          const fullId = String((order as any).wakilniTrackingId || (order as any).wakilniOrderId);
+                          const fullId = String(order.wakilniTrackingId || order.wakilniOrderId);
                           return (
                             <button
-                              onClick={() => setTrackingTarget({
-                                trackingId: (order as any).wakilniTrackingId ?? null,
-                                wakilniOrderId: (order as any).wakilniOrderId ?? null,
-                                systemId: (order as any).systemId ?? null,
-                                sellerId: order.id,
-                              })}
+                              onClick={() => handleTrackingClick(order)}
                               className="text-[hsl(210,60%,52%)] hover:underline font-medium tabular-nums"
                               title={fullId}
                             >
