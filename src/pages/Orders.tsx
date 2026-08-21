@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { eachDayOfInterval, isAfter } from "date-fns";
 import { startOfDayPKT as startOfDay, subDaysPKT as subDays, formatPKT as fmtDate } from "@/lib/timezone";
-import { Search, SlidersHorizontal, X, Columns3, CalendarIcon, Filter, Pencil, History, MessageCircle, Download, RefreshCw, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Copy, Check } from "lucide-react";
+import { Search, SlidersHorizontal, X, Columns3, CalendarIcon, Filter, Pencil, History, MessageCircle, Download, RefreshCw, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Copy, Check, Truck } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,6 +29,7 @@ import { DatePresetFilter, type DatePresetValue } from "@/components/DatePresetF
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import WakilniTrackingModal from "@/components/WakilniTrackingModal";
+import SellerTrackingModal from "@/components/SellerTrackingModal";
 import { FinancialIndicators } from "@/components/FinancialIndicators";
 
 /* ── Status badge configs ── */
@@ -101,6 +102,19 @@ const subStatusClass = (raw?: string | null): string => {
 };
 
 const shippedDeliveryStatuses: DeliveryStatus[] = ["shipped", "in_transit", "with_courier"];
+const sellerTrackableDeliveryStatuses: DeliveryStatus[] = [
+  "shipped",
+  "in_transit",
+  "with_courier",
+  "delivered",
+  "failed_attempt",
+  "ready_for_return",
+  "returned",
+  "return",
+  "cancelled",
+  "rejected",
+];
+
 function StatusBadge({ label, cls, attemptCount }: { label: string; cls: string; attemptCount?: number }) {
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none whitespace-nowrap ${cls}`}>
@@ -229,6 +243,7 @@ export default function Orders() {
   const [historyOrder, setHistoryOrder] = useState<Order | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState<{ trackingId?: string | null; wakilniOrderId?: string | null; systemId?: number | null; sellerId?: string | null } | null>(null);
+  const [sellerTrackingOrderId, setSellerTrackingOrderId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [totalOrderCount, setTotalOrderCount] = useState(0);
@@ -407,46 +422,39 @@ export default function Orders() {
   const [sortKey, setSortKey] = useState<SortableKey>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  const orderListColumns = useMemo(() => {
-    const baseColumns = [
-      "order_id",
-      "system_id",
-      "customer_name",
-      "customer_phone",
-      "customer_city",
-      "customer_address",
-      "product_name",
-      "quantity",
-      "price",
-      "total_amount",
-      "confirmation_status",
-      "delivery_status",
-      "created_at",
-      "updated_at",
-      "confirmed_at",
-      "delivered_at",
-      "note",
-      "seller_id",
-      "agent_id",
-      "original_agent_id",
-      "attempt_count",
-      "confirmation_channel",
-      "whatsapp_status",
-      "invoice_id",
-      "variant_name",
-      "variant_sku",
-    ];
-
-    const adminColumns = [
-      "orio_order_id",
-      "orio_shipping_status",
-      "wakilni_order_id",
-      "wakilni_tracking_id",
-      "wakilni_sync_status",
-    ];
-
-    return [...baseColumns, ...(isAdmin ? adminColumns : [])].join(",");
-  }, [isAdmin]);
+  const orderListColumns = useMemo(() => `
+    order_id,
+    system_id,
+    customer_name,
+    customer_phone,
+    customer_city,
+    customer_address,
+    product_name,
+    quantity,
+    price,
+    total_amount,
+    confirmation_status,
+    delivery_status,
+    created_at,
+    updated_at,
+    confirmed_at,
+    delivered_at,
+    note,
+    seller_id,
+    agent_id,
+    original_agent_id,
+    attempt_count,
+    orio_order_id,
+    orio_shipping_status,
+    wakilni_order_id,
+    wakilni_tracking_id,
+    wakilni_sync_status,
+    confirmation_channel,
+    whatsapp_status,
+    invoice_id,
+    variant_name,
+    variant_sku
+  `, []);
 
   const mapOrderRow = useCallback((o: any, profileMap: Map<string, string>, invoiceMap: Map<string, string>): Order => ({
     id: o.order_id,
@@ -527,15 +535,14 @@ export default function Orders() {
     const safeSearch = debouncedSearch.trim().replace(/[(),%]/g, " ");
     if (includeSearch && safeSearch) {
       const pattern = `%${safeSearch}%`;
-      const searchFilters = [
+      query = query.or([
         `order_id.ilike.${pattern}`,
         `customer_name.ilike.${pattern}`,
         `customer_phone.ilike.${pattern}`,
         `customer_city.ilike.${pattern}`,
         `product_name.ilike.${pattern}`,
-      ];
-      if (isAdmin) searchFilters.push(`wakilni_order_id.ilike.${pattern}`);
-      query = query.or(searchFilters.join(","));
+        `wakilni_order_id.ilike.${pattern}`,
+      ].join(","));
     }
     return query;
   }, [appliedFilters, debouncedSearch, isAdmin, profileNameToId]);
@@ -749,16 +756,37 @@ export default function Orders() {
 
   const isCol = (key: ColumnKey) => visibleColumns.has(key);
 
+  const canSellerTrackOrder = (order: Order) =>
+    !isAdmin
+    && sellerTrackableDeliveryStatuses.includes(order.deliveryStatus)
+    && !!(order.wakilniTrackingId || order.wakilniOrderId);
+
   const hasTrackingReference = (order: Order) => !!(order.wakilniTrackingId || order.wakilniOrderId);
 
+  const handleSellerOrderIdClick = (order: Order) => {
+    if (!canSellerTrackOrder(order)) {
+      toast.info("Tracking is not available yet");
+      return;
+    }
+    setSellerTrackingOrderId(order.id);
+  };
+
   const handleTrackingClick = (order: Order) => {
-    if (!isAdmin) return;
-    setTrackingTarget({
-      trackingId: order.wakilniTrackingId ?? null,
-      wakilniOrderId: order.wakilniOrderId ?? null,
-      systemId: order.systemId ?? null,
-      sellerId: order.id,
-    });
+    if (isAdmin) {
+      setTrackingTarget({
+        trackingId: order.wakilniTrackingId ?? null,
+        wakilniOrderId: order.wakilniOrderId ?? null,
+        systemId: order.systemId ?? null,
+        sellerId: order.id,
+      });
+      return;
+    }
+
+    if (hasTrackingReference(order)) {
+      setSellerTrackingOrderId(order.id);
+    } else {
+      toast.info("Tracking is not available yet");
+    }
   };
 
   return (
@@ -1045,7 +1073,7 @@ export default function Orders() {
                   <span className="inline-flex items-center gap-1">System ID {sortKey === 'systemId' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}</span>
                 </th>}
                 {isCol('id') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Seller ID</th>}
-                {isAdmin && isCol('wakilniId') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Wakilni ID</th>}
+                {isCol('wakilniId') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider">Wakilni ID</th>}
                 {isCol('createdAt') && <th className="text-left py-3 px-4 font-medium text-xs text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('createdAt')}>
                   <span className="inline-flex items-center gap-1">Created {sortKey === 'createdAt' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}</span>
                 </th>}
@@ -1095,10 +1123,14 @@ export default function Orders() {
                   {isAdmin && isCol('systemId') && <td className="py-2.5 px-4 font-mono text-xs text-muted-foreground">{order.systemId ?? '—'}</td>}
                   {isCol('id') && (
                     <td className="py-2.5 px-4 font-medium text-xs" onClick={(e) => e.stopPropagation()}>
-                      {isAdmin ? (
+                      {isAdmin || canSellerTrackOrder(order) ? (
                         <button
                           type="button"
                           onClick={() => {
+                            if (!isAdmin) {
+                              handleSellerOrderIdClick(order);
+                              return;
+                            }
                             navigator.clipboard.writeText(order.id);
                             setCopiedId(order.id);
                             toast.success("Order ID copied");
@@ -1106,15 +1138,20 @@ export default function Orders() {
                           }}
                           className={cn(
                             "inline-flex items-center gap-1 transition-colors group",
-                            "hover:text-primary"
+                            isAdmin
+                              ? "hover:text-primary"
+                              : "text-[hsl(210,60%,52%)] font-semibold underline underline-offset-4 decoration-[hsl(210,60%,52%)]/35 hover:decoration-[hsl(210,60%,52%)]"
                           )}
-                          title="Click to copy"
+                          title={isAdmin ? "Click to copy" : "View tracking"}
                         >
                           <span>{order.id}</span>
-                          {copiedId === order.id ? (
-                            <Check className="w-3 h-3 text-success" />
-                          ) : (
-                            <Copy className="w-3 h-3 opacity-0 group-hover:opacity-60" />
+                          {!isAdmin && <Truck className="w-3.5 h-3.5" />}
+                          {isAdmin && (
+                            copiedId === order.id ? (
+                              <Check className="w-3 h-3 text-success" />
+                            ) : (
+                              <Copy className="w-3 h-3 opacity-0 group-hover:opacity-60" />
+                            )
                           )}
                         </button>
                       ) : (
@@ -1122,7 +1159,7 @@ export default function Orders() {
                       )}
                     </td>
                   )}
-                  {isAdmin && isCol('wakilniId') && (
+                  {isCol('wakilniId') && (
                     <td className="py-2.5 px-4 text-xs" onClick={(e) => e.stopPropagation()}>
                       {hasTrackingReference(order) ? (
                         (() => {
@@ -1267,16 +1304,21 @@ export default function Orders() {
                   type="button"
                   className={cn(
                     "inline-flex items-center gap-1 font-medium text-sm transition-colors",
-                    isAdmin && "hover:text-primary"
+                    isAdmin || !canSellerTrackOrder(order)
+                      ? "hover:text-primary"
+                      : "text-[hsl(210,60%,52%)] font-semibold underline underline-offset-4 decoration-[hsl(210,60%,52%)]/35 hover:decoration-[hsl(210,60%,52%)]"
                   )}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (isAdmin) {
                       navigate(`/orders/${order.id}`);
+                    } else if (canSellerTrackOrder(order)) {
+                      handleSellerOrderIdClick(order);
                     }
                   }}
                 >
                   {order.id}
+                  {canSellerTrackOrder(order) && <Truck className="w-3.5 h-3.5" />}
                 </button>
                 <span className="text-xs text-muted-foreground tabular-nums">{format(new Date(order.createdAt), 'dd MMM yyyy HH:mm')}</span>
               </div>
@@ -1350,6 +1392,17 @@ export default function Orders() {
             setRefreshKey(k => k + 1);
           }}
           onStatusSync={() => setRefreshKey(k => k + 1)}
+        />
+      )}
+
+      {sellerTrackingOrderId && (
+        <SellerTrackingModal
+          orderId={sellerTrackingOrderId}
+          open={!!sellerTrackingOrderId}
+          onClose={() => {
+            setSellerTrackingOrderId(null);
+            setRefreshKey(k => k + 1);
+          }}
         />
       )}
 
