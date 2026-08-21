@@ -154,14 +154,7 @@ const channelConfig: Record<string, { label: string; cls: string }> = {
 };
 
 /* ── Sparkline KPI Cards ── */
-type OrdersListStats = {
-  total: number;
-  shipped: number;
-  delivered: number;
-  returned: number;
-};
-
-function OrderSparklineCards({ orders, stats }: { orders: Order[]; stats?: OrdersListStats }) {
+function OrderSparklineCards({ orders }: { orders: Order[] }) {
   const { isDataVisible } = useDataVisibility();
   const sparkData = useMemo(() => {
     const days = eachDayOfInterval({
@@ -184,12 +177,12 @@ function OrderSparklineCards({ orders, stats }: { orders: Order[]; stats?: Order
     });
   }, [orders]);
 
-  const totals = useMemo(() => stats || ({
+  const totals = useMemo(() => ({
     total: orders.length,
     shipped: orders.filter(o => shippedDeliveryStatuses.includes(o.deliveryStatus)).length,
     delivered: orders.filter(o => o.deliveryStatus === "delivered").length,
     returned: orders.filter(o => o.deliveryStatus === "returned").length,
-  }), [orders, stats]);
+  }), [orders]);
 
   const cards = [
     { title: "Total Orders", value: totals.total, dataKey: "total", color: "hsl(210,60%,52%)" },
@@ -246,14 +239,9 @@ export default function Orders() {
   const [sellerTrackingOrderId, setSellerTrackingOrderId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [totalOrderCount, setTotalOrderCount] = useState(0);
-  const [ordersLoading, setOrdersLoading] = useState(false);
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [orderStats, setOrderStats] = useState<OrdersListStats>({ total: 0, shipped: 0, delivered: 0, returned: 0 });
   const [sellerNames, setSellerNames] = useState<string[]>([]);
   const [agentNames, setAgentNames] = useState<string[]>([]);
   const [productNames, setProductNames] = useState<string[]>([]);
-  const [profileNameToId, setProfileNameToId] = useState<Map<string, string>>(new Map());
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -364,6 +352,130 @@ export default function Orders() {
     setRefreshKey(k => k + 1);
   };
 
+  // Fetch orders from database
+  useEffect(() => {
+    const fetchOrders = async () => {
+      // Paginate using `.range()` to bypass PostgREST's `db-max-rows` cap
+      // (commonly 1000). Page size is intentionally kept below that cap so
+      // each request returns a full page when more rows exist — otherwise
+      // the loop would stop one page early and the UI would freeze at e.g.
+      // 999/1000 even when the database has more rows.
+      //
+      // Order by a stable, unique secondary key (`id`) so pagination is
+      // deterministic. Without it, rows that share the same `created_at`
+      // can shift between offset windows and we lose count (e.g. 1,050 → 999).
+      // We also de-duplicate by `id` as a final safety net in case a row
+      // is re-inserted between fetches.
+      const PAGE = 500;
+      let from = 0;
+      const seen = new Set<string>();
+      const all: any[] = [];
+      // Hard ceiling to prevent runaway loops — bump if the system grows past this.
+      const MAX_ROWS = 200000;
+
+      while (from < MAX_ROWS) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, from + PAGE - 1);
+
+        if (error) {
+          console.error("Error fetching orders:", error);
+          return;
+        }
+
+        const batch = data || [];
+        for (const row of batch) {
+          if (!seen.has(row.id)) {
+            seen.add(row.id);
+            all.push(row);
+          }
+        }
+        if (batch.length < PAGE) break;
+        from += PAGE;
+      }
+
+      const data = all;
+
+      // Fetch seller & agent names for display
+      const sellerIds = [...new Set((data || []).map(o => o.seller_id))];
+      const agentIdsSet = new Set<string>();
+      (data || []).forEach(o => {
+        if (o.agent_id) agentIdsSet.add(o.agent_id);
+        if (o.original_agent_id) agentIdsSet.add(o.original_agent_id);
+      });
+      const allUserIds = [...new Set([...sellerIds, ...agentIdsSet])];
+
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, name")
+        .in("user_id", allUserIds);
+
+      const profileMap = new Map((profiles || []).map(p => [p.user_id, p.name]));
+
+      // Fetch invoice statuses for all orders that have an invoice_id
+      const invoiceIds = [...new Set((data || []).map(o => o.invoice_id).filter(Boolean))];
+      const invoiceMap = new Map<string, string>();
+      if (invoiceIds.length > 0) {
+        const { data: invoices } = await supabase
+          .from("invoices")
+          .select("id, status")
+          .in("id", invoiceIds);
+        (invoices || []).forEach(inv => invoiceMap.set(inv.id, inv.status));
+      }
+
+      const mapped: Order[] = (data || []).map(o => ({
+        id: o.order_id,
+        systemId: o.system_id || undefined,
+        customer: o.customer_name,
+        phone: o.customer_phone,
+        city: o.customer_city,
+        address: o.customer_address || "",
+        products: [{
+          name: o.product_name,
+          qty: o.quantity,
+          price: Number(o.price),
+          variantName: (o as any).variant_name || null,
+          variantSku: (o as any).variant_sku || null,
+        }],
+        total: Number(o.total_amount),
+        paidAmount: 0,
+        status: (o.confirmation_status === "confirmed" ? o.delivery_status : o.confirmation_status) as any,
+        confirmationStatus: o.confirmation_status as ConfirmationStatus,
+        deliveryStatus: (o.delivery_status || "pending") as DeliveryStatus,
+        createdAt: o.created_at,
+        updatedAt: o.updated_at,
+        confirmedAt: o.confirmed_at || undefined,
+        deliveredAt: o.delivered_at || undefined,
+        notes: o.note || undefined,
+        seller: profileMap.get(o.seller_id) || "Unknown",
+        agentName: o.agent_id ? (profileMap.get(o.agent_id) || undefined) : (o.original_agent_id ? (profileMap.get(o.original_agent_id) || undefined) : undefined),
+        upsell: false,
+        warehouseState: "in_stock" as const,
+        history: [],
+        attemptCount: o.attempt_count || 0,
+        orioOrderId: o.orio_order_id || null,
+        orioShippingStatus: o.orio_shipping_status || null,
+        wakilniOrderId: (o as any).wakilni_order_id || null,
+        wakilniTrackingId: (o as any).wakilni_tracking_id || null,
+        wakilniSyncStatus: (o as any).wakilni_sync_status || null,
+        confirmationChannel: o.confirmation_channel || 'agent',
+        whatsappStatus: o.whatsapp_status || null,
+        invoiceId: o.invoice_id || null,
+        invoiceStatus: o.invoice_id ? (invoiceMap.get(o.invoice_id) || null) : null,
+      }));
+
+      setOrders(mapped);
+      setSellerNames([...new Set(mapped.map(o => o.seller))]);
+      setProductNames([...new Set(mapped.flatMap(o => o.products.map(p => p.name)))]);
+      setAgentNames([...new Set(mapped.map(o => o.agentName).filter(Boolean) as string[])]);
+    };
+
+    fetchOrders();
+  }, [refreshKey]);
+
   // Filters state
   const [datePreset, setDatePreset] = useState<DatePresetValue>("maximum");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -421,264 +533,6 @@ export default function Orders() {
   type SortableKey = 'systemId' | 'createdAt' | 'updatedAt';
   const [sortKey, setSortKey] = useState<SortableKey>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-
-  const orderListColumns = useMemo(() => `
-    order_id,
-    system_id,
-    customer_name,
-    customer_phone,
-    customer_city,
-    customer_address,
-    product_name,
-    quantity,
-    price,
-    total_amount,
-    confirmation_status,
-    delivery_status,
-    created_at,
-    updated_at,
-    confirmed_at,
-    delivered_at,
-    note,
-    seller_id,
-    agent_id,
-    original_agent_id,
-    attempt_count,
-    orio_order_id,
-    orio_shipping_status,
-    wakilni_order_id,
-    wakilni_tracking_id,
-    wakilni_sync_status,
-    confirmation_channel,
-    whatsapp_status,
-    invoice_id,
-    variant_name,
-    variant_sku
-  `, []);
-
-  const mapOrderRow = useCallback((o: any, profileMap: Map<string, string>, invoiceMap: Map<string, string>): Order => ({
-    id: o.order_id,
-    systemId: o.system_id || undefined,
-    customer: o.customer_name,
-    phone: o.customer_phone,
-    city: o.customer_city,
-    address: o.customer_address || "",
-    products: [{
-      name: o.product_name,
-      qty: o.quantity,
-      price: Number(o.price),
-      variantName: o.variant_name || null,
-      variantSku: o.variant_sku || null,
-    }],
-    total: Number(o.total_amount),
-    paidAmount: 0,
-    status: (o.confirmation_status === "confirmed" ? o.delivery_status : o.confirmation_status) as any,
-    confirmationStatus: o.confirmation_status as ConfirmationStatus,
-    deliveryStatus: (o.delivery_status || "pending") as DeliveryStatus,
-    createdAt: o.created_at,
-    updatedAt: o.updated_at,
-    confirmedAt: o.confirmed_at || undefined,
-    deliveredAt: o.delivered_at || undefined,
-    notes: o.note || undefined,
-    seller: profileMap.get(o.seller_id) || "Unknown",
-    agentName: o.agent_id ? (profileMap.get(o.agent_id) || undefined) : (o.original_agent_id ? (profileMap.get(o.original_agent_id) || undefined) : undefined),
-    upsell: false,
-    warehouseState: "in_stock" as const,
-    history: [],
-    attemptCount: o.attempt_count || 0,
-    orioOrderId: o.orio_order_id || null,
-    orioShippingStatus: o.orio_shipping_status || null,
-    wakilniOrderId: o.wakilni_order_id || null,
-    wakilniTrackingId: o.wakilni_tracking_id || null,
-    wakilniSyncStatus: o.wakilni_sync_status || null,
-    confirmationChannel: o.confirmation_channel || 'agent',
-    whatsappStatus: o.whatsapp_status || null,
-    invoiceId: o.invoice_id || null,
-    invoiceStatus: o.invoice_id ? (invoiceMap.get(o.invoice_id) || null) : null,
-  }), []);
-
-  const applyServerFilters = useCallback((query: any, includeSearch = true) => {
-    const f = appliedFilters;
-    if (f.dateRange?.from) {
-      query = query.gte("created_at", f.dateRange.from.toISOString());
-      if (f.dateRange.to) {
-        const to = new Date(f.dateRange.to);
-        to.setDate(to.getDate() + 1);
-        query = query.lt("created_at", to.toISOString());
-      }
-    }
-    if (f.product !== 'all') query = query.eq("product_name", f.product);
-    if (f.seller !== 'all') {
-      const sellerId = profileNameToId.get(f.seller);
-      query = sellerId ? query.eq("seller_id", sellerId) : query.eq("seller_id", "__missing_seller__");
-    }
-    if (f.agent !== 'all') {
-      const agentId = profileNameToId.get(f.agent);
-      query = agentId
-        ? query.or(`agent_id.eq.${agentId},original_agent_id.eq.${agentId}`)
-        : query.eq("agent_id", "__missing_agent__");
-    }
-    if (f.confirmation !== 'all') {
-      if (f.confirmation === 'no_answer') {
-        query = query.in("confirmation_status", ["no_answer", "no_answer_1", "no_answer_2", "no_answer_3", "no_answer_4", "no_answer_5", "no_answer_6", "no_answer_7", "no_answer_8", "no_answer_9"]);
-      } else if (!isAdmin && f.confirmation === 'new') {
-        query = query.in("confirmation_status", ["new", "new_wts"]);
-      } else {
-        query = query.eq("confirmation_status", f.confirmation);
-      }
-    }
-    if (f.delivery !== 'all') query = query.eq("delivery_status", f.delivery);
-    if (f.subStatus !== 'all') query = query.eq("orio_shipping_status", f.subStatus);
-    if (f.channel !== 'all') query = query.eq("confirmation_channel", f.channel);
-    if (f.upsell === 'yes') query = query.eq("order_id", "__no_upsell_rows__");
-
-    const safeSearch = debouncedSearch.trim().replace(/[(),%]/g, " ");
-    if (includeSearch && safeSearch) {
-      const pattern = `%${safeSearch}%`;
-      query = query.or([
-        `order_id.ilike.${pattern}`,
-        `customer_name.ilike.${pattern}`,
-        `customer_phone.ilike.${pattern}`,
-        `customer_city.ilike.${pattern}`,
-        `product_name.ilike.${pattern}`,
-        `wakilni_order_id.ilike.${pattern}`,
-      ].join(","));
-    }
-    return query;
-  }, [appliedFilters, debouncedSearch, isAdmin, profileNameToId]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
-    return () => window.clearTimeout(timer);
-  }, [search]);
-
-  useEffect(() => {
-    const fetchFilterOptions = async () => {
-      const [{ data: profiles }, { data: roles }, { data: products }] = await Promise.all([
-        supabase.from("profiles").select("user_id, name").order("name", { ascending: true }),
-        supabase.from("user_roles").select("user_id, role"),
-        supabase.from("products").select("name").order("name", { ascending: true }),
-      ]);
-
-      const nameToId = new Map<string, string>();
-      const roleByUserId = new Map((roles || []).map((roleRow: any) => [roleRow.user_id, roleRow.role]));
-      const sellers: string[] = [];
-      const agents: string[] = [];
-      (profiles || []).forEach((profile: any) => {
-        if (!profile.name) return;
-        nameToId.set(profile.name, profile.user_id);
-        const role = roleByUserId.get(profile.user_id);
-        if (role === "seller") sellers.push(profile.name);
-        if (role === "agent") agents.push(profile.name);
-      });
-
-      setProfileNameToId(nameToId);
-      setSellerNames([...new Set(sellers)]);
-      setAgentNames([...new Set(agents)]);
-      setProductNames([...new Set((products || []).map((p: any) => p.name).filter(Boolean))]);
-    };
-
-    fetchFilterOptions();
-  }, []);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [appliedFilters, debouncedSearch, pageSize]);
-
-  useEffect(() => {
-    const fetchOrders = async () => {
-      setOrdersLoading(true);
-      const from = (currentPage - 1) * pageSize;
-      const to = from + pageSize - 1;
-      const sortColumn = sortKey === "systemId" ? "system_id" : sortKey === "updatedAt" ? "updated_at" : "created_at";
-
-      try {
-        let query: any = supabase
-          .from("orders")
-          .select(orderListColumns, { count: "exact" });
-        query = applyServerFilters(query);
-        query = query
-          .order(sortColumn, { ascending: sortDir === "asc", nullsFirst: false })
-          .order("id", { ascending: sortDir === "asc" })
-          .range(from, to);
-
-        const { data, count, error } = await query;
-        if (error) throw error;
-
-        const pageRows = data || [];
-        const userIds = new Set<string>();
-        pageRows.forEach((o: any) => {
-          if (o.seller_id) userIds.add(o.seller_id);
-          if (o.agent_id) userIds.add(o.agent_id);
-          if (o.original_agent_id) userIds.add(o.original_agent_id);
-        });
-
-        const profileMap = new Map<string, string>();
-        if (userIds.size > 0) {
-          const { data: profiles } = await supabase
-            .from("profiles")
-            .select("user_id, name")
-            .in("user_id", [...userIds]);
-          (profiles || []).forEach((profile: any) => profileMap.set(profile.user_id, profile.name));
-        }
-
-        const invoiceIds = [...new Set(pageRows.map((o: any) => o.invoice_id).filter(Boolean))];
-        const invoiceMap = new Map<string, string>();
-        if (invoiceIds.length > 0) {
-          const { data: invoices } = await supabase
-            .from("invoices")
-            .select("id, status")
-            .in("id", invoiceIds);
-          (invoices || []).forEach((inv: any) => invoiceMap.set(inv.id, inv.status));
-        }
-
-        setOrders(pageRows.map((o: any) => mapOrderRow(o, profileMap, invoiceMap)));
-        setTotalOrderCount(count || 0);
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-        toast.error("Failed to load orders");
-      } finally {
-        setOrdersLoading(false);
-      }
-    };
-
-    fetchOrders();
-  }, [applyServerFilters, currentPage, mapOrderRow, orderListColumns, pageSize, refreshKey, sortDir, sortKey]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchStats = async () => {
-      const countFor = async (deliveryStatuses?: DeliveryStatus[]) => {
-        let query: any = supabase
-          .from("orders")
-          .select("id", { count: "exact", head: true });
-        query = applyServerFilters(query);
-        if (deliveryStatuses?.length) query = query.in("delivery_status", deliveryStatuses);
-        const { count, error } = await query;
-        if (error) throw error;
-        return count || 0;
-      };
-
-      try {
-        const [total, shipped, delivered, returned] = await Promise.all([
-          countFor(),
-          countFor(shippedDeliveryStatuses),
-          countFor(["delivered"]),
-          countFor(["returned"]),
-        ]);
-        if (cancelled) return;
-        setOrderStats({ total, shipped, delivered, returned });
-      } catch (error) {
-        console.error("Error fetching order stats:", error);
-      }
-    };
-
-    const timer = window.setTimeout(() => void fetchStats(), 500);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [applyServerFilters, refreshKey]);
 
   const toggleSort = (key: SortableKey) => {
     if (sortKey === key) {
@@ -738,12 +592,64 @@ export default function Orders() {
     return count;
   }, [appliedFilters]);
 
-  const totalPages = Math.max(1, Math.ceil(totalOrderCount / pageSize));
-  const paginatedOrders = orders;
+  const filtered = useMemo(() => {
+    const f = appliedFilters;
+    return orders
+      .filter(o => {
+        if (f.dateRange?.from) {
+          const d = new Date(o.createdAt);
+          if (d < f.dateRange.from) return false;
+          if (f.dateRange.to && d > new Date(f.dateRange.to.getTime() + 86400000)) return false;
+        }
+        if (f.product !== 'all' && !o.products.some(p => p.name === f.product)) return false;
+        if (f.seller !== 'all' && o.seller !== f.seller) return false;
+        if (f.agent !== 'all' && o.agentName !== f.agent) return false;
+        if (f.confirmation !== 'all') {
+          // For sellers, "new" filter also matches new_wts (WhatsApp pipeline is hidden as plain New)
+          const effective = (!isAdmin && o.confirmationStatus === 'new_wts') ? 'new' : o.confirmationStatus;
+          const matchesNoAnswerGroup = f.confirmation === 'no_answer' && effective.startsWith('no_answer');
+          if (!matchesNoAnswerGroup && effective !== f.confirmation) return false;
+        }
+        if (f.delivery !== 'all' && o.deliveryStatus !== f.delivery) return false;
+        if (f.subStatus !== 'all' && (o.orioShippingStatus || '') !== f.subStatus) return false;
+        if (f.channel !== 'all' && (o.confirmationChannel || 'agent') !== f.channel) return false;
+        if (f.upsell !== 'all') {
+          if (f.upsell === 'yes' && !o.upsell) return false;
+          if (f.upsell === 'no' && o.upsell) return false;
+        }
+        
+        if (search) {
+          const s = search.toLowerCase();
+          return o.id.toLowerCase().includes(s) || o.customer.toLowerCase().includes(s) ||
+            o.phone.includes(s) || o.city.toLowerCase().includes(s);
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        let valA: number, valB: number;
+        if (sortKey === 'systemId') {
+          valA = a.systemId ?? 0;
+          valB = b.systemId ?? 0;
+        } else if (sortKey === 'updatedAt') {
+          valA = new Date(a.updatedAt).getTime();
+          valB = new Date(b.updatedAt).getTime();
+        } else {
+          valA = new Date(a.createdAt).getTime();
+          valB = new Date(b.createdAt).getTime();
+        }
+        return sortDir === 'asc' ? valA - valB : valB - valA;
+      });
+  }, [search, appliedFilters, orders, sortKey, sortDir]);
 
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [currentPage, totalPages]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
+
+  // Reset to page 1 when filters/search change
+  const prevFilteredLen = filtered.length;
+  useMemo(() => { setCurrentPage(1); }, [search, appliedFilters, pageSize]);
 
   const toggleColumn = (key: ColumnKey) => {
     setVisibleColumns(prev => {
@@ -786,7 +692,7 @@ export default function Orders() {
       </div>
 
       {/* Mini Sparkline KPIs */}
-      <OrderSparklineCards orders={orders} stats={orderStats} />
+      <OrderSparklineCards orders={orders} />
 
       {/* Search & Filters */}
       <div className="flex items-center justify-end gap-2">
@@ -998,7 +904,7 @@ export default function Orders() {
         <div className="flex items-center justify-between px-4 py-2.5 border-b">
           <div className="flex items-center gap-3">
             <p className="text-sm font-medium">
-              {totalOrderCount} <span className="text-muted-foreground font-normal">order{totalOrderCount !== 1 ? 's' : ''}</span>
+              {filtered.length} <span className="text-muted-foreground font-normal">order{filtered.length !== 1 ? 's' : ''}</span>
             </p>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground">Show</span>
@@ -1076,14 +982,7 @@ export default function Orders() {
               </tr>
             </thead>
             <tbody>
-              {ordersLoading && (
-                <tr>
-                  <td colSpan={18} className="py-8 text-center text-sm text-muted-foreground">
-                    Loading orders...
-                  </td>
-                </tr>
-              )}
-              {!ordersLoading && paginatedOrders.map((order) => (
+              {paginatedOrders.map((order) => (
                 <tr
                   key={order.id}
                   className={cn(
@@ -1262,7 +1161,7 @@ export default function Orders() {
                   </td>
                 </tr>
               ))}
-              {!ordersLoading && totalOrderCount === 0 && (
+              {filtered.length === 0 && (
                 <tr>
                   <td colSpan={visibleColumns.size + (isAdmin ? 2 : 1)} className="py-16 text-center text-muted-foreground text-sm">
                     No orders found matching your criteria
@@ -1275,10 +1174,7 @@ export default function Orders() {
 
         {/* Mobile Cards */}
         <div className="md:hidden divide-y">
-          {ordersLoading && (
-            <div className="p-8 text-center text-sm text-muted-foreground">Loading orders...</div>
-          )}
-          {!ordersLoading && paginatedOrders.map((order) => (
+          {paginatedOrders.map((order) => (
             <div
               key={order.id}
               className="p-4 hover:bg-muted/30 cursor-pointer transition-colors active:scale-[0.98]"
@@ -1334,7 +1230,7 @@ export default function Orders() {
               </div>
             </div>
           ))}
-          {!ordersLoading && totalOrderCount === 0 && (
+          {filtered.length === 0 && (
             <div className="py-16 text-center text-muted-foreground text-sm">No orders found</div>
           )}
         </div>
@@ -1343,7 +1239,7 @@ export default function Orders() {
         <div className="flex items-center justify-end px-4 py-2.5 border-t">
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground tabular-nums mr-2">
-              {totalOrderCount === 0 ? 0 : (currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalOrderCount)} of {totalOrderCount}
+              {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filtered.length)} of {filtered.length}
             </span>
             <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={currentPage <= 1} onClick={() => setCurrentPage(1)}>
               <span className="text-xs">«</span>
