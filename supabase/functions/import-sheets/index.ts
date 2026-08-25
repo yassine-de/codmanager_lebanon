@@ -90,8 +90,22 @@ function parseSheetNumber(raw: string | undefined | null): number {
   if (raw === undefined || raw === null) return NaN;
   const s = String(raw).trim();
   if (!s) return NaN;
-  // Remove commas (thousand separators) and any spaces
-  const cleaned = s.replace(/,/g, "").replace(/\s/g, "");
+  let cleaned = s.replace(/\s/g, "").replace(/[^\d,.\-]/g, "");
+
+  const comma = cleaned.lastIndexOf(",");
+  const dot = cleaned.lastIndexOf(".");
+  if (comma >= 0 && dot >= 0) {
+    // Use the rightmost separator as decimal separator:
+    // "1,234.56" -> "1234.56", "1.234,56" -> "1234.56"
+    cleaned = comma > dot
+      ? cleaned.replace(/\./g, "").replace(",", ".")
+      : cleaned.replace(/,/g, "");
+  } else if (comma >= 0) {
+    const [, decimals = ""] = cleaned.split(",");
+    cleaned = decimals.length > 0 && decimals.length <= 2
+      ? cleaned.replace(",", ".")
+      : cleaned.replace(/,/g, "");
+  }
   const n = parseFloat(cleaned);
   return isFinite(n) ? n : NaN;
 }
