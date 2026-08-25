@@ -16,6 +16,7 @@ interface UserPresence {
 
 function getStatus(lastSeen: Date, isActive: boolean): PresenceStatus {
   const diffMs = Date.now() - lastSeen.getTime();
+  if (diffMs < 0) return "offline";
   const diffMin = diffMs / 60_000;
   if (isActive && diffMin < 2) return "online";
   if (diffMin < 5) return "idle";
@@ -24,6 +25,7 @@ function getStatus(lastSeen: Date, isActive: boolean): PresenceStatus {
 
 function formatTimeAgo(date: Date): string {
   const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return "Invalid time";
   const minutes = Math.floor(diffMs / 60_000);
   if (minutes < 1) return "Just now";
   if (minutes < 60) return `${minutes}m ago`;

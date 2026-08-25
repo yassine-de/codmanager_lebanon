@@ -12,12 +12,7 @@ export function usePresenceHeartbeat() {
     if (!user) return;
 
     const sendHeartbeat = async () => {
-      await supabase
-        .from("user_presence" as any)
-        .upsert(
-          { user_id: user.id, last_seen: new Date().toISOString(), is_active: true },
-          { onConflict: "user_id" }
-        );
+      await supabase.rpc("touch_user_presence" as any);
     };
 
     // Send immediately
@@ -29,11 +24,7 @@ export function usePresenceHeartbeat() {
     // Mark inactive on page hide
     const handleVisibility = () => {
       if (document.hidden) {
-        supabase
-          .from("user_presence" as any)
-          .update({ is_active: false, last_seen: new Date().toISOString() })
-          .eq("user_id", user.id)
-          .then();
+        supabase.rpc("set_user_presence_inactive" as any).then();
       } else {
         sendHeartbeat();
       }
@@ -45,11 +36,7 @@ export function usePresenceHeartbeat() {
       if (intervalRef.current) clearInterval(intervalRef.current);
       document.removeEventListener("visibilitychange", handleVisibility);
       // Mark offline on unmount
-      supabase
-        .from("user_presence" as any)
-        .update({ is_active: false, last_seen: new Date().toISOString() })
-        .eq("user_id", user.id)
-        .then();
+      supabase.rpc("set_user_presence_inactive" as any).then();
     };
   }, [user?.id]);
 }
