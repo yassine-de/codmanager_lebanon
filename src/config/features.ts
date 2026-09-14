@@ -1,7 +1,7 @@
 export const features = {
-  whatsapp: false,
-  whatsappAi: false,
-  whatsappCampaigns: false,
+  whatsapp: true,
+  whatsappAi: true,
+  whatsappCampaigns: true,
   followUps: false,
   agentAssignment: true,
   freightForwarder: false,
