@@ -364,8 +364,8 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
-                    {/* WhatsApp Automation dropdown — injected right after Follow Ups */}
-                    {features.whatsapp && item.url === '/follow-ups' && isAdmin && (
+                    {/* WhatsApp Automation dropdown — injected right after Alerts */}
+                    {features.whatsapp && item.url === '/alerts' && isAdmin && (
                       <Collapsible defaultOpen={location.pathname.startsWith("/whatsapp")} className="group/whatsapp">
                         <SidebarMenuItem>
                           <CollapsibleTrigger asChild>
