@@ -32,6 +32,7 @@ export interface Order {
   shippedAt?: string;
   deliveredAt?: string;
   notes?: string;
+  cancelReason?: string | null;
   seller: string;
   agentName?: string;
   upsell: boolean;

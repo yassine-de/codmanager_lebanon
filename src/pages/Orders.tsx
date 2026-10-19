@@ -440,6 +440,7 @@ export default function Orders() {
     confirmed_at,
     delivered_at,
     note,
+    cancel_reason,
     seller_id,
     agent_id,
     original_agent_id,
@@ -480,6 +481,7 @@ export default function Orders() {
     confirmedAt: o.confirmed_at || undefined,
     deliveredAt: o.delivered_at || undefined,
     notes: o.note || undefined,
+    cancelReason: o.cancel_reason || null,
     seller: profileMap.get(o.seller_id) || "Unknown",
     agentName: o.agent_id ? (profileMap.get(o.agent_id) || undefined) : (o.original_agent_id ? (profileMap.get(o.original_agent_id) || undefined) : undefined),
     upsell: false,
@@ -1407,6 +1409,7 @@ export default function Orders() {
               confirmation_status: updated.confirmationStatus,
               delivery_status: updated.deliveryStatus,
               note: updated.notes || '',
+              cancel_reason: updated.confirmationStatus === 'cancelled' ? updated.cancelReason : null,
               quantity: updated.products.reduce((s, p) => s + p.qty, 0),
               price: updated.products[0]?.price || 0,
               total_amount: updated.total,
@@ -1462,6 +1465,7 @@ export default function Orders() {
             trackChange('customer_city', editOrder.city, updated.city);
             trackChange('total_amount', editOrder.total, updated.total);
             trackChange('note', editOrder.notes, updated.notes);
+            trackChange('cancel_reason', editOrder.cancelReason, updated.cancelReason);
 
             if (historyEntries.length > 0) {
               await supabase.from('order_history').insert(historyEntries);

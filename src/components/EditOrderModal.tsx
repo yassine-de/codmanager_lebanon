@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { CitySelect } from "@/components/CitySelect";
+import { CANCEL_REASONS, isKnownCancelReason, resolveCancelReason } from "@/lib/cancellationReasons";
 
 const confirmationOptions: { value: ConfirmationStatus; label: string }[] = [
   { value: 'new', label: 'New' },
@@ -75,6 +76,7 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
   const [confirmationStatus, setConfirmationStatus] = useState<ConfirmationStatus>('new');
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus>('pending');
   const [notes, setNotes] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
   const [products, setProducts] = useState<{ name: string; qty: number; price: number; variantName?: string | null; variantSku?: string | null }[]>([]);
   const [upsell, setUpsell] = useState(false);
 
@@ -87,6 +89,11 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
       setConfirmationStatus(order.confirmationStatus);
       setDeliveryStatus(order.deliveryStatus);
       setNotes(order.notes || '');
+      const storedReason = order.cancelReason || '';
+      setCancelReason(isKnownCancelReason(storedReason) ? storedReason : (storedReason ? 'other' : ''));
+      if (storedReason && !isKnownCancelReason(storedReason) && !order.notes) {
+        setNotes(storedReason);
+      }
       setProducts(order.products.map(p => ({ ...p })));
       setUpsell(order.upsell);
     }
@@ -132,6 +139,14 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
       toast.error('Invalid product quantity or price');
       return;
     }
+    if (confirmationStatus === 'cancelled' && !cancelReason) {
+      toast.error('Cancellation reason is required');
+      return;
+    }
+    if (confirmationStatus === 'cancelled' && cancelReason === 'other' && !notes.trim()) {
+      toast.error('Please enter the cancellation reason in Notes');
+      return;
+    }
 
     const historyEvents = [...order.history];
     const now = new Date().toISOString();
@@ -164,6 +179,7 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
       confirmationStatus,
       deliveryStatus,
       notes: notes.trim() || undefined,
+      cancelReason: confirmationStatus === 'cancelled' ? resolveCancelReason(cancelReason, notes) : null,
       products,
       total,
       upsell,
@@ -337,6 +353,25 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
             </div>
             )}
 
+            {confirmationStatus === 'cancelled' && !isSeller && (
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+                <Label className={fieldLabel}>Cancellation Reason *</Label>
+                <Select value={cancelReason} onValueChange={setCancelReason}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Select reason..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CANCEL_REASONS.map((reason) => (
+                      <SelectItem key={reason.value} value={reason.value}>{reason.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {cancelReason === 'other' && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">Enter the cancellation reason in Notes below.</p>
+                )}
+              </div>
+            )}
+
             {/* Upsell + Notes */}
             <div>
               <h3 className={sectionTitle}>Additional</h3>
@@ -370,7 +405,14 @@ export default function EditOrderModal({ open, onOpenChange, order, onSave }: Pr
 
         <DialogFooter className="px-5 py-3 border-t">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button size="sm" onClick={handleSave}>Save Changes</Button>
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={confirmationStatus === 'cancelled'
+              && (!cancelReason || (cancelReason === 'other' && !notes.trim()))}
+          >
+            Save Changes
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

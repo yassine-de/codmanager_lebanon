@@ -19,6 +19,7 @@ import { getProductVariants, hasValidSelectedVariant, type CatalogVariant } from
 import { CitySelect } from "@/components/CitySelect";
 import { formatPKT as format } from "@/lib/timezone";
 import { appendAgentDebugLog } from "@/lib/agent-debug-log";
+import { CANCEL_REASONS, resolveCancelReason } from "@/lib/cancellationReasons";
 import { toast } from "sonner";
 import {
   Play, ChevronRight, Phone, PhoneOff, MessageCircle, User, MapPin, Package, DollarSign,
@@ -26,14 +27,6 @@ import {
   Pencil, Plus, Trash2, X, Check, Loader2, Clock, RotateCcw, Copy, AlertTriangle
 } from "lucide-react";
 
-
-const CANCEL_REASONS = [
-  { value: "high_price", label: "💰 High Price" },
-  { value: "product_issue", label: "⚠️ Product Issue" },
-  { value: "not_convinced", label: "🤔 Not Convinced" },
-  { value: "quality_issue", label: "❌ Quality Issue" },
-  { value: "other", label: "📝 Other" },
-];
 
 const NO_ANSWER_MAX_ATTEMPTS = 12;
 const RETRY_COOLDOWN_MS = 30 * 60 * 1000; // 30 min
@@ -713,7 +706,7 @@ const AgentOrders = () => {
         updateData.delivery_status = shippingStatus === "shipped" ? "booked" : "pending";
       }
       if (selectedStatus === "cancelled") {
-        updateData.cancel_reason = cancelReason === "other" ? note.trim() : cancelReason;
+        updateData.cancel_reason = resolveCancelReason(cancelReason, note);
       }
       if (selectedStatus === "postponed" && postponeDate) {
         const [hourStr, rest] = postponeTime.split(":");
@@ -847,7 +840,7 @@ const AgentOrders = () => {
       trackChange("price", currentOrder.price, activeItems[0]?.price);
       trackChange("total_amount", currentOrder.total_amount, orderTotal);
       if (selectedStatus === "confirmed") trackChange("delivery_status", currentOrder.delivery_status, shippingStatus === "shipped" ? "booked" : "pending");
-      if (selectedStatus === "cancelled") trackChange("cancel_reason", currentOrder.cancel_reason, cancelReason === "other" ? note.trim() : cancelReason);
+      if (selectedStatus === "cancelled") trackChange("cancel_reason", currentOrder.cancel_reason, resolveCancelReason(cancelReason, note));
       if (note.trim() && note.trim() !== (currentOrder.note || "")) trackChange("note", currentOrder.note, note.trim());
       if (selectedStatus === "postponed") {
         if (postponeNote.trim()) trackChange("postpone_note", currentOrder.postpone_note, postponeNote.trim());

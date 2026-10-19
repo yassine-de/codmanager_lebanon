@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import WakilniTrackingModal from "@/components/WakilniTrackingModal";
 import { getProductVariants, hasValidSelectedVariant, type CatalogVariant } from "@/lib/productVariants";
+import { CANCEL_REASONS, isKnownCancelReason, resolveCancelReason } from "@/lib/cancellationReasons";
 
 const confirmationBadge: Record<string, { label: string; className: string }> = {
   confirmed: { label: "✅ Confirmed", className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
@@ -64,6 +65,7 @@ interface EditForm {
   price: number;
   quantity: number;
   confirmation_status: string;
+  cancel_reason: string;
   note: string;
   postpone_date: Date | null;
   postpone_time: string;
@@ -95,6 +97,7 @@ const AgentConfirmedOrders = () => {
     price: 0,
     quantity: 1,
     confirmation_status: "",
+    cancel_reason: "",
     note: "",
     postpone_date: null,
     postpone_time: "",
@@ -119,6 +122,7 @@ const AgentConfirmedOrders = () => {
   });
 
   const isPostponed = editForm.confirmation_status === "postponed";
+  const isCancelled = editForm.confirmation_status === "cancelled";
   const selectedProductVariants = useMemo(
     () => getProductVariants(sellerProducts, editForm.product_name),
     [sellerProducts, editForm.product_name],
@@ -154,6 +158,12 @@ const AgentConfirmedOrders = () => {
       if (requiresVariantSelection) {
         throw new Error("Select a product variant before confirming this order.");
       }
+      if (isCancelled && !editForm.cancel_reason) {
+        throw new Error("Select a cancellation reason.");
+      }
+      if (isCancelled && editForm.cancel_reason === "other" && !editForm.note.trim()) {
+        throw new Error("Enter the cancellation reason in Note.");
+      }
       const totalAmount = editForm.price * editForm.quantity;
       const confirmed_at = editForm.confirmation_status === "confirmed" ? new Date().toISOString() : null;
 
@@ -185,6 +195,7 @@ const AgentConfirmedOrders = () => {
           quantity: editForm.quantity,
           total_amount: totalAmount,
           confirmation_status: editForm.confirmation_status,
+          cancel_reason: isCancelled ? resolveCancelReason(editForm.cancel_reason, editForm.note) : null,
           confirmed_at,
           note: editForm.note.trim(),
           postpone_date,
@@ -209,6 +220,11 @@ const AgentConfirmedOrders = () => {
           if (String(editOrder[f]) !== String(editForm[f])) {
             changes.push({ field: f, old_val: String(editOrder[f]), new_val: String(editForm[f]) });
           }
+        }
+        const oldCancelReason = editOrder.cancel_reason || "";
+        const newCancelReason = isCancelled ? resolveCancelReason(editForm.cancel_reason, editForm.note) : "";
+        if (oldCancelReason !== newCancelReason) {
+          changes.push({ field: "cancel_reason", old_val: oldCancelReason, new_val: newCancelReason });
         }
         if (changes.length > 0) {
           const gid = crypto.randomUUID();
@@ -298,7 +314,8 @@ const AgentConfirmedOrders = () => {
       price: Number(order.price) || 0,
       quantity: order.quantity || 1,
       confirmation_status: order.confirmation_status || "",
-      note: order.note || "",
+      cancel_reason: isKnownCancelReason(order.cancel_reason) ? order.cancel_reason : (order.cancel_reason ? "other" : ""),
+      note: order.note || (order.cancel_reason && !isKnownCancelReason(order.cancel_reason) ? order.cancel_reason : ""),
       postpone_date: order.postpone_date ? new Date(order.postpone_date) : null,
       postpone_time: order.postpone_date ? format(new Date(order.postpone_date), "HH:mm") : "",
       postpone_note: order.postpone_note || "",
@@ -799,6 +816,25 @@ const AgentConfirmedOrders = () => {
               </div>
             </div>
 
+            {isCancelled && (
+              <div className="space-y-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+                <Label className="text-xs font-semibold">Cancellation Reason *</Label>
+                <Select value={editForm.cancel_reason} onValueChange={(v) => updateField("cancel_reason", v)}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Select reason..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CANCEL_REASONS.map((reason) => (
+                      <SelectItem key={reason.value} value={reason.value}>{reason.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {editForm.cancel_reason === "other" && (
+                  <p className="text-[10px] text-muted-foreground">Enter the cancellation reason in Note below.</p>
+                )}
+              </div>
+            )}
+
             {/* Postpone Schedule - shown when status is postponed */}
             {isPostponed && (
               <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
@@ -854,13 +890,13 @@ const AgentConfirmedOrders = () => {
 
             {/* Note */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Note</Label>
+              <Label className="text-xs">Note{isCancelled && editForm.cancel_reason === "other" ? " *" : ""}</Label>
               <Input
                 className="h-9 text-sm"
                 value={editForm.note}
                 onChange={(e) => updateField("note", e.target.value)}
                 maxLength={500}
-                placeholder="Optional note..."
+                placeholder={isCancelled && editForm.cancel_reason === "other" ? "Enter cancellation reason..." : "Optional note..."}
               />
             </div>
           </div>
@@ -869,7 +905,10 @@ const AgentConfirmedOrders = () => {
             <Button
               size="sm"
               onClick={() => updateMutation.mutate()}
-              disabled={updateMutation.isPending || requiresVariantSelection || (isPostponed && (!editForm.postpone_date || isPostponeTimeInvalid))}
+              disabled={updateMutation.isPending
+                || requiresVariantSelection
+                || (isCancelled && (!editForm.cancel_reason || (editForm.cancel_reason === "other" && !editForm.note.trim())))
+                || (isPostponed && (!editForm.postpone_date || isPostponeTimeInvalid))}
             >
               {updateMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
