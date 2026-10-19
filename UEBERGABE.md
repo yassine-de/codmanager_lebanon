@@ -104,6 +104,25 @@ Am 19.10.2026 deployt und anschließend als `ACTIVE` geprüft:
 5. Danach muss entschieden werden, ob bestätigte Bestellungen automatisch an
    Wakilni gebucht werden sollen. Aktuell ist das ausgeschaltet.
 
+## Datenbankbereinigung vom 19.10.2026
+
+- Ursache der überschrittenen Free-Plan-Datenbankgröße war hauptsächlich
+  `cron.job_run_details`, nicht die Bestellungsdaten.
+- `whatsapp-ai-sweeper` war aus dem Pakistan/Altprojekt übernommen und zeigte
+  auf das falsche Supabase-Projekt `gxyxmxzphyepsmecwbfi`.
+- Der Sweeper wurde pausiert und bleibt bis zu einem kontrollierten Lebanon-Test
+  deaktiviert.
+- Seine 199.651 historischen Ausführungen wurden nach erfolgreicher Sicherung
+  gelöscht; andere Cron-Historien blieben erhalten.
+- Nach `VACUUM FULL` sank die Datenbankgröße von ungefähr 563 MB auf 286 MB.
+- Die vollständige Cron-Historie vor der Löschung liegt nur lokal unter:
+  `D:\CODEX\CODSERVICE\backups\codlebanon\2026-10-19`
+- Das Backup enthält 629.721 Datensätze, Manifest, SHA-256-Prüfsumme,
+  Wiederherstellungsanleitung und Restore-Skript. Es kann Cron-Befehle enthalten
+  und darf deshalb nicht nach GitHub oder in einen ungeschützten Cloud-Share.
+- Für die Weiterarbeit auf einem anderen Rechner muss dieses Backup bei Bedarf
+  separat und sicher übertragen werden; es ist absichtlich nicht Teil des Repos.
+
 ## Empfohlener nächster Schritt
 
 Eine einzige Automation `New Order Confirmation Lebanon` erstellen:
