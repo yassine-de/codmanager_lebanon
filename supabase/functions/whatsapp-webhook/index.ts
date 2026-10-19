@@ -801,6 +801,8 @@ async function handleIncoming(value: any) {
             const node = nodes.find((n: any) => n.id === pausedRun.current_node_id);
             const buttons: any[] = Array.isArray(node?.data?.template_buttons)
               ? node.data.template_buttons
+              : Array.isArray(node?.data?.buttons)
+              ? node.data.buttons
               : [];
             const idx = buttons.findIndex(
               (b) => String(b?.text ?? "").trim().toLowerCase() === bodyText.trim().toLowerCase(),

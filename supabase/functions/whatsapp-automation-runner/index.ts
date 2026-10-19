@@ -261,20 +261,39 @@ async function sendText(args: {
   conversationId: string | null;
   orderId: string | null;
   runId: string;
+  buttons?: Array<{ id: string; text: string }>;
 }) {
   const { body, to, conversationId, orderId, runId } = args;
+  const buttons = Array.isArray(args.buttons) ? args.buttons.slice(0, 3) : [];
   const settings = await getSettings();
   if (!settings) throw new Error("WhatsApp settings missing");
   const accessToken = (settings as any).access_token || Deno.env.get("WHATSAPP_META_ACCESS_TOKEN");
   if (!accessToken) throw new Error("Access token missing");
 
-  const payload = {
-    messaging_product: "whatsapp",
-    recipient_type: "individual",
-    to,
-    type: "text",
-    text: { body },
-  };
+  const payload = buttons.length > 0
+    ? {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: { text: body },
+          action: {
+            buttons: buttons.map((button) => ({
+              type: "reply",
+              reply: { id: button.id, title: button.text },
+            })),
+          },
+        },
+      }
+    : {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "text",
+        text: { body },
+      };
   const url = `${settings.api_base_url}/${settings.phone_number_id}/messages`;
   const resp = await fetch(url, {
     method: "POST",
@@ -290,7 +309,7 @@ async function sendText(args: {
       conversation_id: conversationId,
       order_id: orderId,
       direction: "out",
-      message_type: "text",
+      message_type: buttons.length > 0 ? "interactive" : "text",
       body,
       payload: { ...payload, _automation_run_id: runId },
       meta_message_id: metaMsgId,
@@ -497,6 +516,7 @@ async function executeFlow(args: {
         currentId = findNextNode(edges, node.id)?.target ?? null;
       } else if (node.type === "send_message") {
         const text = render(String(node.data?.message ?? ""), vars);
+        const buttons = Array.isArray(node.data?.buttons) ? node.data.buttons : [];
         if (!text.trim()) throw new Error("send_message empty");
         if (!normalizedPhone) throw new Error("Customer phone invalid");
         await sendText({
@@ -505,8 +525,16 @@ async function executeFlow(args: {
           conversationId: conversation?.id ?? null,
           orderId: order?.order_id ?? null,
           runId,
+          buttons,
         });
         await appendLog(runId, { type: "send_message", node_id: node.id });
+        if (buttons.length > 0) {
+          await admin
+            .from("whatsapp_automation_runs")
+            .update({ status: "waiting_reply", current_node_id: node.id })
+            .eq("id", runId);
+          return;
+        }
         currentId = findNextNode(edges, node.id)?.target ?? null;
       } else if (node.type === "ai_step") {
         // Actually execute the AI: generate a reply with OpenAI and send it as text.
@@ -649,6 +677,7 @@ async function executeFlow(args: {
           conversationId: conversation?.id ?? null,
           orderId: order?.order_id ?? null,
           runId,
+          buttons: Array.isArray(node.data?.buttons) ? node.data.buttons : [],
         });
         await appendLog(runId, { type: "ai_step", node_id: node.id, reply_len: reply.length });
 
@@ -861,6 +890,7 @@ async function applyButtonAction(opts: {
         ai_takeover?: boolean;
         ai_gate?: "off" | "validate";
         intent_kind?: "confirm" | "cancel" | "info";
+        address_confirmed?: boolean;
       }
     | undefined;
   order: any | null;
@@ -877,7 +907,8 @@ async function applyButtonAction(opts: {
     action.status === "confirmed" ||
     action.intent_kind === "confirm";
   const storedAddrDeliverable = !!order && isAddressDeliverable(order.customer_address, order.customer_city);
-  const requireAddressConfirmation = wantsConfirm && !!order;
+  const requireAddressConfirmation =
+    wantsConfirm && !!order && (action.address_confirmed !== true || !storedAddrDeliverable);
   const aiGated = requireAddressConfirmation || action.ai_gate === "validate";
   const wantsTakeover = action.ai_takeover === true || aiGated;
 
@@ -938,6 +969,9 @@ async function applyButtonAction(opts: {
     whatsapp_note: noteFlag,
     whatsapp_last_reply_at: new Date().toISOString(),
   };
+  const finalAddressConfirmation =
+    action.address_confirmed === true && wantsConfirm && storedAddrDeliverable;
+  if (finalAddressConfirmation) updates.whatsapp_status = "confirmed";
 
   if (hasMappedStatus) {
     const before = order.confirmation_status;
@@ -962,6 +996,19 @@ async function applyButtonAction(opts: {
     }
   } else {
     await admin.from("orders").update(updates).eq("order_id", order.order_id);
+  }
+
+  if (finalAddressConfirmation && conversationId) {
+    await admin
+      .from("whatsapp_conversations")
+      .update({
+        status: "confirmed",
+        outcome: "confirmed",
+        pending_button_intent: null,
+        ai_enabled: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", conversationId);
   }
 
 }
@@ -1140,16 +1187,18 @@ async function resumeRun(runId: string, opts: { buttonIndex?: number; replyText?
   let handle: string | undefined;
   if (typeof opts.buttonIndex === "number") handle = `btn:${opts.buttonIndex}`;
 
-  // Apply per-button action configured on the current send_template node
+  // Apply per-button action configured on the current interactive node
   // (status mapping + AI gate / takeover) BEFORE moving to the next node.
   if (typeof opts.buttonIndex === "number" && run.current_node_id) {
     const currentNode = nodes.find((n) => n.id === run.current_node_id);
-    if (currentNode?.type === "send_template") {
+    if (["send_template", "send_message", "ai_step"].includes(currentNode?.type)) {
       const buttonActions = Array.isArray(currentNode.data?.button_actions)
         ? currentNode.data.button_actions
         : [];
       const tplButtons = Array.isArray(currentNode.data?.template_buttons)
         ? currentNode.data.template_buttons
+        : Array.isArray(currentNode.data?.buttons)
+        ? currentNode.data.buttons
         : [];
       const action = buttonActions[opts.buttonIndex];
       const buttonText =
@@ -1164,7 +1213,7 @@ async function resumeRun(runId: string, opts: { buttonIndex?: number; replyText?
           buttonText,
         });
       } catch (e) {
-        errLog("send_template applyButtonAction failed", (e as Error).message);
+        errLog("interactive applyButtonAction failed", (e as Error).message);
       }
     }
   }
