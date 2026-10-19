@@ -70,8 +70,9 @@ function buildSystem(settings: any, memory: any | null, productCtx: string) {
   const tone = settings.brand_tone || "friendly";
   const lines = settings.response_lines ?? 3;
   let sys = `${settings.system_prompt}\n\nBrand tone: ${tone}.\nLanguage rules: ${settings.language_rules}\nProduct context: ${settings.product_context}\n\nKeep replies to about ${lines} short line(s). Do not invent prices or stock. Be concise.`;
-  // CRITICAL language mirroring rule — overrides any conflicting setting
-  sys += `\n\nCRITICAL LANGUAGE RULE (highest priority, overrides everything else):\n- Detect the language/script of the CUSTOMER'S MOST RECENT message and reply in EXACTLY that same language and script.\n- If the customer writes in English (Latin script, English words) → reply in English ONLY.\n- If the customer writes in Urdu (Arabic script) → reply in Urdu (Arabic script).\n- If the customer writes in Roman Urdu (Urdu words in Latin letters like "kya hai", "bhej do") → reply in Roman Urdu (Latin letters).\n- NEVER switch the customer's language. NEVER reply in Urdu script if the customer wrote in English. NEVER reply in English if the customer wrote in Urdu script.\n- Ignore the stored "Customer memory > Language" field if it conflicts with the language of the latest message — the latest message wins.`;
+  // Lebanon language policy: Arabic is the default, while clearly English or
+  // French customer messages are answered in the same language.
+  sys += `\n\nCRITICAL LANGUAGE RULE (highest priority, overrides everything else):\n- Default to clear Lebanese Arabic in Arabic script.\n- If the customer's MOST RECENT message is clearly English, reply in English only.\n- If it is clearly French, reply in French only.\n- If it is Arabic or mixed/ambiguous, reply in Lebanese Arabic using Arabic script.\n- Keep wording simple, warm, and easy to understand.\n- Ignore the stored "Customer memory > Language" field if it conflicts with the latest message — the latest message wins.`;
   if (productCtx) sys += `\n\nAvailable products:\n${productCtx}`;
   if (memory?.summary) sys += `\n\nCustomer memory (for context only, do NOT use for language choice):\n${memory.summary}\nPrevious language seen: ${memory.language ?? "unknown"}\nIntent: ${memory.intent ?? "unknown"}\nSentiment: ${memory.sentiment ?? "unknown"}\nLead score: ${memory.lead_score ?? 0}`;
   return sys;
@@ -80,7 +81,7 @@ function buildSystem(settings: any, memory: any | null, productCtx: string) {
 async function loadProductContext(admin: any) {
   const { data } = await admin.from("products").select("name,price,quantity,active").eq("active", true).limit(20);
   if (!data?.length) return "";
-  return data.map((p: any) => `- ${p.name} (${p.price} PKR, stock: ${p.quantity})`).join("\n");
+  return data.map((p: any) => `- ${p.name} ($${p.price} USD, stock: ${p.quantity})`).join("\n");
 }
 
 async function loadHistory(admin: any, conversationId: string, limit = 10) {
@@ -147,7 +148,7 @@ Deno.serve(async (req) => {
           parameters: {
             type: "object",
             properties: {
-              language: { type: "string", description: "darija|arabic|french|english|other" },
+              language: { type: "string", description: "lebanese_arabic|arabic|french|english|other" },
               sentiment: { type: "string", enum: ["positive", "neutral", "negative"] },
               intent: { type: "string", description: "order_inquiry|product_question|complaint|greeting|cancel|confirm|other" },
               lead_score: { type: "integer", minimum: 0, maximum: 100 },

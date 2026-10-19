@@ -88,7 +88,7 @@ async function transcribeWhatsappAudio(audio: any): Promise<string | null> {
     const form = new FormData();
     form.append("file", new Blob([audioBuffer], { type: mimeType }), `voice.${ext}`);
     form.append("model", "whisper-1");
-    // No language hint — Whisper auto-detects (Urdu, English, Arabic, French, …).
+    // No language hint — Whisper auto-detects (Arabic, English, French, …).
 
     const whisperResp = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
@@ -176,11 +176,11 @@ async function fetchWhatsappMediaAsDataUrl(media: any): Promise<{ dataUrl: strin
 //  3. any recent order from this phone (with leading-zero variant)
 async function findOrCreateConversation(phone: string, orderId?: string | null) {
   // Normalize phone variants so we match conversations created by outbound
-  // (no `+` e.g. "923233320960") AND inbound (with `+` e.g. "+923233320960")
-  // AND legacy local format (e.g. "03233320960").
-  const digits = phone.replace(/\D/g, "");           // 923233320960
-  const withPlus = `+${digits}`;                      // +923233320960
-  const localZero = digits.startsWith("92") ? `0${digits.slice(2)}` : digits; // 03233320960
+  // (no `+` e.g. "96179451180") AND inbound (with `+` e.g. "+96179451180")
+  // AND legacy Lebanese local format (e.g. "079451180").
+  const digits = phone.replace(/\D/g, "");
+  const withPlus = `+${digits}`;
+  const localZero = digits.startsWith("961") ? `0${digits.slice(3)}` : digits;
   const phoneVariants = Array.from(new Set([phone, digits, withPlus, localZero]));
 
   let order: any = null;
@@ -386,18 +386,18 @@ export function isAddressDeliverable(addr?: string | null, city?: string | null)
   const hasNumber = /\d/.test(raw);
   // STRONG indicators: explicitly numbered/structured location markers. These
   // unambiguously point to a deliverable spot for a courier.
-  const strongKeyword = /\b(house|flat|plot|shop\s*(?:no|number|#)?\s*\d|office\s*(?:no|number|#)?\s*\d|street\s*(?:no|number|#)?\s*\d|gali\s*(?:no|number|#)?\s*\d|block|sector|phase|apartment|building|floor|villa|tower|plaza)\b/i;
+  const strongKeyword = /(?:\b(?:house|flat|plot|shop\s*(?:no|number|#)?\s*\d|office\s*(?:no|number|#)?\s*\d|street\s*(?:no|number|#)?\s*\d|block|sector|apartment|building|floor|villa|tower|plaza)\b|بناية|مبنى|طابق|شقة|منزل|بيت|فيلا|برج)/i;
   // WEAK indicators: area/landmark words. Helpful but NOT enough on their own
   // (e.g. "National bank ghalegay" is just a vague POI — courier can't find it).
-  const weakKeyword = /\b(shop|office|store|street|road|st\.?|rd\.?|lane|town|village|colony|mohalla|mahalla|gali|bazar|bazaar|market|society|park|stop|stand|gate|center|centre|care|hotel|masjid|mosque|school|college|university|hospital|clinic|bank|station|chowk|square|more|tehsil|tehseel|ward|union|abad|pura|nagar|kot|gunj|ganj|garh|wala|پور|آباد|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر|چوک|تحصیل|دکان)\b/gi;
-  const landmarkIndicator = /\b(near|opposite|behind|front|side|adjacent|main|stop)\b/i;
+  const weakKeyword = /(?:\b(?:shop|office|store|street|road|st\.?|rd\.?|lane|town|village|district|area|neighborhood|quarter|market|park|gate|center|centre|hotel|mosque|church|school|university|hospital|clinic|bank|station|square)\b|شارع|طريق|حي|منطقة|محلة|ضيعة|قرية|ساحة|سوق|دكان|مكتب|فندق|جامع|مسجد|كنيسة|مدرسة|جامعة|مستشفى|عيادة|بنك|محطة)/gi;
+  const landmarkIndicator = /(?:\b(?:near|opposite|behind|beside|next to|main)\b|قرب|بالقرب|جنب|مقابل|وراء|حد)/i;
 
   // Has a digit AND any structural/area context → deliverable.
   if (hasNumber && (strongKeyword.test(lower) || weakKeyword.test(lower) || landmarkIndicator.test(lower))) return true;
   // Has a digit and ≥ 4 tokens (e.g. "House 12 Gulshan Block 4") → deliverable.
   if (hasNumber && tokens.length >= 4) return true;
   // Strong structural keyword present → deliverable even without a number
-  // (e.g. "Phase 2 DHA Lahore" — phase implies sector structure).
+  // (e.g. "Building Cedar Hamra" — building implies a precise structure).
   if (strongKeyword.test(lower)) return true;
   // Weak keywords only: require AT LEAST TWO distinct weak signals. A single
   // vague POI like "National bank ghalegay" (AB-803) or "company near sarena
@@ -1347,21 +1347,21 @@ async function aiContinueReply(args: {
     : "";
 
   const orderCtx = order
-    ? `\n\nOrder context:\n- Order ID: ${order.order_id}\n- Customer: ${order.customer_name}\n- Product: ${order.product_name}\n- Quantity: ${order.quantity}\n- Total: ${order.total_amount} PKR\n- City: ${order.customer_city}\n- Address: ${order.customer_address ?? "(not provided)"}`
+    ? `\n\nOrder context:\n- Order ID: ${order.order_id}\n- Customer: ${order.customer_name}\n- Product: ${order.product_name}\n- Quantity: ${order.quantity}\n- Total: $${order.total_amount} USD\n- City/area: ${order.customer_city}\n- Address: ${order.customer_address ?? "(not provided)"}`
     : "";
   const hasStoredAddress =
     !!order &&
     isAddressDeliverable(order.customer_address, order.customer_city);
   const addressRule = order && !hasStoredAddress
-    ? `\n\nIMPORTANT — ADDRESS COLLECTION: The customer's delivery address is MISSING, FAKE, TEST data, or too vague (current value: "${order.customer_address ?? "(none)"}", city: "${order.customer_city ?? "(none)"}").\n\nA deliverable address needs:\n1) A city / town / tehsil / village name in Pakistan, AND\n2) AT LEAST ONE locator detail — ANY of:\n   - a house/flat/plot/shop NUMBER, OR\n   - a street/lane/road/gali NAME or number, OR\n   - a neighborhood/colony/block/sector/phase/mohalla/tehsil name, OR\n   - a known landmark / shop / hotel / masjid / school / chowk / bank / hospital + area\n\nGOOD examples (ACCEPT — DO NOT ask for house number):\n- "House 12 Street 4 Gulshan-e-Iqbal" ✅\n- "Tehsil Dipalpur Madina Chowk Mobile Care Shop" ✅ (landmark + area + city → deliverable)\n- "Near UBL Bank Main Bazaar Road Batagram" ✅\n- "Mohalla Islamia Gali 2 Layyah" ✅\n\nBAD examples (REJECT and ask for more):\n- "Lahore" (just city, no other detail)\n- "Test" / "same" / random text\n- A single word with no context\n\nRules:\n- ⚠️ DO NOT demand a house number if the customer already gave a clear landmark + area or a shop/office name. Pakistani rural & semi-urban deliveries often work via landmarks — couriers call to find the exact spot.\n- DO NOT keep asking for "house number" once you have city + a recognizable place (shop, hotel, masjid, chowk, mohalla, tehsil, etc.).\n- Politely (in the customer's language) ask for missing details only if address is just a city name or fake.\n- Once the customer gives city + any locator (landmark / shop / area / street / number), thank them and confirm the order will be delivered. The system auto-confirms in the background.`
+    ? `\n\nIMPORTANT — ADDRESS COLLECTION FOR LEBANON: The customer's delivery address is missing, fake/test data, or too vague (current value: "${order.customer_address ?? "(none)"}", city/area: "${order.customer_city ?? "(none)"}").\n\nA deliverable Lebanese address needs:\n1) A city, town, village, district, or area in Lebanon, AND\n2) At least one useful locator: building/house/apartment, street/road, neighborhood, floor, shop/office, or a recognizable landmark.\n\nGood examples:\n- "Hamra, Makdessi Street, Cedar Building, 3rd floor"\n- "Jounieh, Sarba, near St. Joseph Church, Al Noor Building"\n- "طرابلس، الميناء، شارع بور سعيد، بناية النور، الطابق الثاني"\n\nReject a city or area alone (for example only "Beirut"), fake/test text, or a single vague word. Do not insist on a house number if the customer supplied a clear area plus building, street, shop/office, or landmark. Ask only for the missing details, in the customer's language. Once the customer supplies a usable area and locator, thank them; the system confirms the order in the background.`
     : order && hasStoredAddress
-    ? `\n\nIMPORTANT: The customer ALREADY has a detailed delivery address on file:\n  📍 ${order.customer_address}, ${order.customer_city}\n\nADDRESS HANDLING RULES:\n- Do NOT proactively ask "Should we deliver to <address>? Reply YES" UNLESS the customer is clearly trying to confirm/place the order in this very message (e.g. they said "confirm", "ok send it", "ship it", "haan bhej do", "deliver kar do", or directly answered a confirmation question you previously asked).\n- If the customer is asking a question (about price, payment method like "cash on delivery", product details, delivery time, color/size, return policy, etc.), JUST answer their question naturally and helpfully. Do NOT ask them to reply YES to an address — they are not at that step yet.\n- If the customer says something like "cash on delivery", "COD", "kitne ka hai", "kab ayega", "what color", treat it as an INFO question — answer it, then optionally invite them to confirm at the end (e.g. "If you'd like to proceed, just say confirm and we'll dispatch."). Do NOT prompt with the stored address.\n- If the customer EXPLICITLY says the stored address is wrong or sends new address details, then capture the new address. The system will auto-confirm in the background.\n- A bare "yes / ok / sahi" reply ONLY counts as a confirmation if your IMMEDIATELY PREVIOUS message asked them to confirm. Otherwise treat it as casual acknowledgement and continue helping.`
+    ? `\n\nIMPORTANT: The customer ALREADY has a detailed delivery address on file:\n  📍 ${order.customer_address}, ${order.customer_city}\n\nADDRESS HANDLING RULES:\n- Do not proactively ask the customer to confirm the address unless they are clearly confirming/placing the order now or directly answering a confirmation question.\n- If the customer asks about price, cash on delivery, product details, delivery time, color, size, or policy, answer only from available context. Do not turn an information question into an address-confirmation request.\n- If the customer explicitly says the stored address is wrong or sends a new address, capture the new address; the system will confirm in the background when it is complete.\n- A bare "yes", "ok", "نعم", "أكيد", or "تمام" only counts as confirmation if the immediately previous message asked for confirmation.`
     : "";
   const imageRule = hasProductImage
     ? `\n\nProduct image: an official image of "${order.product_name}" is available. If the customer asks for a photo / picture / image of the product (in any language: "تصويرة", "صورة", "tswira", "photo", "image", "pic", "send me the picture", "بعتلي صورة", etc.), CALL the tool \`send_product_image\` to send it as a real WhatsApp image. After calling the tool, write a short natural reply confirming you sent the photo. Never paste the image URL as text.`
     : `\n\nProduct image: no official product image is available. If the customer asks for a photo, politely apologize and offer more details instead. Do NOT call \`send_product_image\`.`;
   const cancelRule = order
-    ? `\n\nCANCELLATION HANDLING (CRITICAL):\n- If the customer says they want to cancel the order (in any language: "cancel", "annuler", "إلغاء", "الغاء", "ما بغيتش", "no quiero", "I don't want it", "remove order", "نہیں چاہیے", "cancel kar do", "mat bhejo", "rahne do", "stop", etc.), DO NOT acknowledge cancellation as final and DO NOT change anything.\n- The order is currently "${order.confirmation_status}". You are NOT allowed to cancel a confirmed order or move any order to a cancelled state. Only a human agent can do that.\n- Instead, reply politely and empathetically in the customer's language. First apologize briefly, then ASK why they want to cancel (price? delivery time? changed mind? found cheaper? doesn't need it anymore? quality concerns?).\n- After understanding the reason, try to save the sale with a relevant solution: reassure about quality/warranty, suggest a different variant/quantity, clarify delivery timing, or address their specific concern.\n- IMPORTANT — DISCOUNT POLICY: You CANNOT offer any discount yourself. If (and ONLY if) the customer's reason is clearly about PRICE / TOO EXPENSIVE / "ghali" / "mahnga" / "cher" / "غالي" / "expensive" and they would buy with a discount, CALL the tool \`flag_for_human_discount\` with a short reason. Then tell the customer (in their language) that a human agent will contact them shortly to discuss a special price. Do NOT promise a specific discount amount.\n- If the customer's objection is NOT about price and you can resolve it with reassurance, keep the conversation going naturally. If they accept and you have a deliverable address on file (or they provide one), the system will auto-confirm in the background.\n- Never write phrases like "your order has been cancelled" or "I have cancelled it". Keep the conversation open. If the customer firmly insists after you tried to help (and discount is not the issue), tell them a human agent will contact them shortly to finalize.\n- Keep replies short (1-3 lines), warm, and respectful. Never argue or pressure the customer.`
+    ? `\n\nCANCELLATION HANDLING (CRITICAL):\n- If the customer wants to cancel (for example "cancel", "annuler", "إلغاء", "الغاء", "ما بدي الطلب", "مش بدي ياه", "I don't want it", "remove order", or "stop"), do not claim the cancellation is final and do not change the order yourself.\n- The order is currently "${order.confirmation_status}". Only a human agent can finalize cancellation.\n- Ask briefly and respectfully why they want to cancel, then address their concern only with facts available in context. Never pressure or argue.\n- You cannot offer a discount. If price is the reason ("غالي", "expensive", "cher") and the customer might buy with a better price, call \`flag_for_human_discount\`; do not promise an amount.\n- If the customer firmly insists, call \`handoff_to_agent\` and tell them a team member will handle the request. Keep replies to 1-3 lines.`
     : "";
 
   // Pending button intent — when admin configured "AI gates the button", the
@@ -1371,13 +1371,13 @@ async function aiContinueReply(args: {
   // for cancel).
   const pendingIntent = (conv as any)?.pending_button_intent ?? null;
   const pendingIntentRule = pendingIntent
-    ? `\n\nPENDING CUSTOMER INTENT (from a button they clicked):\n- The customer pressed "${pendingIntent.button_text}" which means they want to: ${pendingIntent.intent === "confirm" ? `CONFIRM the order. \n  CRITICAL ADDRESS GATING: The order is NOT yet finalized. The system will only mark it confirmed once we have a COMPLETE & DELIVERABLE address (city + at least one usable locator like house/street/area/landmark). \n  - If the stored address is already detailed enough → reply with a short warm thank-you, briefly read back the address, and the system will auto-confirm. \n  - If the address is missing, vague (e.g. just "Karachi", "Lahore center", "home", a single landmark with no street/area), fake, or too short → THANK them for confirming the order, then in the SAME short message ask politely (in their language) for the FULL address: house/flat #, street, area/block, nearest landmark, + city. \n  - DO NOT say "your order is being processed", "your order is confirmed", "we will ship now", or anything that implies the order is already finalized. Use phrasing like "to ship your order we just need your full address" instead.\n  - Once the customer sends a real complete address, the system will auto-confirm in the background; THEN you can thank them and say the courier will call on arrival.` : pendingIntent.intent === "cancel" ? "CANCEL the order. Follow the CANCELLATION HANDLING rules above — try to understand WHY and rescue the sale. Do NOT acknowledge the cancellation as final yourself." : "request more INFO. Answer their questions accurately."}`
+    ? `\n\nPENDING CUSTOMER INTENT (from a button they clicked):\n- The customer pressed "${pendingIntent.button_text}" which means they want to: ${pendingIntent.intent === "confirm" ? `CONFIRM the order. \n  CRITICAL ADDRESS GATING: The order is NOT yet finalized. The system will only mark it confirmed once we have a complete Lebanese delivery address (city/area plus at least one usable locator such as building, street, neighborhood, floor, shop, or landmark). \n  - If the stored address is already detailed enough → reply with a short warm thank-you, briefly read back the address, and the system will auto-confirm. \n  - If the address is missing, vague (for example only "Beirut", "home", or a landmark without an area), fake, or too short → thank them for confirming, then in the same short message politely ask for the full address: city/area, street, building/house, floor, and nearest landmark when available. \n  - Do not imply the order is finalized until the address is complete. Say that the full address is still needed for delivery.\n  - Once the customer sends a complete address, the system auto-confirms; then thank them and say the courier will call on arrival.` : pendingIntent.intent === "cancel" ? "CANCEL the order. Follow the CANCELLATION HANDLING rules above — try to understand WHY and rescue the sale. Do NOT acknowledge the cancellation as final yourself." : "request more INFO. Answer their questions accurately."}`
     : "";
 
   const locationRule = `\n\nLOCATION SHARING: If the customer's message starts with "📍" (they shared their GPS location), treat the full text as their delivery address. Extract the most useful part (street, area, city) and use it as-is — do NOT ask for another address. Acknowledge it warmly (e.g. "Thanks for sharing your location! We'll deliver to [address].") and the system will auto-save it.`;
   const baseSys = aiSettings.system_prompt || "You are a helpful WhatsApp sales assistant.";
-  const inspectionRule = `\n\nPARCEL INSPECTION POLICY (Pakistan COD — CRITICAL):\n- This is Cash on Delivery. The customer IS allowed to OPEN and INSPECT the parcel BEFORE paying the courier.\n- If the customer asks (in any language: "open parcel", "check before pay", "parcel khol kr dekh sakte hain", "khol ke check karna hai", "before payment open", "kya main parcel khol sakta hun", "inspect karna", "dekhna hai pehle", etc.) → reply YES, confirm clearly that they CAN open and check the product before paying, since it's Cash on Delivery.\n- Reassure them: if not satisfied with quality, they can REFUSE the parcel and not pay anything.\n- NEVER say "you cannot open before payment" or "payment first then check". That is WRONG for COD in Pakistan.\n- Keep the reply short, warm, and confident.`;
-  const handoffRule = `\n\nHUMAN HANDOFF POLICY (CRITICAL — NO STALLING):\n- You are FORBIDDEN from sending stalling messages like "let me check", "please hold on", "I'll get back to you shortly", "let me confirm and revert", "give me a moment", "خليني نشوف", "ek minute", "ruko zara", or any equivalent in any language.\n- Whenever you would say something like that — OR the customer asks for a brochure / detailed spec sheet / warranty document / OEM info / something not in your product context — you MUST call the tool \`handoff_to_agent\` with a short reason.\n- When you call \`handoff_to_agent\`, your text reply to the customer MUST clearly tell them you are transferring them to a human agent who will contact them shortly. Use the customer's language. Examples:\n  • English: "I'm transferring you to one of our human agents who will assist you shortly 🙏"\n  • Roman Urdu: "Main aap ko hamare human agent ke pass transfer kar raha hoon, wo jaldi aap se contact karenge 🙏"\n  • Urdu: "میں آپ کو ہمارے انسانی ایجنٹ کے پاس منتقل کر رہا ہوں، وہ جلد آپ سے رابطہ کریں گے 🙏"\n- After calling \`handoff_to_agent\`, do NOT continue the conversation yourself. The agent takes over.`;
+  const inspectionRule = `\n\nPARCEL INSPECTION POLICY:\n- Do not promise that a parcel may be opened or refused before payment unless that policy is explicitly present in product context.\n- If the customer asks about opening, inspecting, refusing, exchanging, or returning a parcel and the answer is not in the provided context, call \`handoff_to_agent\` and say a human agent will clarify the policy shortly.`;
+  const handoffRule = `\n\nHUMAN HANDOFF POLICY (CRITICAL — NO STALLING):\n- Never send stalling messages such as "let me check", "please hold on", "I'll get back to you", "give me a moment", "خليني شوف", or equivalents.\n- For information not contained in order/product context (including warranty documents or delivery/return policy), call \`handoff_to_agent\` with a short reason.\n- Tell the customer clearly, in their language, that a human agent will assist them shortly. Examples:\n  • Arabic: "رح حوّلك لأحد موظفينا ليساعدك بأقرب وقت 🙏"\n  • English: "I'm transferring you to one of our team members who will assist you shortly 🙏"\n  • French: "Je vous transfère à un membre de notre équipe qui vous aidera rapidement 🙏"\n- After calling \`handoff_to_agent\`, do not continue the conversation yourself.`;
   const sysPrompt =
     `${baseSys}\n\nBrand tone: ${aiSettings.brand_tone || "friendly"}.\nLanguage rules: ${aiSettings.language_rules || ""}\n\nKeep replies short (about ${aiSettings.response_lines ?? 3} line(s)). Do not invent facts.${orderCtx}${productContext}${addressRule}${imageRule}${cancelRule}${pendingIntentRule}${locationRule}${inspectionRule}${handoffRule}`;
 
@@ -1668,7 +1668,7 @@ async function aiContinueReply(args: {
 
     // After replying, attempt to extract a complete address from the customer's
     // latest message + history. If we get a deliverable address, update the
-    // order (mapping city to ORIO cache) and auto-confirm.
+    // order (mapping city/area to the Wakilni cache) and auto-confirm.
     if (order) {
       try {
         await tryExtractAndConfirmAddress({
@@ -1689,8 +1689,8 @@ async function aiContinueReply(args: {
 }
 
 // ---------------------------------------------------------------------------
-// Extract a complete delivery address via OpenAI (JSON mode), match the city
-// to ORIO cities cache, then update + auto-confirm the order.
+// Extract a complete delivery address via OpenAI (JSON mode), match the area
+// to the Wakilni delivery-area cache, then update + auto-confirm the order.
 // ---------------------------------------------------------------------------
 async function tryExtractAndConfirmAddress(args: {
   order: any;
@@ -1720,7 +1720,7 @@ async function tryExtractAndConfirmAddress(args: {
   //   (b) Customer replied with text to the template/AI (no button click) and
   //       the stored address from the imported sheet is already complete.
   // In both cases there is no NEW address detail to extract — the AI extractor
-  // would return "incomplete" on a generic reply ("ok", "haan", "thanks") and
+  // would return "incomplete" on a generic reply ("ok", "yes", "thanks") and
   // the order would stay on `new` forever even though the bot already told the
   // customer "your order is confirmed". Finalize using the stored address.
   // GUARD: never auto-confirm via the stored-address shortcut if the customer's
@@ -1728,7 +1728,7 @@ async function tryExtractAndConfirmAddress(args: {
   // shortcut should only fire on positive engagement (or on a pending button
   // intent already captured separately). AB-790 fix.
   const txt = String(customerText || "").toLowerCase().trim();
-  const negativeIntentRe = /\b(cancel|annul|annuler|don'?t know|do not know|didn'?t order|did not order|wrong order|not mine|not me|i don'?t want|i do not want|don'?t want it|stop|refuse|return|refund|mistake|by mistake|nahi chahiye|nahin chahiye|nahi chaahiye|mat bhejo|mat bhejna|nahi karna|nahin karna|rahne do|cancel kar do|cancel karo|cancel karna|nahi pata|nahin pata|nai pata|maloom nahi|pata nahi|maine order nahi kiya|order nahi kiya|order nai kiya|galat order|mera order nahi|ghalat|mujhe nahi chahiye|mujhe nahin chahiye|kuch nahi chahiye|paise nahi|paisay nahi|free|muft|mufat|نہیں چاہیے|الغاء|إلغاء|ما بغيتش|لا أريد|لا اريد|نہیں|نہی|پتہ نہیں|پتا نہیں|غلط)\b/i;
+  const negativeIntentRe = /(?:\b(?:cancel|annul|annuler|je ne veux pas|don'?t know|do not know|didn'?t order|did not order|wrong order|not mine|not me|i don'?t want|i do not want|don'?t want it|stop|refuse|return|refund|mistake|by mistake)\b|الغاء|إلغاء|إلغي|الغي|ما بدي|مش بدي|لا أريد|لا اريد|طلب غلط|مش طلبي)/i;
   if (negativeIntentRe.test(txt)) {
     log("address-extract: skipped stored-address shortcut (negative intent)", {
       order: order.order_id,
@@ -1744,7 +1744,7 @@ async function tryExtractAndConfirmAddress(args: {
   // Advisor 😊", "thanks", a greeting, or a business auto-responder) must NOT
   // trigger auto-confirmation. Without this guard the system finalizes orders
   // the customer never agreed to.
-  const positiveIntentRe = /\b(yes|yeah|yep|yup|sure|ok|okay|okk+|k|kk+|confirm|confirmed|done|haan|haanji|han|hanji|jee|jee?\s*haan|ji|ji\s*haan|theek|thik|thik\s*hai|theek\s*hai|sahi|sahih|correct|right|right\s*hai|order\s*kar|order\s*do|bhej\s*do|bhejo|deliver|chahiye|chaahiye|chahyie|mangwa|mangwao|book|book\s*kar|accept|agree|approve|proceed|go\s*ahead|نعم|أيوة|تمام|موافق|بسم\s*الله|ہاں|جی|جی\s*ہاں|ٹھیک|درست|تصدیق|بھیج|منگوا)\b/i;
+  const positiveIntentRe = /(?:\b(?:yes|yeah|yep|sure|ok|okay|confirm|confirmed|done|correct|right|deliver|book|accept|agree|approve|proceed|go\s*ahead|oui|confirme|confirmé|d'accord)\b|نعم|ايه|إيه|أكيد|اكيد|تمام|موافق|ثبت|تأكيد|أكد|بعتوه|ابعثوه|وصلوه)/i;
   const hasPositiveIntent = positiveIntentRe.test(txt);
   if (!hasPendingIntent && !hasPositiveIntent) {
     log("address-extract: skipped stored-address shortcut (no positive intent)", {
@@ -1815,49 +1815,42 @@ async function tryExtractAndConfirmAddress(args: {
     return;
   }
 
-  // Load ORIO cities for matching (non-blocking — if cache is empty we still
-  // confirm the order using the raw city text the AI extracted).
+  // Load Wakilni areas for matching (non-blocking — if the cache is empty we
+  // still confirm the order using the raw city/area text the AI extracted).
   const { data: cities } = await admin
-    .from("orio_cities_cache")
-    .select("city_name");
-  const cityNames = (cities ?? []).map((c: any) => c.city_name);
+    .from("wakilni_areas_cache")
+    .select("area_name");
+  const cityNames = (cities ?? []).map((c: any) => c.area_name);
   if (cityNames.length === 0) {
-    log("address-extract: orio_cities_cache empty — proceeding without city matching");
+    log("address-extract: wakilni_areas_cache empty — proceeding without area matching");
   }
 
-  const extractPrompt = `You are an address-extraction assistant for a courier in Pakistan. Your job is to ensure the address is DETAILED ENOUGH for a courier to find the exact location without calling the customer.
+  const extractPrompt = `You are an address-extraction assistant for a courier in Lebanon. Your job is to ensure the address is detailed enough for a courier to find the destination.
 
 A "deliverable" address requires:
-1) A city OR town OR tehsil OR village name (anywhere in Pakistan), AND
-2) SPECIFIC location details — "near [landmark]" ALONE is NOT enough. The customer must provide at least ONE of:
-   - a house / flat / plot / shop / office NUMBER (e.g. "House 45", "Plot 12", "Shop 3"), OR
-   - a specific street / lane / road / gali NAME or number (e.g. "Ajmera Road", "Street 4", "Gali 3"), OR
-   - a neighborhood / area / colony / block / sector / phase / mohalla name (e.g. "Gulshan-e-Iqbal Block 7", "DHA Phase 5", "Saddar", "Johar Town", "Mohalla Islamia"), OR
-   - a COMBINATION of landmark + street/area (e.g. "near Allahdin Hotel, Main Bazaar Road" — NOT just "near Allahdin Hotel" alone)
+1) A Lebanese city, town, village, district, or area, AND
+2) At least one specific locator: building/house/apartment, street/road, neighborhood, floor, shop/office, or a recognizable landmark.
 
 REJECT these as incomplete (complete=false):
-- "Near Allahdin Hotel" (landmark only, no street/area/number)
-- "Chowk Fawara" (landmark only)
-- "opposite XYZ Masjid" (landmark only, no area)
-- Just a city name (e.g. "Lahore" alone)
+- A landmark with no city/area
+- Just a city or district name (e.g. "Beirut" alone)
 - Single vague words: "home", "here", "same", "send it"
-- Affirmations / payment / generic chatter with NO address detail: "yes", "ok", "sahi", "haan", "confirm", "cash on delivery", "COD", "send karo", "deliver kar do", "bhej do", "thik hai" — these are NOT addresses, even if a previous message contained one
+- Affirmations, payment terms, or generic chatter with no address detail: "yes", "ok", "confirm", "cash on delivery", "COD", "نعم", "أكيد" — these are not addresses
 - Fake / test / placeholder values
 
 ACCEPT these as complete (complete=true):
-- "House 12 Street 4 Gulshan-e-Iqbal" (has number + street + area)
-- "Near Allahdin Hotel Main Bazaar Road" (landmark + street)
-- "Mohalla Islamia Gali 2" (area + street)
-- "Plot 7 near UBL Bank" (has number + landmark)
-- "DHA Phase 5 Block D" (area + block)
+- "Hamra, Makdessi Street, Cedar Building, 3rd floor"
+- "Jounieh, Sarba, near St. Joseph Church, Al Noor Building"
+- "طرابلس، الميناء، شارع بور سعيد، بناية النور، الطابق الثاني"
+- "Zahle, Boulevard, near the municipality, shop 4"
 
 Return JSON ONLY in this exact schema:
 { "complete": boolean, "full_address": string, "city": string }
 
 Rules:
-- "complete" = true ONLY if the address has a city/town + a house/plot number OR a street/gali name OR an area/mohalla/block/sector. A landmark alone (near X, opposite X, chowk X) without any of these is NOT complete.
-- "full_address" must be a single line containing all the detail parts the customer provided (house/flat, street, block/sector/phase, area, landmark) — DO NOT include the city.
-- "city" must be the city/town/village name in English/Latin script (e.g. "Karachi", "Lahore", "Peshawar", "Batagram", "Layyah").
+- "complete" = true only if the address has a city/area plus at least one useful locator. A landmark without a city/area is not complete.
+- "full_address" must be one line containing only the address details the customer provided. Do not invent or translate details.
+- "city" must contain the Lebanese city, town, village, district, or delivery area, preserving the customer's spelling and script.
 - For obvious fake/test/placeholder values or single vague words, return complete=false.
 - DO NOT invent details. Only use what the customer explicitly said anywhere in the conversation (history + latest message).`;
 
@@ -1906,7 +1899,7 @@ Rules:
     return;
   }
 
-  // Match city to ORIO cache (case-insensitive, trimmed). City matching is
+  // Match city/area to the Wakilni cache (case-insensitive, trimmed). Matching is
   // NON-BLOCKING: if no match, we still confirm the order using the raw city
   // text the customer provided — admins can fix it later.
   const wanted = parsed.city.trim().toLowerCase();
@@ -1919,7 +1912,7 @@ Rules:
   }
   const finalCity = matchedCity || parsed.city.trim();
   if (!matchedCity) {
-    log("address-extract: city not in ORIO cache, using raw", parsed.city);
+    log("address-extract: area not in Wakilni cache, using raw", parsed.city);
   }
 
   // Snapshot before for history (capture original values BEFORE any update)
@@ -1934,7 +1927,7 @@ Rules:
   for (const f of trackedFields) before[f] = order[f] ?? null;
 
   // STEP 1: Update address + city FIRST and wait for it to commit.
-  // This guarantees that any downstream consumer (ORIO sync, triggers, etc.)
+  // This guarantees that any downstream consumer (Wakilni sync, triggers, etc.)
   // that reads the order after confirmation will see the new address — never
   // the stale one.
   const newAddress = parsed.full_address.trim();
@@ -1952,7 +1945,7 @@ Rules:
   }
 
   // STEP 2: Re-fetch to confirm the address is persisted, then confirm the
-  // order (and optionally trigger auto-book to ORIO). Doing this as a separate
+  // order (and optionally trigger auto-book to Wakilni). Doing this as a separate
   // statement means the row's address column is already committed when the
   // booked status is set.
   const { data: refreshed } = await admin
