@@ -916,7 +916,7 @@ const AgentOrders = () => {
     let phone = editCustomer.phone.replace(/[\s\-\(\)]/g, "");
     phone = phone.replace(/^\+/, "");
     if (phone.startsWith("00")) phone = phone.substring(2);
-    if (phone.startsWith("0")) phone = "92" + phone.substring(1);
+    if (phone.startsWith("0")) phone = "961" + phone.substring(1);
 
     const appUrl = `whatsapp://send?phone=${phone}`;
     const webUrl = `https://wa.me/${phone}`;

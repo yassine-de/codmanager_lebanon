@@ -175,12 +175,13 @@ async function fetchWhatsappMediaAsDataUrl(media: any): Promise<{ dataUrl: strin
 //  2. latest order with confirmation_status = 'new_wts'
 //  3. any recent order from this phone (with leading-zero variant)
 async function findOrCreateConversation(phone: string, orderId?: string | null) {
+  const settings = await getSettings();
+  const defaultCC = String(settings?.default_country_code || "961").replace(/\D/g, "");
   // Normalize phone variants so we match conversations created by outbound
-  // (no `+` e.g. "96179451180") AND inbound (with `+` e.g. "+96179451180")
-  // AND legacy Lebanese local format (e.g. "079451180").
+  // (no `+`), inbound (with `+`), and local leading-zero format.
   const digits = phone.replace(/\D/g, "");
   const withPlus = `+${digits}`;
-  const localZero = digits.startsWith("961") ? `0${digits.slice(3)}` : digits;
+  const localZero = defaultCC && digits.startsWith(defaultCC) ? `0${digits.slice(defaultCC.length)}` : digits;
   const phoneVariants = Array.from(new Set([phone, digits, withPlus, localZero]));
 
   let order: any = null;
@@ -296,16 +297,28 @@ async function findOrCreateConversation(phone: string, orderId?: string | null) 
       .select()
       .single();
     if (error) {
-      // Race condition: another webhook just inserted an unlinked conversation
-      // for this phone (blocked by whatsapp_conversations_phone_unlinked_unique).
-      // Fall back to fetching the existing one so we don't drop the message.
-      const { data: existing } = await admin
-        .from("whatsapp_conversations")
-        .select("*")
-        .in("customer_phone", phoneVariants)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Race condition: another process may have inserted this order's
+      // conversation or an unlinked phone conversation first. Re-fetch the
+      // winner so the incoming message is not dropped.
+      let existing: any = null;
+      if (order) {
+        const { data } = await admin
+          .from("whatsapp_conversations")
+          .select("*")
+          .eq("order_id", order.order_id)
+          .maybeSingle();
+        existing = data;
+      }
+      if (!existing) {
+        const { data } = await admin
+          .from("whatsapp_conversations")
+          .select("*")
+          .in("customer_phone", phoneVariants)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        existing = data;
+      }
       if (existing) {
         conv = existing;
       } else {
@@ -472,7 +485,7 @@ async function applyOutcome(
             status: "confirmed",
             outcome: "confirmed",
             pending_button_intent: null,
-            ai_enabled: true,
+            ai_enabled: false,
             updated_at: new Date().toISOString(),
           })
           .eq("id", conversationId);
@@ -518,9 +531,11 @@ async function applyOutcome(
     log("button confirm gated: awaiting AI address validation", order.order_id);
     return;
   } else if (outcome === "more_info") {
-    updates.confirmation_status = "new";
+    updates.confirmation_status = String(order.confirmation_status || "").toLowerCase() === "no_answer" ? "no_answer" : "new";
     updates.confirmation_channel = "agent";
     updates.agent_id = null;
+    updates.assigned_at = null;
+    updates.last_activity_at = null;
   } else if (outcome === "canceled") {
     // IMPORTANT: WhatsApp button can only confirm orders, NEVER cancel them.
     // We only flag the conversation/order so a human agent can decide.
@@ -803,6 +818,7 @@ async function handleIncoming(value: any) {
         .from("whatsapp_conversations")
         .update({
           last_message_at: nowIso,
+          last_inbound_at: nowIso,
           updated_at: nowIso,
           status: nextStatus,
         })
@@ -1453,6 +1469,23 @@ async function aiContinueReply(args: {
     return;
   }
 
+  {
+    const claimTs = new Date().toISOString();
+    const dedupWindowMs = Math.max(0, (aiSettings.ai_dedup_window_seconds ?? 30)) * 1000;
+    const sinceIso = new Date(Date.now() - dedupWindowMs).toISOString();
+    const { data: claimed } = await admin
+      .from("whatsapp_conversations")
+      .update({ last_reply_at: claimTs, updated_at: claimTs })
+      .eq("id", conv.id)
+      .or(`last_reply_at.is.null,last_reply_at.lt.${sinceIso}`)
+      .select("id")
+      .maybeSingle();
+    if (!claimed) {
+      log("ai-continue: dedup - reply slot already claimed, skipping", conv.id);
+      return;
+    }
+  }
+
   const aiBody: any = {
     model,
     messages: [{ role: "system", content: sysPrompt }, ...history],
@@ -1578,12 +1611,15 @@ async function aiContinueReply(args: {
         .includes(String(order.confirmation_status || "").toLowerCase());
 
       if (releasable) {
+        const nextConfirmationStatus = String(beforeStatus || "").toLowerCase() === "no_answer" ? "no_answer" : "new";
         await admin
           .from("orders")
           .update({
-            confirmation_status: "new",
+            confirmation_status: nextConfirmationStatus,
             confirmation_channel: "agent",
             agent_id: null,
+            assigned_at: null,
+            last_activity_at: null,
             whatsapp_status: "handoff_to_agent",
             whatsapp_note: `AI handoff to human agent. ${reason ? `Reason: ${reason}` : ""}`.slice(0, 500),
             whatsapp_last_reply_at: new Date().toISOString(),
@@ -1596,7 +1632,7 @@ async function aiContinueReply(args: {
             actionType: "whatsapp_handoff",
             role: "ai",
             before: { confirmation_status: beforeStatus, agent_id: beforeAgent ?? null },
-            after: { confirmation_status: "new", agent_id: null },
+            after: { confirmation_status: nextConfirmationStatus, agent_id: null },
             fields: ["confirmation_status", "agent_id"],
           });
         } catch { /* non-fatal */ }
@@ -1660,9 +1696,10 @@ async function aiContinueReply(args: {
   });
 
   if (ok) {
+    const replyTs = new Date().toISOString();
     await admin
       .from("whatsapp_conversations")
-      .update({ status: "ai_active", updated_at: new Date().toISOString() })
+      .update({ status: "ai_active", last_reply_at: replyTs, updated_at: replyTs })
       .eq("id", conv.id);
     log("ai-continue: replied", { conv: conv.id, len: reply.length });
 
@@ -1797,6 +1834,7 @@ async function tryExtractAndConfirmAddress(args: {
         status: "confirmed",
         outcome: "confirmed",
         pending_button_intent: null,
+        ai_enabled: false,
         updated_at: new Date().toISOString(),
       })
       .eq("id", conv.id);
@@ -2001,6 +2039,7 @@ Rules:
       status: "confirmed",
       outcome: "confirmed",
       pending_button_intent: null, // Clear: AI gating finalized via confirm.
+      ai_enabled: false,
       updated_at: new Date().toISOString(),
     })
     .eq("id", conv.id);

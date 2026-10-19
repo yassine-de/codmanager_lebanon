@@ -1536,7 +1536,7 @@ function renderCell(
       const phone = row.customer_phone;
       if (!phone) return <span className="text-muted-foreground/50 text-xs">—</span>;
       const cleaned = phone.replace(/\D/g, "");
-      const waNumber = cleaned.startsWith("92") ? cleaned : cleaned.startsWith("0") ? "92" + cleaned.slice(1) : cleaned;
+      const waNumber = cleaned.startsWith("961") ? cleaned : cleaned.startsWith("0") ? "961" + cleaned.slice(1) : cleaned;
       const waUrl = `https://wa.me/${waNumber}`;
       return (
         <div className="flex items-center gap-1.5">
@@ -1678,7 +1678,7 @@ function renderCell(
     case "actions": {
       const phone = row.customer_phone ?? "";
       const cleaned = phone.replace(/\D/g, "");
-      const waNumber = cleaned.startsWith("92") ? cleaned : cleaned.startsWith("0") ? "92" + cleaned.slice(1) : cleaned;
+      const waNumber = cleaned.startsWith("961") ? cleaned : cleaned.startsWith("0") ? "961" + cleaned.slice(1) : cleaned;
       const waUrl = `https://wa.me/${waNumber}`;
       return (
         <div className="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity duration-150">

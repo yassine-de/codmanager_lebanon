@@ -298,7 +298,7 @@ async function ensureConversation(order: any, normalizedPhone: string) {
   //    the same phone → keep threads separate so the AI doesn't mix products.
   const digits = (normalizedPhone || "").replace(/\D/g, "");
   const withPlus = digits ? `+${digits}` : "";
-  const localZero = digits.startsWith("92") ? `0${digits.slice(2)}` : digits;
+  const localZero = digits.startsWith("961") ? `0${digits.slice(3)}` : digits;
   const phoneVariants = Array.from(
     new Set([normalizedPhone, digits, withPlus, localZero].filter(Boolean)),
   );
@@ -394,7 +394,7 @@ async function executeFlow(args: {
   const edges: FlowEdge[] = (automation.edges as any) ?? [];
 
   const settings = await getSettings();
-  const defaultCC = settings?.default_country_code || "92";
+  const defaultCC = settings?.default_country_code || "961";
   const normalizedPhone = normalizePhone(order?.customer_phone || conversation?.customer_phone || "", defaultCC);
 
   const vars = {
@@ -738,7 +738,7 @@ async function startNewRuns(triggerType: string, orderId: string) {
   }
 
   const settings = await getSettings();
-  const defaultCC = settings?.default_country_code || "92";
+  const defaultCC = settings?.default_country_code || "961";
   const normalizedPhone = normalizePhone(order.customer_phone || "", defaultCC);
   const conv = await ensureConversation(order, normalizedPhone);
 

@@ -43,6 +43,13 @@ function normalizePhoneDigits(raw: string): string {
     .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
 }
 
+function isWithinCustomerServiceWindow(lastInboundAt?: string | null) {
+  if (!lastInboundAt) return false;
+  const lastInbound = new Date(lastInboundAt).getTime();
+  if (!Number.isFinite(lastInbound)) return false;
+  return Date.now() - lastInbound < 24 * 60 * 60 * 1000;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -63,14 +70,34 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey        = Deno.env.get("SUPABASE_ANON_KEY")!;
     const isInternalCall = jwt === serviceRoleKey || jwt === anonKey;
+    let sentByUserId: string | null = null;
 
     if (!isInternalCall) {
-      // Regular user call — validate JWT (any authenticated user may send)
-      const { data: userData } = await admin.auth.getUser(jwt);
-      if (!userData?.user) {
-        return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      let validUser = false;
+      try {
+        const anyAuth = admin.auth as any;
+        if (typeof anyAuth.getClaims === "function") {
+          const { data: claimsData, error: claimsErr } = await anyAuth.getClaims(jwt);
+          if (!claimsErr && claimsData?.claims?.sub) {
+            validUser = true;
+            sentByUserId = claimsData.claims.sub as string;
+          }
+        }
+        if (!validUser) {
+          const { data: userData } = await admin.auth.getUser(jwt);
+          if (userData?.user) {
+            validUser = true;
+            sentByUserId = userData.user.id;
+          }
+        }
+      } catch (authErr) {
+        console.error("[whatsapp-send] auth validation error:", (authErr as Error).message);
+      }
+      if (!validUser) {
+        return new Response(
+          JSON.stringify({ ok: false, error: "Session expired - please sign out and sign in again." }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
     }
 
@@ -111,9 +138,10 @@ Deno.serve(async (req) => {
       // Different product on the same phone → start a fresh thread so the AI
       // doesn't mix products in the same conversation.
       if (!conv && order.customer_phone) {
-        const digits = order.customer_phone.replace(/\D/g, "");
+        const defaultCC = String(settings.default_country_code || "961").replace(/\D/g, "");
+        const digits = normalizePhoneDigits(order.customer_phone).replace(/\D/g, "");
         const withPlus = digits ? `+${digits}` : "";
-        const localZero = digits.startsWith("92") ? `0${digits.slice(2)}` : digits;
+        const localZero = defaultCC && digits.startsWith(defaultCC) ? `0${digits.slice(defaultCC.length)}` : digits;
         const variants = Array.from(
           new Set([order.customer_phone, digits, withPlus, localZero].filter(Boolean)),
         );
@@ -197,6 +225,7 @@ Deno.serve(async (req) => {
         meta_message_id: null,
         status: "note",
         error_message: null,
+        sent_by: sentByUserId,
       });
 
       return new Response(JSON.stringify({ ok: true, note: true }), {
@@ -209,6 +238,18 @@ Deno.serve(async (req) => {
     let bodyText = body.body ?? "";
     let sentTemplateId: string | null = null;
     let sentTemplateName: string | null = null;
+
+    const requiresCustomerServiceWindow = ["text", "image", "document", "audio", "order"].includes(mode);
+    if (requiresCustomerServiceWindow && !isWithinCustomerServiceWindow(conv?.last_inbound_at)) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          window_expired: true,
+          error: "24h WhatsApp window is closed. Send an approved template first, then wait for the customer to reply before sending free-text messages.",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     if (mode === "text") {
       if (!bodyText.trim()) throw new Error("Empty message");
@@ -447,6 +488,7 @@ Deno.serve(async (req) => {
       meta_message_id: metaMsgId,
       status: ok ? "sent" : "failed",
       error_message: ok ? null : JSON.stringify(respJson),
+      sent_by: sentByUserId,
     });
 
     if (ok) {
