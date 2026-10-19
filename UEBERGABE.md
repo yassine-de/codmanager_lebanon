@@ -123,6 +123,56 @@ Am 19.10.2026 deployt und anschließend als `ACTIVE` geprüft:
 - Für die Weiterarbeit auf einem anderen Rechner muss dieses Backup bei Bedarf
   separat und sicher übertragen werden; es ist absichtlich nicht Teil des Repos.
 
+## Bestellvalidierungen vom 19.10.2026
+
+### Variantenpflicht bei Bestätigung
+
+- Wenn ein Produkt Varianten besitzt, kann ein Agent die Bestellung erst auf
+  `Confirmed` setzen, nachdem eine gültige Variante ausgewählt wurde.
+- Die Prüfung greift sowohl bei der normalen Agent-Bearbeitung als auch bei der
+  nachträglichen Bearbeitung unter `Treated Orders`.
+- Zusätzlich schützt die Datenbank den Agent-RPC gegen eine Bestätigung ohne
+  erforderliche Variante.
+- Migration: `20261019193000_require_agent_variant_before_confirmation.sql`
+- Commit: `3be494b Require variants before agent confirmation`
+
+### Pflichtgrund bei Stornierungen
+
+Bei einer neuen Umstellung auf `Cancelled` muss jetzt ein Grund ausgewählt
+werden. Das gilt für:
+
+- die normale Agent-Bearbeitung
+- die nachträgliche Bearbeitung unter `Treated Orders`
+- das allgemeine `Edit Order`-Fenster für Administratoren
+
+Verfügbare Gründe:
+
+- `High Price`
+- `Product Issue`
+- `Not Convinced`
+- `Quality Issue`
+- `Other`
+
+Bei `Other` ist das Notizfeld verpflichtend; der eingegebene Text wird als
+konkreter `cancel_reason` gespeichert. Änderungen am Status und am Grund werden
+in `order_history` protokolliert.
+
+Die Datenbank lehnt neue Wechsel auf `Cancelled` ohne `cancel_reason` ab. Bereits
+vorhandene alte Stornierungen ohne Grund werden nicht nachträglich verändert und
+können weiterhin in Auswertungen als `Not specified` erscheinen.
+
+- Migration: `20261019194500_require_cancel_reason.sql`
+- Commit: `f103720 Require cancellation reasons across order flows`
+- Migration ist in der Live-Datenbank angewendet und in der Supabase-
+  Migrationshistorie als `applied` registriert.
+- Die veröffentlichte Produktion wurde auf das neue Dropdown geprüft.
+
+Während der Veröffentlichung war die Datenbankregel kurz vor der neuen
+Oberfläche aktiv. Dadurch wurden Stornierungen aus der alten `Treated Orders`-
+Oberfläche blockiert. Die Regel wurde vorübergehend entfernt, zuerst die neue
+Oberfläche veröffentlicht und danach erneut aktiviert. Der Endstand ist geprüft;
+bei dieser Korrektur wurden keine Bestellungen verändert.
+
 ## Empfohlener nächster Schritt
 
 Eine einzige Automation `New Order Confirmation Lebanon` erstellen:
@@ -170,8 +220,12 @@ Vor der Übergabe ausgeführt:
 - beide WhatsApp-Funktionen deployt: erfolgreich
 - Webhook-Handshake: erfolgreich
 - Meta-Template-Synchronisierung: erfolgreich, Template `APPROVED`
-- `npm test`: 1 Testdatei / 1 Test erfolgreich
+- `npm test`: 3 Testdateien / 9 Tests erfolgreich
 - `npm run build`: erfolgreich
+- Produktionsbundle enthält die neue Stornierungsgrund-Oberfläche: erfolgreich
+- Datenbanktrigger `require_cancel_reason_on_orders`: aktiv
+- Datenbankregel mit temporärer Testtabelle geprüft: grundlose Stornierung
+  abgelehnt, Stornierung mit Grund akzeptiert; Testtransaktion zurückgerollt
 - Syntax-Bundling beider geänderter Edge Functions: erfolgreich
 - `git diff --check`: erfolgreich
 
@@ -187,6 +241,13 @@ WhatsApp-Änderung neu eingeführter Befund.
 - `supabase/migrations/20261019120000_localize_whatsapp_ai_for_lebanon.sql`
 - `src/pages/whatsapp/WhatsappAutomations.tsx`
 - `src/pages/whatsapp/WhatsappAutomationBuilder.tsx`
+- `src/pages/AgentOrders.tsx`
+- `src/pages/AgentConfirmedOrders.tsx`
+- `src/components/EditOrderModal.tsx`
+- `src/lib/cancellationReasons.ts`
+- `src/lib/productVariants.ts`
+- `supabase/migrations/20261019193000_require_agent_variant_before_confirmation.sql`
+- `supabase/migrations/20261019194500_require_cancel_reason.sql`
 
 Hinweis zur Migration: Die AI-Einstellungen wurden bereits direkt in der
 Live-Datenbank aktualisiert. Die neue Migration hält denselben Sollzustand im
