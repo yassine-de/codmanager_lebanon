@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { getProductVariants, hasValidSelectedVariant, type CatalogVariant } from "@/lib/productVariants";
 import { CitySelect } from "@/components/CitySelect";
 import { formatPKT as format } from "@/lib/timezone";
 import { appendAgentDebugLog } from "@/lib/agent-debug-log";
@@ -109,7 +110,7 @@ const AgentOrders = () => {
   const [editMode, setEditMode] = useState(false);
   const [isManualPrice, setIsManualPrice] = useState(false);
   const [manualTotal, setManualTotal] = useState(0);
-  const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; sku?: string | null; variants?: any[] | null; product_url: string | null; video_url: string | null }[]>([]);
+  const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; sku?: string | null; variants?: CatalogVariant[] | null; product_url: string | null; video_url: string | null }[]>([]);
   const [historicalOffers, setHistoricalOffers] = useState<string | null>(null);
   const [historicalLastPrice, setHistoricalLastPrice] = useState<number | null>(null);
 
@@ -231,13 +232,17 @@ const AgentOrders = () => {
     };
   }, [started, authUser?.id]);
 
-  const activeItems = editItems.length > 0
+  const activeItems = useMemo(() => editItems.length > 0
     ? editItems
     : currentOrder
       ? [{ name: currentOrder.product_name, qty: currentOrder.quantity, price: Number(currentOrder.price), variantName: currentOrder.variant_name, variantSku: currentOrder.variant_sku }]
-      : [];
+      : [], [editItems, currentOrder]);
   const autoTotal = activeItems.reduce((s, p) => s + p.qty * p.price, 0);
   const orderTotal = isManualPrice ? manualTotal : autoTotal;
+  const missingVariantItems = useMemo(
+    () => activeItems.filter((item) => !hasValidSelectedVariant(item, sellerProducts)),
+    [activeItems, sellerProducts],
+  );
 
   const refreshAvailableCounts = useCallback(async (productNamesParam?: string[] | null) => {
     if (!authUser) return;
@@ -609,6 +614,7 @@ const AgentOrders = () => {
   const canSubmit = useMemo(() => {
     if (!selectedStatus) return false;
     if (selectedStatus === "confirmed" && !shippingStatus) return false;
+    if (selectedStatus === "confirmed" && missingVariantItems.length > 0) return false;
     if (selectedStatus === "cancelled") {
       if (!cancelReason) return false;
       if (cancelReason === "other" && !note.trim()) return false;
@@ -631,7 +637,7 @@ const AgentOrders = () => {
       }
     }
     return true;
-  }, [selectedStatus, shippingStatus, cancelReason, note, postponeDate, postponeTime, postponeNote]);
+  }, [selectedStatus, shippingStatus, missingVariantItems, cancelReason, note, postponeDate, postponeTime, postponeNote]);
 
   const handleSubmit = async () => {
     if (!canSubmit || !currentOrder || !authUser) return;
@@ -1253,10 +1259,10 @@ const AgentOrders = () => {
                           )}
                         </p>
 
-                        {editMode ? (
+                        {editMode || (selectedStatus === "confirmed" && !hasValidSelectedVariant(op, sellerProducts)) ? (
                           <div className="flex items-center gap-2">
                             {(() => {
-                              const variants = ((matchedProduct as any)?.variants || []).filter((v: any) => v?.name);
+                              const variants = getProductVariants(sellerProducts, op.name);
                               if (variants.length === 0) return null;
                               return (
                                 <div className="space-y-0.5">
@@ -1266,7 +1272,7 @@ const AgentOrders = () => {
                                       <SelectValue placeholder="Variant" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {variants.map((variant: any) => (
+                                      {variants.map((variant) => (
                                         <SelectItem key={variant.id || variant.sku || variant.name} value={String(variant.name)} className="text-xs">
                                           {variant.name}{variant.sku ? ` · ${variant.sku}` : ""}
                                         </SelectItem>
@@ -1404,6 +1410,12 @@ const AgentOrders = () => {
                   </div>
                 );
               })()}
+
+              {selectedStatus === "confirmed" && missingVariantItems.length > 0 && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                  Select a variant for {missingVariantItems.map((item) => item.name).join(", ")} before confirming this order.
+                </div>
+              )}
 
               {/* Add Item Button */}
               {editMode && sellerProducts.length > 0 && (

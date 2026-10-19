@@ -18,6 +18,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import WakilniTrackingModal from "@/components/WakilniTrackingModal";
+import { getProductVariants, hasValidSelectedVariant, type CatalogVariant } from "@/lib/productVariants";
 
 const confirmationBadge: Record<string, { label: string; className: string }> = {
   confirmed: { label: "✅ Confirmed", className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
@@ -58,6 +59,8 @@ interface EditForm {
   customer_city: string;
   customer_address: string;
   product_name: string;
+  variant_name: string;
+  variant_sku: string;
   price: number;
   quantity: number;
   confirmation_status: string;
@@ -80,13 +83,15 @@ const AgentConfirmedOrders = () => {
   const [editOrder, setEditOrder] = useState<any>(null);
   const [trackingTarget, setTrackingTarget] = useState<{ trackingId?: string | null; wakilniOrderId?: string | null; systemId?: number | null; sellerId?: string | null } | null>(null);
   const [reclaimingId, setReclaimingId] = useState<string | null>(null);
-  const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; product_url: string | null; video_url: string | null }[]>([]);
+  const [sellerProducts, setSellerProducts] = useState<{ id: string; name: string; price: number; variants?: CatalogVariant[] | null; product_url: string | null; video_url: string | null }[]>([]);
   const [editForm, setEditForm] = useState<EditForm>({
     customer_name: "",
     customer_phone: "",
     customer_city: "",
     customer_address: "",
     product_name: "",
+    variant_name: "",
+    variant_sku: "",
     price: 0,
     quantity: 1,
     confirmation_status: "",
@@ -114,6 +119,17 @@ const AgentConfirmedOrders = () => {
   });
 
   const isPostponed = editForm.confirmation_status === "postponed";
+  const selectedProductVariants = useMemo(
+    () => getProductVariants(sellerProducts, editForm.product_name),
+    [sellerProducts, editForm.product_name],
+  );
+  const requiresVariantSelection = editForm.confirmation_status === "confirmed"
+    && (editOrder?.confirmation_status !== "confirmed" || editForm.product_name !== editOrder?.product_name)
+    && !hasValidSelectedVariant({
+      name: editForm.product_name,
+      variantName: editForm.variant_name,
+      variantSku: editForm.variant_sku,
+    }, sellerProducts);
 
   // Auto-suggest time 30min from now when selecting today
   useEffect(() => {
@@ -135,6 +151,9 @@ const AgentConfirmedOrders = () => {
   const updateMutation = useMutation({
     mutationFn: async () => {
       if (!editOrder) return;
+      if (requiresVariantSelection) {
+        throw new Error("Select a product variant before confirming this order.");
+      }
       const totalAmount = editForm.price * editForm.quantity;
       const confirmed_at = editForm.confirmation_status === "confirmed" ? new Date().toISOString() : null;
 
@@ -160,6 +179,8 @@ const AgentConfirmedOrders = () => {
           customer_city: editForm.customer_city.trim(),
           customer_address: editForm.customer_address.trim(),
           product_name: editForm.product_name.trim(),
+          variant_name: editForm.variant_name.trim() || null,
+          variant_sku: editForm.variant_sku.trim() || null,
           price: editForm.price,
           quantity: editForm.quantity,
           total_amount: totalAmount,
@@ -212,7 +233,7 @@ const AgentConfirmedOrders = () => {
       toast.success("Order updated successfully");
       setEditOrder(null);
     },
-    onError: () => toast.error("Failed to update order"),
+    onError: (error: Error) => toast.error(error.message || "Failed to update order"),
   });
 
   const filteredOrders = useMemo(() => {
@@ -272,6 +293,8 @@ const AgentConfirmedOrders = () => {
       customer_city: order.customer_city || "",
       customer_address: order.customer_address || "",
       product_name: order.product_name || "",
+      variant_name: order.variant_name || "",
+      variant_sku: order.variant_sku || "",
       price: Number(order.price) || 0,
       quantity: order.quantity || 1,
       confirmation_status: order.confirmation_status || "",
@@ -284,7 +307,7 @@ const AgentConfirmedOrders = () => {
     // Fetch seller's products for links and add-item
     supabase
       .from("products")
-      .select("id, name, price, product_url, video_url")
+      .select("id, name, price, variants, product_url, video_url")
       .eq("seller_id", order.seller_id)
       .then(({ data }) => {
         setSellerProducts((data || []).map(p => ({ ...p, price: Number(p.price) })));
@@ -599,8 +622,13 @@ const AgentConfirmedOrders = () => {
                             key={sp.id}
                             className="w-full text-left px-3 py-2 rounded-md hover:bg-accent text-xs flex items-center justify-between gap-2 transition-colors"
                             onClick={() => {
-                              updateField("product_name", sp.name);
-                              updateField("price", sp.price);
+                              setEditForm((prev) => ({
+                                ...prev,
+                                product_name: sp.name,
+                                price: sp.price,
+                                variant_name: "",
+                                variant_sku: "",
+                              }));
                             }}
                           >
                             <span className="truncate font-medium">{sp.name}</span>
@@ -621,6 +649,36 @@ const AgentConfirmedOrders = () => {
                   maxLength={200}
                 />
               </div>
+              {selectedProductVariants.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Variant *</Label>
+                  <Select
+                    value={editForm.variant_name}
+                    onValueChange={(variantName) => {
+                      const variant = selectedProductVariants.find((candidate) => candidate.name === variantName);
+                      setEditForm((prev) => ({
+                        ...prev,
+                        variant_name: variantName,
+                        variant_sku: variant?.sku || "",
+                      }));
+                    }}
+                  >
+                    <SelectTrigger className={cn("h-9 text-sm", requiresVariantSelection && "border-destructive")}>
+                      <SelectValue placeholder="Select variant" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedProductVariants.map((variant) => (
+                        <SelectItem key={variant.sku || variant.name} value={String(variant.name || variant.sku)}>
+                          {variant.name || variant.sku}{variant.sku && variant.name ? ` · ${variant.sku}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {requiresVariantSelection && (
+                    <p className="text-xs text-destructive">Select a variant before confirming this order.</p>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Price ($)</Label>
@@ -811,7 +869,7 @@ const AgentConfirmedOrders = () => {
             <Button
               size="sm"
               onClick={() => updateMutation.mutate()}
-              disabled={updateMutation.isPending || (isPostponed && (!editForm.postpone_date || isPostponeTimeInvalid))}
+              disabled={updateMutation.isPending || requiresVariantSelection || (isPostponed && (!editForm.postpone_date || isPostponeTimeInvalid))}
             >
               {updateMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
