@@ -49,6 +49,25 @@ function normalizePhoneDigits(raw: string): string {
     .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
 }
 
+function isAddressDeliverable(addr?: string | null, city?: string | null): boolean {
+  if (!addr || !city || String(city).trim().length === 0) return false;
+  const raw = String(addr).trim();
+  if (raw.length < 12) return false;
+  const lower = raw.toLowerCase();
+  const fakePattern = /\b(test|testing|tester|fake|dummy|sample|example|n\/?a|none|null|xxx+|asdf+|qwerty|aaaa+|placeholder|abc+|address here|adress|same|here)\b/i;
+  if (fakePattern.test(lower)) return false;
+  const tokens = raw.split(/\s+/).filter((w) => w.length > 1);
+  if (tokens.length < 3) return false;
+  const hasNumber = /\d/.test(raw);
+  const strongKeyword = /\b(house|flat|plot|shop\s*(?:no|number|#)?\s*\d|office\s*(?:no|number|#)?\s*\d|street\s*(?:no|number|#)?\s*\d|gali\s*(?:no|number|#)?\s*\d|block|sector|phase|apartment|building|floor|villa|tower|plaza)\b/i;
+  const weakKeyword = /\b(shop|office|store|street|road|st\.?|rd\.?|lane|town|village|colony|mohalla|mahalla|gali|bazar|bazaar|market|society|park|stop|stand|gate|center|centre|care|hotel|masjid|mosque|school|college|university|hospital|clinic|bank|station|chowk|square|more|tehsil|tehseel|ward|union|abad|pura|nagar|kot|gunj|ganj|garh|wala|پور|آباد|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر|چوک|تحصیل|دکان)\b/gi;
+  const landmarkIndicator = /\b(near|opposite|behind|front|side|adjacent|main|stop)\b/i;
+  if (hasNumber && (strongKeyword.test(lower) || weakKeyword.test(lower) || landmarkIndicator.test(lower))) return true;
+  if (hasNumber && tokens.length >= 4) return true;
+  if (strongKeyword.test(lower)) return true;
+  return (lower.match(weakKeyword) || []).length >= 2;
+}
+
 function render(template: string, vars: Record<string, any>) {
   return (template || "").replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, k) => {
     const v = vars[k];
@@ -570,15 +589,16 @@ async function executeFlow(args: {
 
         // Build system prompt: node-level prompt overrides global if provided.
         const orderCtx = order
-          ? `\n\nOrder context:\n- Order ID: ${order.order_id}\n- Customer: ${order.customer_name}\n- Product: ${order.product_name}\n- Quantity: ${order.quantity}\n- Total: ${order.total_amount} PKR\n- City: ${order.customer_city}\n- Address: ${order.customer_address ?? "(not provided)"}`
+          ? `\n\nOrder context:\n- Order ID: ${order.order_id}\n- Customer: ${order.customer_name}\n- Product: ${order.product_name}\n- Quantity: ${order.quantity}\n- Total: ${order.total_amount} USD\n- City: ${order.customer_city}\n- Address: ${order.customer_address ?? "(not provided)"}`
           : "";
-        // Address-completion rule: explicit, deterministic signal so the AI
-        // does NOT re-ask for an address that is already deliverable on file.
+        // Address-confirmation rule: after the customer confirms purchase
+        // intent, read a deliverable stored address back and ask for explicit
+        // approval. A missing/weak address must be collected instead.
         const addressDeliverable = !!order && isAddressDeliverable(order.customer_address, order.customer_city);
         const addressRule = !order
           ? ""
           : addressDeliverable
-          ? `\n\nADDRESS STATUS: The customer's stored address ("${order.customer_address}", ${order.customer_city}) is ALREADY detailed enough for delivery. DO NOT ask the customer to send their address again. Just send a short, warm confirmation that the order is being processed and the courier will contact them. Never write "please send your full address", "to ensure smooth delivery please send", or any equivalent.`
+          ? `\n\nADDRESS STATUS: The customer's stored address is detailed enough for delivery: "${order.customer_address}", ${order.customer_city}. Read this exact address back and ask the customer explicitly whether it is correct. Do NOT say the order is confirmed yet. Tell them to reply yes if correct, or send the complete corrected address if not.`
           : `\n\nADDRESS STATUS: The stored address ("${order.customer_address ?? "(none)"}", ${order.customer_city ?? "(none)"}) is missing or too vague for the courier. Politely ask the customer (in their language) for the FULL address: house/flat #, street, area/block, nearest landmark, and city. Keep asking in follow-ups until you receive a complete, deliverable address. Do NOT confirm the order yourself — the system will auto-confirm once the address is complete.`;
         // Resolve effective system prompt based on node-level mode:
         //  - instructions_mode = "general" → always use global AI Settings prompt
@@ -850,51 +870,16 @@ async function applyButtonAction(opts: {
   const { action, order, conversationId, buttonText } = opts;
   if (!action) return;
 
-  // Address-deliverable check (mirrors webhook's isAddressDeliverable).
-  // Used to FORCE AI gating on confirm buttons when the address is incomplete,
-  // regardless of admin-configured ai_gate setting. This prevents premature
-  // order confirmation when the customer only gave a city / vague text.
-  const isAddressDeliverable = (addr?: string | null, city?: string | null): boolean => {
-    if (!addr) return false;
-    if (!city || String(city).trim().length === 0) return false;
-    const raw = String(addr).trim();
-    if (raw.length < 12) return false;
-    const lower = raw.toLowerCase();
-    const fakePattern = /\b(test|testing|tester|fake|dummy|sample|example|n\/?a|none|null|xxx+|asdf+|qwerty|aaaa+|placeholder|abc+|address here|adress|same|here)\b/i;
-    if (fakePattern.test(lower)) return false;
-    const tokens = raw.split(/\s+/).filter((w) => w.length > 1);
-    if (tokens.length < 3) return false;
-    const hasNumber = /\d/.test(raw);
-    const strongKeyword = /\b(house|flat|plot|shop\s*(?:no|number|#)?\s*\d|office\s*(?:no|number|#)?\s*\d|street\s*(?:no|number|#)?\s*\d|gali\s*(?:no|number|#)?\s*\d|block|sector|phase|apartment|building|floor|villa|tower|plaza)\b/i;
-    const weakKeyword = /\b(shop|office|store|street|road|st\.?|rd\.?|lane|town|village|colony|mohalla|mahalla|gali|bazar|bazaar|market|society|park|stop|stand|gate|center|centre|care|hotel|masjid|mosque|school|college|university|hospital|clinic|bank|station|chowk|square|more|tehsil|tehseel|ward|union|abad|pura|nagar|kot|gunj|ganj|garh|wala|پور|آباد|گھر|مکان|گلی|سڑک|محلہ|فلیٹ|بلاک|سیکٹر|چوک|تحصیل|دکان)\b/gi;
-    const landmarkIndicator = /\b(near|opposite|behind|front|side|adjacent|main|stop)\b/i;
-    if (hasNumber && (strongKeyword.test(lower) || weakKeyword.test(lower) || landmarkIndicator.test(lower))) return true;
-    if (hasNumber && tokens.length >= 4) return true;
-    if (strongKeyword.test(lower)) return true;
-    const weakHits = (lower.match(weakKeyword) || []).length;
-    if (weakHits >= 2) return true;
-    return false;
-  };
-
-  // Address-gating logic for confirm-buttons:
-  //   • Stored address ALREADY deliverable → SKIP gate, confirm immediately
-  //     (otherwise customer never replies and order stays stuck in
-  //     pending_address forever, e.g. AB-369).
-  //   • Address missing/weak → force AI gate to ask customer.
+  // Confirming the purchase and confirming its delivery address are separate
+  // customer decisions. Always gate a confirm button so the next flow step can
+  // read the stored address back (or request a missing one) before finalizing.
   const wantsConfirm =
     action.status === "confirmed" ||
     action.intent_kind === "confirm";
   const storedAddrDeliverable = !!order && isAddressDeliverable(order.customer_address, order.customer_city);
-  const forceAddressGate = wantsConfirm && !!order && !storedAddrDeliverable;
-
-  // CRITICAL: when the customer pressed a CONFIRM button AND the stored address
-  // is already deliverable, NEVER gate. We confirm immediately. Otherwise we
-  // would stash a pending_button_intent and rely on the AI / customer to send
-  // a follow-up text that may never come, leaving the order stuck on WhatsApp
-  // forever (AB-606).
-  const skipGateForConfirmedAddress = wantsConfirm && storedAddrDeliverable;
-  const aiGated = !skipGateForConfirmedAddress && (action.ai_gate === "validate" || forceAddressGate);
-  const wantsTakeover = !skipGateForConfirmedAddress && (action.ai_takeover === true || aiGated);
+  const requireAddressConfirmation = wantsConfirm && !!order;
+  const aiGated = requireAddressConfirmation || action.ai_gate === "validate";
+  const wantsTakeover = action.ai_takeover === true || aiGated;
 
   // 1) AI takeover (gated buttons always force takeover so AI drives the convo)
   if (conversationId && wantsTakeover) {
@@ -931,13 +916,15 @@ async function applyButtonAction(opts: {
       .eq("id", conversationId);
 
     // Still flag the order so admins see customer interaction, but DON'T touch status.
-    const noteText = forceAddressGate
-      ? `Customer clicked "${buttonText}" — awaiting full delivery address`
+    const noteText = wantsConfirm
+      ? storedAddrDeliverable
+        ? `Customer clicked "${buttonText}" — awaiting explicit address confirmation`
+        : `Customer clicked "${buttonText}" — awaiting full delivery address`
       : `Customer clicked "${buttonText}" — AI validating (${intentKind})`;
     await admin
       .from("orders")
       .update({
-        whatsapp_status: forceAddressGate ? "pending_address" : (order.whatsapp_status ?? null),
+        whatsapp_status: wantsConfirm ? "pending_address" : (order.whatsapp_status ?? null),
         whatsapp_note: noteText,
         whatsapp_last_reply_at: new Date().toISOString(),
       })
@@ -946,16 +933,11 @@ async function applyButtonAction(opts: {
   }
 
   // 3) Non-gated path: apply mapping immediately (legacy).
-  const noteFlag = skipGateForConfirmedAddress
-    ? `Customer clicked "${buttonText}" — auto-confirmed (address on file)`
-    : `Customer clicked "${buttonText}" on WhatsApp`;
+  const noteFlag = `Customer clicked "${buttonText}" on WhatsApp`;
   const updates: Record<string, any> = {
     whatsapp_note: noteFlag,
     whatsapp_last_reply_at: new Date().toISOString(),
   };
-  if (skipGateForConfirmedAddress) {
-    updates.whatsapp_status = "confirmed";
-  }
 
   if (hasMappedStatus) {
     const before = order.confirmation_status;
@@ -982,20 +964,6 @@ async function applyButtonAction(opts: {
     await admin.from("orders").update(updates).eq("order_id", order.order_id);
   }
 
-  // When skipping gate for a confirmed-address auto-confirm, also clear any
-  // stale pending_button_intent on the conversation and mark it confirmed so
-  // the AI does NOT keep asking the customer for their address.
-  if (skipGateForConfirmedAddress && conversationId) {
-    await admin
-      .from("whatsapp_conversations")
-      .update({
-        status: "confirmed",
-        outcome: "confirmed",
-        pending_button_intent: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", conversationId);
-  }
 }
 
 /**

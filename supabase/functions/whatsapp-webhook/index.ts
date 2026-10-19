@@ -425,12 +425,9 @@ export function isAddressDeliverable(addr?: string | null, city?: string | null)
 // Apply CRM updates for a button action. Mirrors whatsapp-action logic so
 // behavior stays consistent between manual Inbox actions and automated webhook.
 //
-// ADDRESS-GATING (CRITICAL): when outcome === "confirmed" but the order does
-// NOT have a deliverable address on file, we DO NOT confirm the order. We
-// stash a "pending_button_intent" on the conversation, force AI takeover, and
-// let the AI ask the customer for the full address. The AI flow's
-// tryExtractAndConfirmAddress() will finalize the confirmation once a real
-// address arrives.
+// ADDRESS-GATING (CRITICAL): a confirm button confirms purchase intent only.
+// The customer must then explicitly approve the stored delivery address or
+// provide a replacement before tryExtractAndConfirmAddress() finalizes it.
 async function applyOutcome(
   order: any,
   outcome: "confirmed" | "more_info" | "canceled",
@@ -444,67 +441,11 @@ async function applyOutcome(
   };
 
   // ── Address-gated confirm path ────────────────────────────────────────────
-  // Strategy:
-  //   • If stored address is ALREADY deliverable → confirm IMMEDIATELY (no AI
-  //     round-trip needed). Otherwise customer never sends a follow-up text
-  //     and the order would be stuck in pending_address forever (e.g. AB-369).
-  //   • If stored address is missing/weak → gate through the AI, ask the
-  //     customer for their full address, finalize once they reply.
+  // Always gate here. The automation's next step reads a complete stored
+  // address back to the customer, or asks for a full address when it is weak.
   if (outcome === "confirmed") {
     const addrLooksDeliverable = isAddressDeliverable(order.customer_address, order.customer_city);
 
-    if (addrLooksDeliverable && order.confirmation_status !== "confirmed") {
-      // Direct confirm — stored address is good enough, no need to ask again.
-      const settings = await getSettings();
-      const trackedFields = ["confirmation_status", "delivery_status", "shipping_status"];
-      const before: Record<string, any> = {};
-      for (const f of trackedFields) before[f] = order[f] ?? null;
-
-      const confirmUpdate: Record<string, any> = {
-        confirmation_status: "confirmed",
-        confirmation_channel: "whatsapp",
-        confirmed_at: new Date().toISOString(),
-        whatsapp_status: "confirmed",
-        whatsapp_last_reply_at: new Date().toISOString(),
-        whatsapp_note: `Customer clicked "${buttonText || "YES"}" — auto-confirmed (address on file)`,
-      };
-      if (settings?.auto_book_shipping) {
-        const ds = String(order.delivery_status ?? "").toLowerCase();
-        const blockBooking = ["booked", "shipped", "in_transit", "delivered", "returned"].includes(ds);
-        if (!blockBooking) {
-          confirmUpdate.delivery_status = "booked";
-          confirmUpdate.shipping_status = "Booked";
-        }
-      }
-      await admin.from("orders").update(confirmUpdate).eq("order_id", order.order_id);
-
-      if (conversationId) {
-        await admin
-          .from("whatsapp_conversations")
-          .update({
-            status: "confirmed",
-            outcome: "confirmed",
-            pending_button_intent: null,
-            ai_enabled: false,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", conversationId);
-      }
-      try {
-        await logOrderHistory({
-          orderId: order.order_id,
-          actionType: "ai_confirm",
-          role: "ai",
-          before,
-          after: confirmUpdate,
-          fields: trackedFields,
-        });
-      } catch (_) { /* non-blocking */ }
-      log("button confirm: stored-address auto-confirmed", order.order_id);
-      return;
-    }
-
-    // Stored address is weak/missing → gate through AI.
     if (conversationId) {
       await admin
         .from("whatsapp_conversations")
@@ -524,11 +465,13 @@ async function applyOutcome(
       .from("orders")
       .update({
         whatsapp_status: "pending_address",
-        whatsapp_note: `Customer clicked "${buttonText || "YES"}" — AI validating address before confirm`,
+        whatsapp_note: addrLooksDeliverable
+          ? `Customer clicked "${buttonText || "YES"}" — awaiting explicit address confirmation`
+          : `Customer clicked "${buttonText || "YES"}" — awaiting full delivery address`,
         whatsapp_last_reply_at: new Date().toISOString(),
       })
       .eq("order_id", order.order_id);
-    log("button confirm gated: awaiting AI address validation", order.order_id);
+    log("button confirm gated: awaiting explicit address confirmation", order.order_id);
     return;
   } else if (outcome === "more_info") {
     updates.confirmation_status = String(order.confirmation_status || "").toLowerCase() === "no_answer" ? "no_answer" : "new";
