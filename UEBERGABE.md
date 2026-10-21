@@ -1,6 +1,6 @@
 # Übergabe – COD Lebanon
 
-Stand: 19. Oktober 2026
+Stand: 21. Oktober 2026
 
 ## Repository
 
@@ -143,6 +143,7 @@ werden. Das gilt für:
 
 - die normale Agent-Bearbeitung
 - die nachträgliche Bearbeitung unter `Treated Orders`
+- die direkte Bearbeitung unter `Agent Order List`
 - das allgemeine `Edit Order`-Fenster für Administratoren
 
 Verfügbare Gründe:
@@ -172,6 +173,12 @@ Oberfläche aktiv. Dadurch wurden Stornierungen aus der alten `Treated Orders`-
 Oberfläche blockiert. Die Regel wurde vorübergehend entfernt, zuerst die neue
 Oberfläche veröffentlicht und danach erneut aktiviert. Der Endstand ist geprüft;
 bei dieser Korrektur wurden keine Bestellungen verändert.
+
+Am 21.10.2026 wurde eine weitere Oberfläche ergänzt: Der Dialog `Edit Order`
+unter `Agent Order List` hatte `cancel_reason` zuvor weder geladen noch
+gespeichert. Deshalb lehnte die aktive Datenbankregel das Speichern dort ab.
+Der Dialog verwendet jetzt ebenfalls dasselbe Dropdown; bei `Other` ist das
+Feld `Info` verpflichtend.
 
 ## Empfohlener nächster Schritt
 
@@ -243,6 +250,7 @@ WhatsApp-Änderung neu eingeführter Befund.
 - `src/pages/whatsapp/WhatsappAutomationBuilder.tsx`
 - `src/pages/AgentOrders.tsx`
 - `src/pages/AgentConfirmedOrders.tsx`
+- `src/pages/AgentOrderList.tsx`
 - `src/components/EditOrderModal.tsx`
 - `src/lib/cancellationReasons.ts`
 - `src/lib/productVariants.ts`

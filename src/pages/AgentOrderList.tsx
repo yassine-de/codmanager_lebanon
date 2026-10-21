@@ -15,6 +15,7 @@ import { CitySelect } from "@/components/CitySelect";
 import { useToast } from "@/hooks/use-toast";
 import CreateOrderModal from "@/components/CreateOrderModal";
 import WakilniTrackingModal from "@/components/WakilniTrackingModal";
+import { CANCEL_REASONS, isKnownCancelReason, resolveCancelReason } from "@/lib/cancellationReasons";
 
 type OrderRow = {
   id: string;
@@ -36,6 +37,7 @@ type OrderRow = {
   price: number;
   total_amount: number;
   note: string | null;
+  cancel_reason: string | null;
   seller_id: string;
   agent_id: string | null;
   original_agent_id: string | null;
@@ -70,6 +72,7 @@ type EditForm = {
   customer_city: string;
   customer_address: string;
   note: string;
+  cancel_reason: string;
 };
 
 const statusOptions = [
@@ -151,6 +154,7 @@ const createEmptyForm = (): EditForm => ({
   customer_city: "",
   customer_address: "",
   note: "",
+  cancel_reason: "",
 });
 
 export default function AgentOrderList() {
@@ -175,7 +179,7 @@ export default function AgentOrderList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id,system_id,order_id,created_at,updated_at,confirmation_status,customer_name,customer_phone,customer_city,customer_address,product_name,product_url,video_url,variant_name,variant_sku,quantity,price,total_amount,note,seller_id,agent_id,original_agent_id,wakilni_order_id,wakilni_tracking_id")
+        .select("id,system_id,order_id,created_at,updated_at,confirmation_status,customer_name,customer_phone,customer_city,customer_address,product_name,product_url,video_url,variant_name,variant_sku,quantity,price,total_amount,note,cancel_reason,seller_id,agent_id,original_agent_id,wakilni_order_id,wakilni_tracking_id")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -235,7 +239,10 @@ export default function AgentOrderList() {
       total_amount: String(selectedOrder.total_amount || selectedOrder.price || 0),
       customer_city: selectedOrder.customer_city || "",
       customer_address: selectedOrder.customer_address || "",
-      note: selectedOrder.note || "",
+      note: selectedOrder.note || (selectedOrder.cancel_reason && !isKnownCancelReason(selectedOrder.cancel_reason) ? selectedOrder.cancel_reason : ""),
+      cancel_reason: isKnownCancelReason(selectedOrder.cancel_reason)
+        ? selectedOrder.cancel_reason || ""
+        : (selectedOrder.cancel_reason ? "other" : ""),
     });
   }, [productsQuery.data, selectedOrder]);
 
@@ -340,6 +347,13 @@ export default function AgentOrderList() {
       const now = new Date().toISOString();
       const movedFromNew = form.confirmation_status !== "new";
 
+      if (form.confirmation_status === "cancelled" && !form.cancel_reason) {
+        throw new Error("Select a cancellation reason.");
+      }
+      if (form.confirmation_status === "cancelled" && form.cancel_reason === "other" && !form.note.trim()) {
+        throw new Error("Enter the cancellation reason in Info.");
+      }
+
       const updateData: Record<string, unknown> = {
         confirmation_status: form.confirmation_status,
         customer_name: form.customer_name.trim(),
@@ -355,6 +369,9 @@ export default function AgentOrderList() {
         total_amount: totalAmount,
         price: unitPrice,
         note: form.note.trim() || null,
+        cancel_reason: form.confirmation_status === "cancelled"
+          ? resolveCancelReason(form.cancel_reason, form.note)
+          : null,
         updated_at: now,
       };
 
@@ -642,6 +659,24 @@ export default function AgentOrderList() {
                   ))}
                 </SelectContent>
               </Select>
+              {form.confirmation_status === "cancelled" && (
+                <div className="space-y-2 pt-2">
+                  <Label>Cancellation Reason *</Label>
+                  <Select value={form.cancel_reason} onValueChange={(value) => updateField("cancel_reason", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select reason" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CANCEL_REASONS.map((reason) => (
+                        <SelectItem key={reason.value} value={reason.value}>{reason.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {form.cancel_reason === "other" && (
+                    <p className="text-xs text-muted-foreground">Enter the cancellation reason in Info.</p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -730,7 +765,7 @@ export default function AgentOrderList() {
             </div>
 
             <div className="space-y-2 md:row-span-2">
-              <Label>Info</Label>
+              <Label>Info{form.confirmation_status === "cancelled" && form.cancel_reason === "other" ? " *" : ""}</Label>
               <Textarea className="min-h-[100px]" value={form.note} onChange={(event) => updateField("note", event.target.value)} />
             </div>
 
@@ -742,7 +777,12 @@ export default function AgentOrderList() {
 
           <div className="sticky bottom-0 -mx-6 -mb-6 flex justify-end gap-3 border-t bg-background px-6 py-4">
             <Button variant="outline" onClick={() => setSelectedOrder(null)} disabled={saving}>Cancel</Button>
-            <Button onClick={saveOrder} disabled={saving}>
+            <Button
+              onClick={saveOrder}
+              disabled={saving
+                || (form.confirmation_status === "cancelled"
+                  && (!form.cancel_reason || (form.cancel_reason === "other" && !form.note.trim())))}
+            >
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
             </Button>
