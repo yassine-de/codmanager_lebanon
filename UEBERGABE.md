@@ -210,6 +210,13 @@ Die Vorlagen-Synchronisierung unterstützt nun Updates über die bestehende
 Meta-Template-ID statt beim Speichern ein Duplikat anzulegen. Meta hat das
 Update angenommen; direkt nach dem Einreichen war der Status `PENDING`.
 
+Auch der zweite Adresspfad wurde mit dem internen Auftrag
+`WA-TEST-20261021-ADDRESS-OK` (`SYSTEM ID 7095`) erfolgreich geprüft: Nach
+`نعم، تأكيد الطلب` wurde die gespeicherte Beirut-Adresse angezeigt, nach
+`نعم، صحيح` wurde der Auftrag bestätigt, die Abschlussnachricht zugestellt
+und der Automation-Lauf ohne Fehler beendet. Die Automation bleibt bis zum
+Abschluss der übrigen Tests auf `draft`.
+
 ## Empfohlener nächster Schritt
 
 1. Den internen Testauftrag kontrolliert auf den Zustand vor der
