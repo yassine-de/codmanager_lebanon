@@ -1964,6 +1964,7 @@ Rules:
   const confirmUpdate: Record<string, any> = {
     whatsapp_status: "confirmed",
     whatsapp_last_reply_at: new Date().toISOString(),
+    whatsapp_note: "Customer provided a new delivery address via WhatsApp; address saved and order confirmed",
   };
   if (!wasAlreadyConfirmed) {
     confirmUpdate.confirmation_status = "confirmed";

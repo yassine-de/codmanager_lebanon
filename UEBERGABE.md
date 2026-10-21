@@ -194,8 +194,15 @@ Ursache war die Abkürzung für bereits zustellbare Adressen im Webhook. Sie
 wurde so begrenzt, dass nach einem Button wie `تعديل العنوان`, `Edit address`
 oder `Modifier l'adresse` zuerst die neue Kundenantwort extrahiert und
 gespeichert werden muss. Erst danach darf die Bestellung bestätigt werden.
-`whatsapp-webhook` Version 10 ist aktiv. Der bestehende Testdatensatz wurde
+`whatsapp-webhook` Version 11 ist aktiv. Der bestehende Testdatensatz wurde
 nicht nachträglich verändert.
+
+Der Wiederholungstest war erfolgreich: Die alte Berliner Adresse wurde durch
+`بيروت، الحمرا، شارع بلس، بناية 12، الطابق الثالث، قرب الجامعة الأميركية`
+ersetzt, `customer_city` wurde auf `بيروت` gesetzt und die Bestellung erst
+danach bestätigt. Zusätzlich wird der interne WhatsApp-Hinweis nach einem
+erfolgreichen Adresswechsel nun ebenfalls auf den abgeschlossenen Zustand
+gesetzt.
 
 ## Empfohlener nächster Schritt
 
@@ -244,7 +251,7 @@ Vor der Übergabe ausgeführt:
 - Meta-Template-Synchronisierung: erfolgreich, Template `APPROVED`
 - `npm test`: 4 Testdateien / 18 Tests erfolgreich
 - `npm run build`: erfolgreich
-- `whatsapp-webhook` Version 10 deployt und als `ACTIVE` geprüft
+- `whatsapp-webhook` Version 11 deployt und als `ACTIVE` geprüft
 - Produktionsbundle enthält die neue Stornierungsgrund-Oberfläche: erfolgreich
 - Datenbanktrigger `require_cancel_reason_on_orders`: aktiv
 - Datenbankregel mit temporärer Testtabelle geprüft: grundlose Stornierung
