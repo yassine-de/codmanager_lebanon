@@ -217,6 +217,15 @@ Auch der zweite Adresspfad wurde mit dem internen Auftrag
 und der Automation-Lauf ohne Fehler beendet. Die Automation bleibt bis zum
 Abschluss der übrigen Tests auf `draft`.
 
+Neue Geschäftsregel für WhatsApp-Stornierungswünsche: Der Bot storniert nie
+automatisch. Eine klare Ablehnung wird sofort als Rückgewinnungsanruf in die
+Agent-Warteschlange gestellt (`confirmation_status = new`, Kanal `agent`,
+`whatsapp_status = retention_call_required`). Die AI wird für die Konversation
+deaktiviert und der Kunde erhält den Hinweis, dass ein Mitarbeiter ihn anrufen
+wird. Erst der Agent entscheidet nach dem Gespräch über Bestätigung oder
+Stornierung. Der interne Live-Testauftrag dafür ist
+`WA-TEST-20261021-RETENTION` (`SYSTEM ID 7096`).
+
 ## Empfohlener nächster Schritt
 
 1. Den internen Testauftrag kontrolliert auf den Zustand vor der

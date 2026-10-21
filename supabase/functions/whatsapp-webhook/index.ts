@@ -6,6 +6,7 @@
 // conversations and orders, and triggers CRM logic for button actions.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?no-check";
 import { isAddressChangeButtonText } from "../_shared/address-intent.ts";
+import { isCancellationRequestText } from "../_shared/cancellation-intent.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -481,10 +482,12 @@ async function applyOutcome(
     updates.assigned_at = null;
     updates.last_activity_at = null;
   } else if (outcome === "canceled") {
-    // IMPORTANT: WhatsApp button can only confirm orders, NEVER cancel them.
-    // We only flag the conversation/order so a human agent can decide.
-    // Do NOT change confirmation_status, agent_id, or confirmation_channel.
-    updates.whatsapp_note = "Customer requested cancellation via WhatsApp";
+    await routeCancellationToAgent({
+      order,
+      conversationId,
+      customerText: buttonText || "Cancellation button",
+    });
+    return;
   }
 
   // Snapshot fields we care about BEFORE update so we can write history deltas
@@ -523,6 +526,114 @@ async function applyOutcome(
 // for non-user actors (whatsapp / ai / system).
 // ---------------------------------------------------------------------------
 const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000";
+
+async function routeCancellationToAgent(args: {
+  order: any;
+  conversationId?: string | null;
+  customerText: string;
+}) {
+  const { order, conversationId, customerText } = args;
+  if (!order) return;
+
+  const nowIso = new Date().toISOString();
+  const currentStatus = String(order.confirmation_status || "").toLowerCase();
+  const releasable = !["confirmed", "booked", "shipped", "delivered", "canceled", "cancelled"]
+    .includes(currentStatus);
+  const note = `Customer requested cancellation via WhatsApp — retention call required. Message: ${customerText}`
+    .slice(0, 500);
+  const updates: Record<string, any> = {
+    whatsapp_status: "retention_call_required",
+    whatsapp_note: note,
+    whatsapp_last_reply_at: nowIso,
+  };
+  if (releasable) {
+    updates.confirmation_status = "new";
+    updates.confirmation_channel = "agent";
+    updates.agent_id = null;
+    updates.assigned_at = null;
+    updates.last_activity_at = null;
+  }
+
+  const { error: orderError } = await admin
+    .from("orders")
+    .update(updates)
+    .eq("order_id", order.order_id);
+  if (orderError) {
+    errLog("retention handoff: order update failed", order.order_id, orderError);
+    return;
+  }
+
+  let conv: any = null;
+  if (conversationId) {
+    const { data } = await admin
+      .from("whatsapp_conversations")
+      .update({
+        ai_enabled: false,
+        status: "needs_human",
+        outcome: null,
+        pending_button_intent: null,
+        updated_at: nowIso,
+      })
+      .eq("id", conversationId)
+      .select("*")
+      .maybeSingle();
+    conv = data;
+  }
+
+  await logOrderHistory({
+    orderId: order.order_id,
+    actionType: "whatsapp_retention_handoff",
+    role: "whatsapp",
+    before: {
+      confirmation_status: order.confirmation_status ?? null,
+      confirmation_channel: order.confirmation_channel ?? null,
+      agent_id: order.agent_id ?? null,
+    },
+    after: updates,
+    fields: ["confirmation_status", "confirmation_channel", "agent_id"],
+  });
+
+  if (!conv?.customer_phone) return;
+  const hasArabic = /[\u0600-\u06ff]/.test(customerText);
+  const hasFrench = /\b(?:annuler|annulation|commande|je ne veux plus)\b/i.test(customerText);
+  const reply = hasArabic
+    ? "وصلتنا رغبتك بإلغاء الطلب. ما لغينا الطلب تلقائياً؛ رح يتواصل معك أحد موظفينا هاتفياً بأقرب وقت ليساعدك 🙏"
+    : hasFrench
+    ? "Nous avons bien reçu votre demande. La commande n'est pas annulée automatiquement ; un membre de notre équipe vous appellera rapidement pour vous aider."
+    : "We received your request. The order was not cancelled automatically; a team member will call you shortly to assist you.";
+
+  try {
+    const settings = await getSettings();
+    const accessToken = settings?.access_token || Deno.env.get("WHATSAPP_META_ACCESS_TOKEN");
+    if (!settings || !accessToken) return;
+    const payload = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: conv.customer_phone,
+      type: "text",
+      text: { body: reply },
+    };
+    const response = await fetch(`${settings.api_base_url}/${settings.phone_number_id}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const responseJson = await response.json();
+    await admin.from("whatsapp_messages").insert({
+      conversation_id: conv.id,
+      order_id: order.order_id,
+      direction: "out",
+      message_type: "text",
+      body: reply,
+      payload,
+      meta_message_id: response.ok ? responseJson?.messages?.[0]?.id ?? null : null,
+      status: response.ok ? "sent" : "failed",
+      error_message: response.ok ? null : JSON.stringify(responseJson).slice(0, 500),
+    });
+  } catch (error) {
+    errLog("retention handoff: customer notification failed", (error as Error).message);
+  }
+}
 
 async function logOrderHistory(args: {
   orderId: string;
@@ -1173,6 +1284,15 @@ async function aiContinueReply(args: {
   const { conv, order } = args;
   if (!conv?.id) return;
 
+  if (order && isCancellationRequestText(args.customerText)) {
+    await routeCancellationToAgent({
+      order,
+      conversationId: conv.id,
+      customerText: args.customerText,
+    });
+    return;
+  }
+
   const { data: aiSettings } = await admin
     .from("whatsapp_ai_settings")
     .select("*")
@@ -1323,7 +1443,7 @@ async function aiContinueReply(args: {
     ? `\n\nProduct image: an official image of "${order.product_name}" is available. If the customer asks for a photo / picture / image of the product (in any language: "تصويرة", "صورة", "tswira", "photo", "image", "pic", "send me the picture", "بعتلي صورة", etc.), CALL the tool \`send_product_image\` to send it as a real WhatsApp image. After calling the tool, write a short natural reply confirming you sent the photo. Never paste the image URL as text.`
     : `\n\nProduct image: no official product image is available. If the customer asks for a photo, politely apologize and offer more details instead. Do NOT call \`send_product_image\`.`;
   const cancelRule = order
-    ? `\n\nCANCELLATION HANDLING (CRITICAL):\n- If the customer wants to cancel (for example "cancel", "annuler", "إلغاء", "الغاء", "ما بدي الطلب", "مش بدي ياه", "I don't want it", "remove order", or "stop"), do not claim the cancellation is final and do not change the order yourself.\n- The order is currently "${order.confirmation_status}". Only a human agent can finalize cancellation.\n- Ask briefly and respectfully why they want to cancel, then address their concern only with facts available in context. Never pressure or argue.\n- You cannot offer a discount. If price is the reason ("غالي", "expensive", "cher") and the customer might buy with a better price, call \`flag_for_human_discount\`; do not promise an amount.\n- If the customer firmly insists, call \`handoff_to_agent\` and tell them a team member will handle the request. Keep replies to 1-3 lines.`
+    ? `\n\nCANCELLATION HANDLING (CRITICAL):\n- Never cancel an order automatically.\n- Any cancellation request must be transferred immediately to a human agent for a retention call.\n- Do not negotiate, promise a discount, or claim the cancellation is final.\n- Call \`handoff_to_agent\` and tell the customer briefly that a team member will call them shortly.`
     : "";
 
   // Pending button intent — when admin configured "AI gates the button", the
