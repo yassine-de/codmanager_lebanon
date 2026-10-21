@@ -5,6 +5,7 @@
 // Foundation of the WhatsApp automation system: stores messages, links them to
 // conversations and orders, and triggers CRM logic for button actions.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?no-check";
+import { isAddressChangeButtonText } from "../_shared/address-intent.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1688,6 +1689,7 @@ async function tryExtractAndConfirmAddress(args: {
   const alreadyDeliverable = isAddressDeliverable(order.customer_address, order.customer_city);
   const pendingIntent = (conv as any)?.pending_button_intent ?? null;
   const hasPendingIntent = !!pendingIntent;
+  const addressChangeRequested = isAddressChangeButtonText(pendingIntent?.button_text);
   if (
     order.confirmation_status === "confirmed" &&
     alreadyDeliverable &&
@@ -1739,7 +1741,8 @@ async function tryExtractAndConfirmAddress(args: {
 
   if (
     alreadyDeliverable &&
-    order.confirmation_status !== "confirmed"
+    order.confirmation_status !== "confirmed" &&
+    !addressChangeRequested
   ) {
     const trackedFields = [
       "confirmation_status",
@@ -1796,6 +1799,13 @@ async function tryExtractAndConfirmAddress(args: {
       city: order.customer_city,
     });
     return;
+  }
+
+  if (alreadyDeliverable && addressChangeRequested) {
+    log("address-extract: ignoring stored address after change request", {
+      order: order.order_id,
+      button: pendingIntent?.button_text ?? null,
+    });
   }
 
   // Load Wakilni areas for matching (non-blocking — if the cache is empty we

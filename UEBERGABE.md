@@ -183,16 +183,28 @@ gespeichert. Deshalb lehnte die aktive Datenbankregel das Speichern dort ab.
 Der Dialog verwendet jetzt ebenfalls dasselbe Dropdown; bei `Other` ist das
 Feld `Info` verpflichtend.
 
+## WhatsApp-Adressbestätigung (21.10.2026)
+
+Die Automation `New Order Confirmation Lebanon` ist vorhanden. Beim internen
+Test `WA-TEST-20261019-02` wurde ein Fehler im Pfad `Adresse ändern` gefunden:
+Die neue libanesische Adresse wurde vom Bot verstanden, die Bestellung wurde
+aber mit der bereits gespeicherten Berliner Adresse bestätigt.
+
+Ursache war die Abkürzung für bereits zustellbare Adressen im Webhook. Sie
+wurde so begrenzt, dass nach einem Button wie `تعديل العنوان`, `Edit address`
+oder `Modifier l'adresse` zuerst die neue Kundenantwort extrahiert und
+gespeichert werden muss. Erst danach darf die Bestellung bestätigt werden.
+`whatsapp-webhook` Version 10 ist aktiv. Der bestehende Testdatensatz wurde
+nicht nachträglich verändert.
+
 ## Empfohlener nächster Schritt
 
-Eine einzige Automation `New Order Confirmation Lebanon` erstellen:
-
-1. Trigger: neue Bestellung für den WhatsApp-Bestätigungskanal
-2. Template senden: `new_order_confirmation_lb_ar`
-3. Auf Button oder Kundenantwort warten
-4. AI nur für Rückfragen bzw. eine fehlende/unvollständige Adresse übernehmen lassen
-5. Zunächst mit genau einer internen Testbestellung testen
-6. Erst nach erfolgreichem Test Full Auto Reply oder Wakilni-Autobuchung aktivieren
+1. Den internen Testauftrag kontrolliert auf den Zustand vor der
+   Adressbestätigung zurücksetzen oder einen neuen Testauftrag anlegen.
+2. `Adresse ändern` wählen und eine vollständige libanesische Adresse senden.
+3. Prüfen, dass `customer_address` und `customer_city` aktualisiert wurden.
+4. Erst danach prüfen, dass `confirmation_status = confirmed` gesetzt wurde.
+5. Wakilni-Autobuchung erst nach diesem erfolgreichen End-to-End-Test aktivieren.
 
 ## Einrichtung auf einem anderen Rechner
 
@@ -230,8 +242,9 @@ Vor der Übergabe ausgeführt:
 - beide WhatsApp-Funktionen deployt: erfolgreich
 - Webhook-Handshake: erfolgreich
 - Meta-Template-Synchronisierung: erfolgreich, Template `APPROVED`
-- `npm test`: 3 Testdateien / 9 Tests erfolgreich
+- `npm test`: 4 Testdateien / 18 Tests erfolgreich
 - `npm run build`: erfolgreich
+- `whatsapp-webhook` Version 10 deployt und als `ACTIVE` geprüft
 - Produktionsbundle enthält die neue Stornierungsgrund-Oberfläche: erfolgreich
 - Datenbanktrigger `require_cancel_reason_on_orders`: aktiv
 - Datenbankregel mit temporärer Testtabelle geprüft: grundlose Stornierung
