@@ -1383,7 +1383,7 @@ async function aiContinueReply(args: {
   if (order?.product_name) {
     const { data: p } = await admin
       .from("products")
-      .select("id,name,image_url,scraped_image_url,price,product_url,ai_context,ai_context_scraped_at")
+      .select("id,name,image_url,scraped_image_url,price,product_url,ai_context,ai_context_manual,ai_context_scraped_at")
       .ilike("name", order.product_name.trim())
       .maybeSingle();
     product = p;
@@ -1424,8 +1424,17 @@ async function aiContinueReply(args: {
     : (product?.scraped_image_url && /^https?:\/\//i.test(product.scraped_image_url) ? product.scraped_image_url : null);
   const hasProductImage = !!effectiveImageUrl;
 
-  const productContext: string = product?.ai_context
-    ? `\n\nProduct details (from store page — use to answer customer questions about features, materials, sizes, colors, usage, etc. Stay accurate, do NOT invent facts not in this text):\n${product.ai_context}`
+  const productContextParts: string[] = [];
+  if (product?.ai_context_manual?.trim()) {
+    productContextParts.push(
+      `Verified product knowledge (reviewed by an admin — prioritize this when answering):\n${product.ai_context_manual.trim()}`,
+    );
+  }
+  if (product?.ai_context?.trim()) {
+    productContextParts.push(`Automatically extracted store-page details:\n${product.ai_context.trim()}`);
+  }
+  const productContext: string = productContextParts.length
+    ? `\n\nProduct details — use these to answer questions about benefits, ingredients, variants, price and usage. Stay accurate, phrase marketing benefits as intended/claimed benefits rather than guaranteed results, and do NOT invent facts not listed here:\n${productContextParts.join("\n\n")}`
     : "";
 
   const orderCtx = order

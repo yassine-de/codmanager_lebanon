@@ -235,6 +235,19 @@ mit `DrMelaxin ضد التجاعيد` erfolgreich geprüft und der interne Testa
 Produkteigenschaften werden nicht erfunden; dafür muss die Shopseite eine
 Beschreibung enthalten.
 
+Da die DrMelaxin-Landingpage ihre Produktvorteile fast ausschließlich als
+Grafiken ausliefert, gibt es nun zusätzlich `products.ai_context_manual` für
+von einem Admin geprüftes Produktwissen. Dieses Feld wird beim automatischen
+Neuladen der Shopseite nicht überschrieben und von der WhatsApp-AI priorisiert.
+Auf der Admin-Produktdetailseite kann es unter `Verified product knowledge`
+bearbeitet werden. Für `DrMelaxin ضد التجاعيد` wurden die Angaben der
+Landingpage zu Retinol, Kollagen, Perlenextrakt, Koffein, Anwendungsbereichen,
+Varianten und Preisangeboten hinterlegt. Wirkversprechen muss die AI als
+beabsichtigte bzw. beworbene Vorteile formulieren, nicht als garantierte
+medizinische Ergebnisse. Die Migration
+`20261021133000_add_verified_product_ai_context.sql` wurde live ausgeführt und
+in der Migrationshistorie als angewendet registriert.
+
 ## Empfohlener nächster Schritt
 
 1. Den internen Testauftrag kontrolliert auf den Zustand vor der
@@ -280,9 +293,12 @@ Vor der Übergabe ausgeführt:
 - beide WhatsApp-Funktionen deployt: erfolgreich
 - Webhook-Handshake: erfolgreich
 - Meta-Template-Synchronisierung: erfolgreich, Template `APPROVED`
-- `npm test`: 4 Testdateien / 18 Tests erfolgreich
+- `npm test`: 5 Testdateien / 31 Tests erfolgreich
 - `npm run build`: erfolgreich
-- `whatsapp-webhook` Version 11 deployt und als `ACTIVE` geprüft
+- DrMelaxin-Produktwissen live gespeichert: 1.742 Zeichen
+- `whatsapp-webhook` mit kombiniertem geprüftem und automatisch extrahiertem
+  Produktkontext deployt
+- `whatsapp-webhook` Version 13 deployt und als `ACTIVE` geprüft
 - Produktionsbundle enthält die neue Stornierungsgrund-Oberfläche: erfolgreich
 - Datenbanktrigger `require_cancel_reason_on_orders`: aktiv
 - Datenbankregel mit temporärer Testtabelle geprüft: grundlose Stornierung
@@ -310,6 +326,7 @@ WhatsApp-Änderung neu eingeführter Befund.
 - `src/lib/productVariants.ts`
 - `supabase/migrations/20261019193000_require_agent_variant_before_confirmation.sql`
 - `supabase/migrations/20261019194500_require_cancel_reason.sql`
+- `supabase/migrations/20261021133000_add_verified_product_ai_context.sql`
 
 Hinweis zur Migration: Die AI-Einstellungen wurden bereits direkt in der
 Live-Datenbank aktualisiert. Die neue Migration hält denselben Sollzustand im

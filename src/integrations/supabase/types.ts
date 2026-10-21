@@ -819,6 +819,7 @@ export type Database = {
         Row: {
           active: boolean
           ai_context: string | null
+          ai_context_manual: string | null
           ai_context_scraped_at: string | null
           created_at: string
           display_id: string | null
@@ -846,6 +847,7 @@ export type Database = {
         Insert: {
           active?: boolean
           ai_context?: string | null
+          ai_context_manual?: string | null
           ai_context_scraped_at?: string | null
           created_at?: string
           display_id?: string | null
@@ -873,6 +875,7 @@ export type Database = {
         Update: {
           active?: boolean
           ai_context?: string | null
+          ai_context_manual?: string | null
           ai_context_scraped_at?: string | null
           created_at?: string
           display_id?: string | null

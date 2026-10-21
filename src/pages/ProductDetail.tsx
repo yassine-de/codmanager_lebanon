@@ -18,6 +18,8 @@ export default function ProductDetail() {
   const { authUser } = useAuth();
   const isAdmin = authUser?.role === "admin";
   const [refreshingCtx, setRefreshingCtx] = useState(false);
+  const [manualAiContext, setManualAiContext] = useState("");
+  const [savingManualCtx, setSavingManualCtx] = useState(false);
 
   const isDbId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || "");
 
@@ -30,7 +32,7 @@ export default function ProductDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("*, variants, weight, ai_context, ai_context_scraped_at")
+        .select("*, variants, weight, ai_context, ai_context_manual, ai_context_scraped_at")
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
@@ -38,6 +40,10 @@ export default function ProductDetail() {
     },
     enabled: isDbId && !mockProduct,
   });
+
+  useEffect(() => {
+    setManualAiContext(dbProduct?.ai_context_manual || "");
+  }, [dbProduct?.id, dbProduct?.ai_context_manual]);
 
   const handleRefreshAiContext = async () => {
     if (!dbProduct?.id) return;
@@ -58,6 +64,25 @@ export default function ProductDetail() {
       toast.error(e?.message || "Failed to scrape store page");
     } finally {
       setRefreshingCtx(false);
+    }
+  };
+
+  const handleSaveManualAiContext = async () => {
+    if (!dbProduct?.id) return;
+    setSavingManualCtx(true);
+    try {
+      const value = manualAiContext.trim() || null;
+      const { error } = await supabase
+        .from("products")
+        .update({ ai_context_manual: value })
+        .eq("id", dbProduct.id);
+      if (error) throw error;
+      toast.success("Verified AI product knowledge saved");
+      await refetchProduct();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to save product knowledge");
+    } finally {
+      setSavingManualCtx(false);
     }
   };
 
@@ -396,6 +421,31 @@ export default function ProductDetail() {
           <p className="text-[11px] text-muted-foreground mb-3">
             The WhatsApp AI assistant uses this content (scraped from the Store URL) to answer customer questions about the product. Cached for 7 days.
           </p>
+          <div className="mb-4">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div>
+                <div className="text-xs font-medium">Verified product knowledge</div>
+                <div className="text-[11px] text-muted-foreground">
+                  Add facts shown in images or videos. This content is preserved when the store page is refreshed.
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleSaveManualAiContext}
+                disabled={savingManualCtx || manualAiContext === (dbProduct?.ai_context_manual || "")}
+                className="h-8"
+              >
+                {savingManualCtx ? "Saving..." : "Save"}
+              </Button>
+            </div>
+            <textarea
+              value={manualAiContext}
+              onChange={(event) => setManualAiContext(event.target.value)}
+              placeholder="Verified benefits, ingredients, usage instructions, variants, and important limitations..."
+              className="min-h-36 w-full resize-y rounded-md border bg-background px-3 py-2 text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+          <div className="text-xs font-medium mb-2">Automatically extracted store-page text</div>
           {!dbProduct?.product_url ? (
             <div className="text-xs text-muted-foreground bg-muted/40 border border-dashed rounded-md p-4 text-center">
               No Store URL set on this product. Add one in product settings to enable AI context.
