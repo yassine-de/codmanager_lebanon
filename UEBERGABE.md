@@ -249,15 +249,14 @@ medizinische Ergebnisse. Die Migration
 in der Migrationshistorie als angewendet registriert.
 
 Der funktionierende `new_order`-Ablauf aus Pakistan wurde mit der Lebanon-
-Konfiguration abgeglichen. Der Lebanon-Flow war technisch vollständig und in
-Live-Tests erfolgreich, stand aber noch auf `draft`. Die Automation
-`New Order Confirmation Lebanon` (`fb4bf6e8-2d8b-4350-a51c-ad143939a081`) ist
-jetzt produktiv `active`. Wie in Pakistan übernimmt ein Mitarbeiter nach 30
-Minuten ohne erfolgreiche Automationsfortsetzung. Lebanon behält zusätzlich
-die expliziten Adressbuttons `نعم، صحيح` und `تعديل العنوان`: Kaufabsicht,
+Konfiguration abgeglichen. Lebanon behält zusätzlich die expliziten
+Adressbuttons `نعم، صحيح` und `تعديل العنوان`: Kaufabsicht,
 Adressbestätigung und finale Bestellbestätigung bleiben getrennte Schritte.
-Die Aktivierung ist in
-`20261021134000_activate_lebanon_whatsapp_confirmation.sql` festgehalten.
+Die Automation `New Order Confirmation Lebanon`
+(`fb4bf6e8-2d8b-4350-a51c-ad143939a081`) bleibt bis zum vollständigen
+End-to-End-Test auf `draft`; auch der zeitgesteuerte Mitarbeiter-Fallback ist
+bis dahin deaktiviert. Eine versehentliche kurzfristige Aktivierung wurde mit
+`20261021135000_pause_lebanon_whatsapp_confirmation.sql` sofort zurückgenommen.
 
 ## Empfohlener nächster Schritt
 
@@ -339,6 +338,7 @@ WhatsApp-Änderung neu eingeführter Befund.
 - `supabase/migrations/20261019194500_require_cancel_reason.sql`
 - `supabase/migrations/20261021133000_add_verified_product_ai_context.sql`
 - `supabase/migrations/20261021134000_activate_lebanon_whatsapp_confirmation.sql`
+- `supabase/migrations/20261021135000_pause_lebanon_whatsapp_confirmation.sql`
 
 Hinweis zur Migration: Die AI-Einstellungen wurden bereits direkt in der
 Live-Datenbank aktualisiert. Die neue Migration hält denselben Sollzustand im
