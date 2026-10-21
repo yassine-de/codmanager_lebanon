@@ -1,7 +1,7 @@
 // @ts-nocheck
 // Sync WhatsApp message templates with Meta Cloud API.
 // Modes:
-//   - submit: Create/submit a template to Meta for approval (POST /{waba_id}/message_templates)
+//   - submit: Create a template or update an existing Meta template
 //   - refresh: Pull template statuses from Meta and update local rows
 //   - delete: Delete a template on Meta (DELETE /{waba_id}/message_templates?name=...)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?no-check";
@@ -119,14 +119,23 @@ Deno.serve(async (req) => {
         .replace(/[^a-z0-9_]/g, "_")
         .slice(0, 60);
 
-      const payload = {
-        name: metaName,
-        language: t.language || "en",
-        category: t.category || "UTILITY",
-        components: buildComponents(t),
-      };
+      const isUpdate = !!t.meta_template_id;
+      const payload = isUpdate
+        ? {
+            category: t.category || "UTILITY",
+            components: buildComponents(t),
+          }
+        : {
+            name: metaName,
+            language: t.language || "en",
+            category: t.category || "UTILITY",
+            components: buildComponents(t),
+          };
+      const submitUrl = isUpdate
+        ? `${base}/${t.meta_template_id}`
+        : `${base}/${s.waba_id}/message_templates`;
 
-      const r = await fetch(`${base}/${s.waba_id}/message_templates`, {
+      const r = await fetch(submitUrl, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${s.access_token}`,
@@ -137,7 +146,7 @@ Deno.serve(async (req) => {
       let data = await r.json();
       if (!r.ok) {
         const reason = data?.error?.error_user_msg || data?.error?.message || JSON.stringify(data);
-        const isDuplicate =
+        const isDuplicate = !isUpdate &&
           /déjà du contenu|already exists|already has content|duplicate/i.test(reason);
 
         if (isDuplicate) {
@@ -179,13 +188,13 @@ Deno.serve(async (req) => {
         .from("whatsapp_templates")
         .update({
           sync_status: (data.status || "PENDING").toUpperCase(),
-          meta_template_id: data.id ? String(data.id) : null,
+          meta_template_id: data.id ? String(data.id) : t.meta_template_id || null,
           meta_template_name: metaName,
           rejection_reason: null,
           last_synced_at: new Date().toISOString(),
         })
         .eq("id", id);
-      return json(200, { ok: true, meta: data });
+      return json(200, { ok: true, updated: isUpdate, meta: data });
     }
 
     if (mode === "refresh") {

@@ -204,6 +204,12 @@ danach bestätigt. Zusätzlich wird der interne WhatsApp-Hinweis nach einem
 erfolgreichen Adresswechsel nun ebenfalls auf den abgeschlossenen Zustand
 gesetzt.
 
+Am 21.10.2026 wurde der Footer der Meta-Vorlage
+`new_order_confirmation_lb_ar` von `COD Lebanon` auf `QH Shop` geändert.
+Die Vorlagen-Synchronisierung unterstützt nun Updates über die bestehende
+Meta-Template-ID statt beim Speichern ein Duplikat anzulegen. Meta hat das
+Update angenommen; direkt nach dem Einreichen war der Status `PENDING`.
+
 ## Empfohlener nächster Schritt
 
 1. Den internen Testauftrag kontrolliert auf den Zustand vor der
