@@ -4,6 +4,8 @@ import { isKnownCancelReason, resolveCancelReason } from "@/lib/cancellationReas
 describe("cancellation reasons", () => {
   it("recognizes configured reasons", () => {
     expect(isKnownCancelReason("high_price")).toBe(true);
+    expect(isKnownCancelReason("did_not_order")).toBe(true);
+    expect(isKnownCancelReason("ordered_by_mistake")).toBe(true);
     expect(isKnownCancelReason("customer_changed_mind")).toBe(false);
   });
 

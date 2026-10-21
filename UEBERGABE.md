@@ -152,6 +152,9 @@ Verfügbare Gründe:
 - `Product Issue`
 - `Not Convinced`
 - `Quality Issue`
+- `No Longer Wants`
+- `Didn't Order`
+- `Ordered by Mistake`
 - `Other`
 
 Bei `Other` ist das Notizfeld verpflichtend; der eingegebene Text wird als
