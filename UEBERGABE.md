@@ -249,14 +249,18 @@ medizinische Ergebnisse. Die Migration
 in der Migrationshistorie als angewendet registriert.
 
 Der funktionierende `new_order`-Ablauf aus Pakistan wurde mit der Lebanon-
-Konfiguration abgeglichen. Lebanon behält zusätzlich die expliziten
-Adressbuttons `نعم، صحيح` und `تعديل العنوان`: Kaufabsicht,
-Adressbestätigung und finale Bestellbestätigung bleiben getrennte Schritte.
+Konfiguration abgeglichen. Die Pakistan-Logik für bereits vollständige
+Adressen wurde übernommen: Der erste Bestätigungsbutton bestätigt die
+Bestellung sofort, wenn eine lieferbare Adresse gespeichert ist. Nur bei
+fehlender oder zu vager Adresse übernimmt die AI die Adressabfrage. Die zuvor
+ergänzten separaten Adressbuttons wurden aus dem Draft-Flow entfernt.
 Die Automation `New Order Confirmation Lebanon`
 (`fb4bf6e8-2d8b-4350-a51c-ad143939a081`) bleibt bis zum vollständigen
 End-to-End-Test auf `draft`; auch der zeitgesteuerte Mitarbeiter-Fallback ist
 bis dahin deaktiviert. Eine versehentliche kurzfristige Aktivierung wurde mit
 `20261021135000_pause_lebanon_whatsapp_confirmation.sql` sofort zurückgenommen.
+Die neue Entscheidungslogik und der vereinfachte Draft-Flow sind in
+`20261021140000_adopt_pakistan_direct_confirmation.sql` festgehalten.
 
 ## Empfohlener nächster Schritt
 
@@ -303,12 +307,13 @@ Vor der Übergabe ausgeführt:
 - beide WhatsApp-Funktionen deployt: erfolgreich
 - Webhook-Handshake: erfolgreich
 - Meta-Template-Synchronisierung: erfolgreich, Template `APPROVED`
-- `npm test`: 5 Testdateien / 31 Tests erfolgreich
+- `npm test`: 5 Testdateien / 35 Tests erfolgreich
 - `npm run build`: erfolgreich
 - DrMelaxin-Produktwissen live gespeichert: 1.742 Zeichen
 - `whatsapp-webhook` mit kombiniertem geprüftem und automatisch extrahiertem
   Produktkontext deployt
-- `whatsapp-webhook` Version 13 deployt und als `ACTIVE` geprüft
+- `whatsapp-webhook` Version 14 deployt und als `ACTIVE` geprüft
+- `whatsapp-automation-runner` Version 9 deployt und als `ACTIVE` geprüft
 - Produktionsbundle enthält die neue Stornierungsgrund-Oberfläche: erfolgreich
 - Datenbanktrigger `require_cancel_reason_on_orders`: aktiv
 - Datenbankregel mit temporärer Testtabelle geprüft: grundlose Stornierung
@@ -339,6 +344,7 @@ WhatsApp-Änderung neu eingeführter Befund.
 - `supabase/migrations/20261021133000_add_verified_product_ai_context.sql`
 - `supabase/migrations/20261021134000_activate_lebanon_whatsapp_confirmation.sql`
 - `supabase/migrations/20261021135000_pause_lebanon_whatsapp_confirmation.sql`
+- `supabase/migrations/20261021140000_adopt_pakistan_direct_confirmation.sql`
 
 Hinweis zur Migration: Die AI-Einstellungen wurden bereits direkt in der
 Live-Datenbank aktualisiert. Die neue Migration hält denselben Sollzustand im

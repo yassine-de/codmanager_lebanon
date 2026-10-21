@@ -9,6 +9,7 @@
 //
 // Node types supported: send_template, send_message, ai_step, condition, delay, add_tag, remove_tag.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?no-check";
+import { shouldConfirmWithStoredAddress } from "../_shared/address-intent.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -900,17 +901,22 @@ async function applyButtonAction(opts: {
   const { action, order, conversationId, buttonText } = opts;
   if (!action) return;
 
-  // Confirming the purchase and confirming its delivery address are separate
-  // customer decisions. Always gate a confirm button so the next flow step can
-  // read the stored address back (or request a missing one) before finalizing.
+  // Match the proven Pakistan flow: a purchase confirmation is final when a
+  // deliverable address is already stored. Only missing/weak addresses are
+  // gated through AI collection.
   const wantsConfirm =
     action.status === "confirmed" ||
     action.intent_kind === "confirm";
   const storedAddrDeliverable = !!order && isAddressDeliverable(order.customer_address, order.customer_city);
-  const requireAddressConfirmation =
-    wantsConfirm && !!order && (action.address_confirmed !== true || !storedAddrDeliverable);
-  const aiGated = requireAddressConfirmation || action.ai_gate === "validate";
-  const wantsTakeover = action.ai_takeover === true || aiGated;
+  const directConfirmWithStoredAddress = shouldConfirmWithStoredAddress(
+    wantsConfirm,
+    storedAddrDeliverable,
+  );
+  const requireAddressCollection = wantsConfirm && !!order && !storedAddrDeliverable;
+  const aiGated = !directConfirmWithStoredAddress &&
+    (requireAddressCollection || action.ai_gate === "validate");
+  const wantsTakeover = !directConfirmWithStoredAddress &&
+    (action.ai_takeover === true || aiGated);
 
   // 1) AI takeover (gated buttons always force takeover so AI drives the convo)
   if (conversationId && wantsTakeover) {
@@ -948,9 +954,7 @@ async function applyButtonAction(opts: {
 
     // Still flag the order so admins see customer interaction, but DON'T touch status.
     const noteText = wantsConfirm
-      ? storedAddrDeliverable
-        ? `Customer clicked "${buttonText}" — awaiting explicit address confirmation`
-        : `Customer clicked "${buttonText}" — awaiting full delivery address`
+      ? `Customer clicked "${buttonText}" — awaiting full delivery address`
       : `Customer clicked "${buttonText}" — AI validating (${intentKind})`;
     await admin
       .from("orders")
@@ -964,13 +968,15 @@ async function applyButtonAction(opts: {
   }
 
   // 3) Non-gated path: apply mapping immediately (legacy).
-  const noteFlag = `Customer clicked "${buttonText}" on WhatsApp`;
+  const noteFlag = directConfirmWithStoredAddress
+    ? `Customer clicked "${buttonText}" — auto-confirmed (address on file)`
+    : `Customer clicked "${buttonText}" on WhatsApp`;
   const updates: Record<string, any> = {
     whatsapp_note: noteFlag,
     whatsapp_last_reply_at: new Date().toISOString(),
   };
   const finalAddressConfirmation =
-    action.address_confirmed === true && wantsConfirm && storedAddrDeliverable;
+    wantsConfirm && storedAddrDeliverable && status === "confirmed";
   if (finalAddressConfirmation) updates.whatsapp_status = "confirmed";
 
   if (hasMappedStatus) {

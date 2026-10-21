@@ -5,7 +5,10 @@
 // Foundation of the WhatsApp automation system: stores messages, links them to
 // conversations and orders, and triggers CRM logic for button actions.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?no-check";
-import { isAddressChangeButtonText } from "../_shared/address-intent.ts";
+import {
+  isAddressChangeButtonText,
+  shouldConfirmWithStoredAddress,
+} from "../_shared/address-intent.ts";
 import { isCancellationRequestText } from "../_shared/cancellation-intent.ts";
 
 const corsHeaders = {
@@ -427,9 +430,9 @@ export function isAddressDeliverable(addr?: string | null, city?: string | null)
 // Apply CRM updates for a button action. Mirrors whatsapp-action logic so
 // behavior stays consistent between manual Inbox actions and automated webhook.
 //
-// ADDRESS-GATING (CRITICAL): a confirm button confirms purchase intent only.
-// The customer must then explicitly approve the stored delivery address or
-// provide a replacement before tryExtractAndConfirmAddress() finalizes it.
+// ADDRESS-GATING: match the proven Pakistan flow. A confirm button finalizes
+// immediately when a deliverable address is already stored. Otherwise AI
+// collects a complete address before tryExtractAndConfirmAddress() finalizes.
 async function applyOutcome(
   order: any,
   outcome: "confirmed" | "more_info" | "canceled",
@@ -443,10 +446,62 @@ async function applyOutcome(
   };
 
   // ── Address-gated confirm path ────────────────────────────────────────────
-  // Always gate here. The automation's next step reads a complete stored
-  // address back to the customer, or asks for a full address when it is weak.
+  // A complete stored address can be used immediately. Missing/weak addresses
+  // remain gated and are collected by AI before confirmation.
   if (outcome === "confirmed") {
     const addrLooksDeliverable = isAddressDeliverable(order.customer_address, order.customer_city);
+
+    if (shouldConfirmWithStoredAddress(true, addrLooksDeliverable)) {
+      const alreadyConfirmed = order.confirmation_status === "confirmed";
+      const trackedFields = ["confirmation_status", "delivery_status", "shipping_status"];
+      const before: Record<string, any> = {};
+      for (const f of trackedFields) before[f] = order[f] ?? null;
+
+      const confirmUpdate: Record<string, any> = {
+        confirmation_status: "confirmed",
+        confirmation_channel: "whatsapp",
+        confirmed_at: order.confirmed_at || new Date().toISOString(),
+        whatsapp_status: "confirmed",
+        whatsapp_last_reply_at: new Date().toISOString(),
+        whatsapp_note: `Customer clicked "${buttonText || "YES"}" — auto-confirmed (address on file)`,
+      };
+      if (settings?.auto_book_shipping) {
+        const ds = String(order.delivery_status ?? "").toLowerCase();
+        const blockBooking = ["booked", "shipped", "in_transit", "delivered", "returned"].includes(ds);
+        if (!blockBooking) {
+          confirmUpdate.delivery_status = "booked";
+          confirmUpdate.shipping_status = "Booked";
+        }
+      }
+      await admin.from("orders").update(confirmUpdate).eq("order_id", order.order_id);
+
+      if (conversationId) {
+        await admin
+          .from("whatsapp_conversations")
+          .update({
+            status: "confirmed",
+            outcome: "confirmed",
+            pending_button_intent: null,
+            ai_enabled: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", conversationId);
+      }
+      if (!alreadyConfirmed) {
+        try {
+          await logOrderHistory({
+            orderId: order.order_id,
+            actionType: "ai_confirm",
+            role: "ai",
+            before,
+            after: confirmUpdate,
+            fields: trackedFields,
+          });
+        } catch (_) { /* non-blocking */ }
+      }
+      log("button confirm: stored-address auto-confirmed", order.order_id);
+      return;
+    }
 
     if (conversationId) {
       await admin
@@ -467,13 +522,11 @@ async function applyOutcome(
       .from("orders")
       .update({
         whatsapp_status: "pending_address",
-        whatsapp_note: addrLooksDeliverable
-          ? `Customer clicked "${buttonText || "YES"}" — awaiting explicit address confirmation`
-          : `Customer clicked "${buttonText || "YES"}" — awaiting full delivery address`,
+        whatsapp_note: `Customer clicked "${buttonText || "YES"}" — awaiting full delivery address`,
         whatsapp_last_reply_at: new Date().toISOString(),
       })
       .eq("order_id", order.order_id);
-    log("button confirm gated: awaiting explicit address confirmation", order.order_id);
+    log("button confirm gated: awaiting full delivery address", order.order_id);
     return;
   } else if (outcome === "more_info") {
     updates.confirmation_status = String(order.confirmation_status || "").toLowerCase() === "no_answer" ? "no_answer" : "new";
