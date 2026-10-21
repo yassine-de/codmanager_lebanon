@@ -22,6 +22,92 @@ const redactSecret = (value: string) => {
   return `${value.slice(0, 4)}…${value.slice(-4)}`;
 };
 
+function decodeHtml(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#(\d+);/g, (_m, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_m, n) => String.fromCodePoint(parseInt(n, 16)));
+}
+
+function extractMeta(html: string, key: string): string {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const patterns = [
+    new RegExp(`<meta[^>]+(?:name|property)=["']${escaped}["'][^>]+content=["']([^"']*)["'][^>]*>`, "i"),
+    new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+(?:name|property)=["']${escaped}["'][^>]*>`, "i"),
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) return decodeHtml(match[1].trim());
+  }
+  return "";
+}
+
+async function scrapeDirect(url: string) {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; CODManagerProductBot/1.0)",
+      Accept: "text/html,application/xhtml+xml",
+    },
+    signal: AbortSignal.timeout(25_000),
+  });
+  if (!response.ok) throw new Error(`store page returned ${response.status}`);
+  const html = await response.text();
+  const title = extractMeta(html, "og:title") ||
+    decodeHtml(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || "");
+  const description = extractMeta(html, "description") || extractMeta(html, "og:description");
+  let image = extractMeta(html, "og:image") || extractMeta(html, "twitter:image") || null;
+  let structuredProduct: any = null;
+  const productAttribute = html.match(/:product=["']([\s\S]*?)["']\s*(?:[:@][\w-]+=|>)/i)?.[1];
+  if (productAttribute) {
+    try {
+      structuredProduct = JSON.parse(decodeHtml(productAttribute));
+      if (!image && /^https?:\/\//i.test(structuredProduct?.thumbnail || "")) {
+        image = structuredProduct.thumbnail;
+      }
+    } catch {
+      structuredProduct = null;
+    }
+  }
+
+  const visibleText = decodeHtml(
+    html
+      .replace(/<(script|style|noscript|template|svg)[^>]*>[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<(?:br|\/p|\/div|\/section|\/article|\/li|\/h[1-6])\s*>/gi, "\n")
+      .replace(/<[^>]+>/g, " "),
+  )
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line, index, all) => line.length > 1 && line !== all[index - 1])
+    .join("\n");
+  const variants = Array.isArray(structuredProduct?.variants)
+    ? structuredProduct.variants
+        .map((variant: any) => Object.values(variant?.variations || {}).join(" / "))
+        .filter(Boolean)
+    : [];
+  const structuredText = structuredProduct
+    ? [
+        structuredProduct.name ? `Product: ${structuredProduct.name}` : null,
+        structuredProduct.description ? `Description: ${structuredProduct.description}` : null,
+        Number.isFinite(structuredProduct.price) ? `Price: ${structuredProduct.price}` : null,
+        Number.isFinite(structuredProduct.compare_at_price)
+          ? `Previous/compare price: ${structuredProduct.compare_at_price}`
+          : null,
+        variants.length ? `Available options: ${variants.join(", ")}` : null,
+      ].filter(Boolean).join("\n")
+    : "";
+  const text = [structuredText, visibleText]
+    .filter(Boolean)
+    .join("\n\n")
+    .slice(0, MAX_CONTEXT_CHARS);
+  if (!text) throw new Error("store page contained no readable text");
+  return { markdown: text, metadata: { title, description, ogImage: image } };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") {
@@ -42,19 +128,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
-    if (!FIRECRAWL_API_KEY) {
-      errLog("missing FIRECRAWL_API_KEY");
-      return new Response(JSON.stringify({ error: "FIRECRAWL_API_KEY not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    log("firecrawl key detected", {
-      length: FIRECRAWL_API_KEY.length,
-      fingerprint: redactSecret(FIRECRAWL_API_KEY),
-    });
+    const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY") || "";
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -98,42 +172,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    log("scraping", { productId, url });
-    const fcRes = await fetch(FIRECRAWL_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        url,
-        formats: ["markdown"],
-        onlyMainContent: true,
-      }),
-    });
-
-    const fcJson: any = await fcRes.json().catch(() => ({}));
-    if (!fcRes.ok) {
-      errLog("firecrawl failed", fcRes.status, {
-        details: fcJson?.error || null,
-        keyFingerprint: redactSecret(FIRECRAWL_API_KEY),
-        keyLength: FIRECRAWL_API_KEY.length,
-      });
-
-      const isUnauthorized = fcRes.status === 401;
-      return new Response(
-        JSON.stringify({
-          error: isUnauthorized ? "Firecrawl authentication failed" : `firecrawl error ${fcRes.status}`,
-          details: isUnauthorized
-            ? "The Firecrawl API key configured in Lovable Cloud is invalid or expired. Update FIRECRAWL_API_KEY and redeploy the function."
-            : fcJson?.error || null,
-        }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    log("scraping", { productId, url, provider: FIRECRAWL_API_KEY ? "firecrawl" : "direct" });
+    let data: any = null;
+    if (FIRECRAWL_API_KEY) {
+      try {
+        const fcRes = await fetch(FIRECRAWL_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
+        });
+        const fcJson: any = await fcRes.json().catch(() => ({}));
+        if (fcRes.ok) data = fcJson?.data ?? fcJson;
+        else errLog("firecrawl failed; using direct fallback", fcRes.status, fcJson?.error || null);
+      } catch (error) {
+        errLog("firecrawl unavailable; using direct fallback", (error as Error).message);
+      }
     }
+    if (!data?.markdown) data = await scrapeDirect(url);
 
-    // Firecrawl v2 shape: { success, data: { markdown, metadata, ... } }
-    const data = fcJson?.data ?? fcJson;
     const markdown: string = data?.markdown || "";
     const metadata = data?.metadata || {};
     if (!markdown) {

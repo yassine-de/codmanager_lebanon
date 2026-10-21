@@ -226,6 +226,15 @@ wird. Erst der Agent entscheidet nach dem Gespräch über Bestätigung oder
 Stornierung. Der interne Live-Testauftrag dafür ist
 `WA-TEST-20261021-RETENTION` (`SYSTEM ID 7096`).
 
+Für Produktfragen ist `product-context-fetch` jetzt im Lebanon-Projekt
+deployed. Wenn kein Firecrawl-Schlüssel vorhanden ist, liest die Funktion die
+Shopseite direkt und übernimmt sichere strukturierte Angaben wie Produktname,
+aktuellen Preis, Vergleichspreis, Varianten und Produktbild. Der Fallback wurde
+mit `DrMelaxin ضد التجاعيد` erfolgreich geprüft und der interne Testauftrag
+7096 vorübergehend mit diesem echten Katalogprodukt verknüpft. Freie
+Produkteigenschaften werden nicht erfunden; dafür muss die Shopseite eine
+Beschreibung enthalten.
+
 ## Empfohlener nächster Schritt
 
 1. Den internen Testauftrag kontrolliert auf den Zustand vor der
