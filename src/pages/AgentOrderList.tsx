@@ -185,7 +185,9 @@ export default function AgentOrderList() {
       if (error) throw error;
       return (data || []) as OrderRow[];
     },
-    refetchInterval: 30000,
+    // Keep the operational list fresh while avoiding a full-history download
+    // every 30 seconds. Agents can still use the explicit Refresh button.
+    refetchInterval: 60_000,
   });
 
   const productsQuery = useQuery({

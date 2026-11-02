@@ -264,7 +264,9 @@ export function useDashboardData(dateRange?: DateRange) {
   const { data: allOrders = [], isLoading, error } = useQuery({
     queryKey: ["dashboard-orders"],
     queryFn: fetchAllDashboardOrders,
-    refetchInterval: 30_000, // refresh every 30s so chart picks up new confirmations live
+    // This query transfers the complete order history. Refreshing on focus keeps
+    // the dashboard current without downloading every order every 30 seconds.
+    refetchInterval: 5 * 60_000,
     refetchOnWindowFocus: true,
   });
 

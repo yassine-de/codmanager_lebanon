@@ -117,7 +117,7 @@ export function AppSidebar() {
       if (error) throw error;
       return count || 0;
     },
-    refetchInterval: 30000,
+    refetchInterval: 60_000,
   });
 
   const { data: sourcingUnseen = 0 } = useQuery({
@@ -131,7 +131,7 @@ export function AppSidebar() {
       return count || 0;
     },
     enabled: features.sourcing && isSeller && !!authUser,
-    refetchInterval: 15000,
+    refetchInterval: 60_000,
   });
 
   const isAdmin = authUser?.role === "admin";
@@ -146,7 +146,7 @@ export function AppSidebar() {
       return count || 0;
     },
     enabled: features.sourcing && isAdmin && !!authUser,
-    refetchInterval: 15000,
+    refetchInterval: 60_000,
   });
 
   const { data: productUnseen = 0 } = useQuery({
@@ -160,7 +160,7 @@ export function AppSidebar() {
       return count || 0;
     },
     enabled: isSeller && !!authUser,
-    refetchInterval: 15000,
+    refetchInterval: 60_000,
   });
 
   const { data: supportUnread = 0 } = useQuery({
@@ -175,7 +175,7 @@ export function AppSidebar() {
       return count || 0;
     },
     enabled: features.support && isAdmin && !!authUser,
-    refetchInterval: 10000,
+    refetchInterval: 60_000,
   });
 
   const { data: agentNewOrders = 0 } = useQuery({
@@ -189,7 +189,7 @@ export function AppSidebar() {
       return count || 0;
     },
     enabled: features.agentAssignment && isAgent && !!authUser,
-    refetchInterval: 15000,
+    refetchInterval: 60_000,
   });
 
   const { data: pendingAdjustments = 0 } = useQuery({
@@ -203,7 +203,7 @@ export function AppSidebar() {
       return count || 0;
     },
     enabled: features.whatsapp && isAdmin && !!authUser,
-    refetchInterval: 15000,
+    refetchInterval: 60_000,
   });
 
   const { data: whatsappInboxUnread = 0 } = useQuery({
@@ -242,7 +242,9 @@ export function AppSidebar() {
       return unreadConvs.size;
     },
     enabled: isAdmin && !!authUser,
-    refetchInterval: 10000,
+    // This query currently downloads recent message metadata to calculate the
+    // badge. Keep the badge useful without repeating that transfer every 10s.
+    refetchInterval: 60_000,
   });
 
   const { data: followUpPending = 0 } = useQuery({
@@ -256,7 +258,7 @@ export function AppSidebar() {
       return count || 0;
     },
     enabled: features.followUps && isFollowUp && !!authUser,
-    refetchInterval: 15000,
+    refetchInterval: 60_000,
   });
 
   const navItems = getNavItems(orderCount, sourcingUnseen, adminSourcingUnseen, productUnseen, supportUnread, agentNewOrders, pendingAdjustments, followUpPending);

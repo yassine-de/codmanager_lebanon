@@ -1,6 +1,6 @@
 # Übergabe – COD Lebanon
 
-Stand: 21. Oktober 2026
+Stand: 2. November 2026
 
 ## Repository
 
@@ -10,6 +10,30 @@ Stand: 21. Oktober 2026
 - Produktionsdomain: `https://cod-service.com`
 
 Diese Datei enthält bewusst keine Zugangsdaten, API-Keys oder Tokens.
+
+## Supabase-Verbrauch und lokale Optimierung
+
+Die Organisation `CODLEBANON` hat im Abrechnungszeitraum vom 02.10.2026 bis
+02.11.2026 mit 5,72 GB das Free-Plan-Egress-Limit von 5 GB überschritten. Die
+Log-Ingestion lag gleichzeitig bei 2,565 GB von 1 GB. Cached Egress (0,13 GB)
+und Storage (0,011 GB) waren niedrig. Das regelmäßige tägliche Verbrauchsmuster
+passt zu den häufigen Datenbankabfragen der Anwendung.
+
+Am 02.11.2026 wurde deshalb eine erste risikoarme Optimierungsstufe lokal
+vorbereitet:
+
+- Dashboard: vollständige Bestellhistorie weiterhin unverändert, automatischer
+  Refresh von 30 Sekunden auf 5 Minuten reduziert; beim Fensterfokus wird
+  weiterhin aktualisiert.
+- Agenten-Bestellliste: vollständige Liste und manueller Refresh unverändert,
+  automatischer Refresh von 30 auf 60 Sekunden reduziert.
+- Sidebar-Zähler: Refresh auf 60 Sekunden vereinheitlicht; Abfragen und
+  Berechnungen selbst wurden nicht verändert.
+
+Diese Änderungen betreffen ausschließlich Leseintervalle. Bestellstatus,
+Schreibvorgänge, WhatsApp, Wakilni und Berechtigungen wurden nicht geändert.
+Die Optimierung wurde am 02.11.2026 nach erfolgreichen Tests und erfolgreichem
+Produktions-Build für den kontrollierten Produktions-Rollout freigegeben.
 
 ## Aktueller WhatsApp-Stand
 
