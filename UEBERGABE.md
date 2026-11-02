@@ -33,7 +33,9 @@ vorbereitet:
 Diese Änderungen betreffen ausschließlich Leseintervalle. Bestellstatus,
 Schreibvorgänge, WhatsApp, Wakilni und Berechtigungen wurden nicht geändert.
 Die Optimierung wurde am 02.11.2026 nach erfolgreichen Tests und erfolgreichem
-Produktions-Build für den kontrollierten Produktions-Rollout freigegeben.
+Produktions-Build kontrolliert auf Netlify veröffentlicht. Die Produktionsdomain
+lieferte danach `HTTP 200` und das neue JavaScript-Bundle aus. Netlify Deploy-ID:
+`6ae85810898432b0db0bc9a8`.
 
 ## Aktueller WhatsApp-Stand
 
